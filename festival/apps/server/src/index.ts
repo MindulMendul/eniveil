@@ -32,6 +32,26 @@ const broadcast = () => {
     }
   }
 };
+const notifyTemporal = (action: "start" | "event" | "end", payload: object) => {
+  const baseUrl = process.env.TEMPORAL_GATEWAY_URL;
+  const token = process.env.TEMPORAL_GATEWAY_TOKEN;
+  if (!baseUrl || !token) return;
+
+  void fetch(new URL(`/internal/sessions/${action}`, baseUrl), {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(3000),
+  }).then((response) => {
+    if (!response.ok)
+      console.error(`Temporal session notification failed: ${response.status}`);
+  }).catch((error) => {
+    console.error("Temporal session notification failed", error);
+  });
+};
 setInterval(broadcast, 30000).unref();
 const allowed = (origin: string, url: string) =>
   origin === (process.env.APP_ORIGIN ?? new URL(url).origin) ||
@@ -139,7 +159,25 @@ app.get(
             throw Error("올바르지 않은 메시지야.");
           const command = commandSchema.parse(JSON.parse(event.data));
           requestId = command.requestId;
+          const room = game.needRoom(me.id);
+          const previousSessionId = room.sessionId;
           game.command(me, command);
+          const sessionId = room.sessionId ?? previousSessionId;
+          if (command.type === "start" && sessionId) {
+            notifyTemporal("start", { sessionId });
+          } else if (command.type === "return" && previousSessionId) {
+            notifyTemporal("end", { sessionId: previousSessionId });
+          } else if (
+            (command.type === "advance" || command.type === "vote") &&
+            sessionId
+          ) {
+            const session = game.state.sessions[sessionId];
+            if (session)
+              notifyTemporal("event", {
+                sessionId,
+                phase: session.phase,
+              });
+          }
           broadcast();
           ws.send(JSON.stringify({ type: "ack", requestId }));
         } catch (error) {
