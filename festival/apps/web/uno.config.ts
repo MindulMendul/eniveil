@@ -3,11 +3,12 @@ import { defineConfig, presetWind4 } from "unocss";
 export default defineConfig({
   presets: [
     presetWind4({
-      preflights: {
-        reset: false,
-      },
+      preflights: { reset: false },
     }),
   ],
+  content: {
+    filesystem: ["src/**/*.{astro,svelte,html}"],
+  },
   theme: {
     colors: {
       festival: {

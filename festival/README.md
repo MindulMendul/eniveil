@@ -28,6 +28,10 @@ bun run start  # http://localhost:3000
 - `packages/shared`: Zod 입력 검증, API/WS 통신 타입. 비밀 콘텐츠 없음.
 - `deploy`: OCI용 Docker Compose와 Nginx 설정 예시.
 
+## UI 스타일
+
+웹 UI는 UnoCSS의 Wind4 프리셋을 사용합니다. `apps/web/uno.config.ts`에 축제 색상과 폰트 토큰이 있고, Astro와 Svelte 컴포넌트에서 `bg-festival-panel`, `text-festival-text`, `font-serif` 같은 유틸리티를 사용할 수 있습니다. 기존 CSS는 유지하며 새 UI부터 점진적으로 적용합니다.
+
 의존성 설치와 실행 명령은 루트에서 관리합니다. 프론트·백은 별도 workspace 패키지이며 함께 빌드·배포할 수 있습니다.
 
 ## 현재 구현
