@@ -1,0 +1,8 @@
+[pr_reviewer]
+extra_instructions = """
+Review this repository as a security-sensitive multiplayer game. Prioritize authorization,
+privacy of role and clue data, WebSocket reconnect and concurrency behavior, persistence
+consistency, and deployment safety. Report only actionable findings with file and line
+references. Treat generated suggestions as advisory; the existing CI checks remain the
+merge gate.
+"""
