@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-worker
+  namespace: festival
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: temporal-worker
+  template:
+    metadata:
+      labels:
+        app: temporal-worker
+    spec:
+      containers:
+        - name: worker
+          image: REPLACE_WITH_TEMPORAL_WORKER_IMAGE
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: internal-http
+              containerPort: 8081
+          env:
+            - name: PORT
+              value: "8081"
+            - name: TEMPORAL_TASK_QUEUE
+              value: festival-room-sessions
+            - name: TEMPORAL_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: festival-temporal
+                  key: address
+            - name: TEMPORAL_NAMESPACE
+              valueFrom:
+                secretKeyRef:
+                  name: festival-temporal
+                  key: namespace
+            - name: TEMPORAL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: festival-temporal
+                  key: api-key
+                  optional: true
+            - name: TEMPORAL_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: festival-temporal
+                  key: gateway-token
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: [ALL]
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: internal-http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: internal-http
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-worker
+  namespace: festival
+spec:
+  selector:
+    app: temporal-worker
+  ports:
+    - name: internal-http
+      port: 8081
+      targetPort: internal-http
