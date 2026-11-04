@@ -98,6 +98,7 @@ jobs:
           test -n "$TEMPORAL_NAMESPACE" || { echo "TEMPORAL_NAMESPACE secret is required"; exit 1; }
           test -n "$TEMPORAL_GATEWAY_TOKEN" || { echo "TEMPORAL_GATEWAY_TOKEN secret is required"; exit 1; }
           sed -i "s|namespace: festival|namespace: $APP_NAMESPACE|g" deploy/k8s/temporal-worker.yaml
+          sed -i "s|name: festival$|name: $APP_NAMESPACE|" deploy/k8s/namespace.yaml
           kubectl apply -f deploy/k8s/namespace.yaml
           kubectl -n "$APP_NAMESPACE" create secret generic festival-temporal \
             --from-literal=address="$TEMPORAL_ADDRESS" \
