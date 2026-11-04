@@ -1,0 +1,21 @@
+{
+  "name": "strange-festival",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun scripts/dev.ts",
+    "build": "bun run --cwd apps/web build",
+    "start": "bun apps/server/src/index.ts",
+    "check": "bun run --cwd apps/web check && bunx tsc -p apps/server/tsconfig.json --noEmit",
+    "test": "bun test apps/server",
+    "verify": "bun run check && bun run build && bun run test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/bun": "^1.3.0"
+  }
+}

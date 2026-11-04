@@ -1,0 +1,9 @@
+{
+  "name": "@festival/server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@festival/shared": "workspace:*",
+    "hono": "^4.13.0"
+  }
+}

@@ -1,0 +1,5 @@
+node_modules
+.git
+data
+.env
+apps/web/dist
