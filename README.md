@@ -80,6 +80,10 @@ APP_ORIGIN=https://your-domain.example docker compose -f deploy/compose.yaml up 
 - 볼륨 `festival-data`를 유지해야 합니다. 삭제하면 데이터가 사라집니다.
 - SQLite 파일은 실행 중 단순 복사하지 말고 SQLite online backup 또는 정지 후 백업을 사용하세요.
 
+## UI 스타일
+
+`apps/web`는 UnoCSS Wind4 프리셋만으로 화면 스타일을 생성합니다. 색상·폰트 토큰과 공통 화면 단축 클래스는 `apps/web/uno.config.ts`에서 관리하며, Svelte/Astro 마크업의 클래스를 UnoCSS가 추출합니다. 화면별 별도 CSS 파일은 사용하지 않습니다.
+
 ## CI/CD와 새 인프라 골격
 
 - GitHub Actions의 `.github/workflows/ci.yml`은 PR과 `main` 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 기존 자동 테스트 suite는 이 CI에서 실행하지 않습니다.
