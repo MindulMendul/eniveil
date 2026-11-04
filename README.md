@@ -80,7 +80,11 @@ APP_ORIGIN=https://your-domain.example docker compose -f deploy/compose.yaml up 
 - 볼륨 `festival-data`를 유지해야 합니다. 삭제하면 데이터가 사라집니다.
 - SQLite 파일은 실행 중 단순 복사하지 말고 SQLite online backup 또는 정지 후 백업을 사용하세요.
 
-## 브랜치 운영\n\n- `feat/<작업명>` 브랜치에서 개발하고 PR을 `dev`로 보냅니다. `dev`에서 통합한 변경은 PR로 `qa`에 승격하고, QA가 끝난 변경은 PR로 `main`에 승격합니다.\n- `qa`에 반영되면 QA 환경에 자동 배포되고, `main`에 반영되면 production 환경에 배포됩니다. 방마다 Pod를 만들지 않고, 세션은 Temporal Workflow Execution으로 관리합니다.\n- PR은 항상 `feat/* → dev`, `dev → qa`, `qa → main` 순서로 엽니다.\n- 이 흐름을 강제하려면 GitHub Settings → Rules → Rulesets에서 `dev`, `qa`, `main`에 직접 push 금지와 PR 필수 규칙을 설정해야 합니다. `production` Environment에는 required reviewers를 지정해야 배포 승인 절차가 실제로 적용됩니다.\n\n## CI/CD와 새 인프라 골격
+## UI 스타일
+
+`apps/web`는 UnoCSS Wind4 프리셋만으로 화면 스타일을 생성합니다. 색상·폰트 토큰과 공통 화면 단축 클래스는 `apps/web/uno.config.ts`에서 관리하며, Svelte/Astro 마크업의 클래스를 UnoCSS가 추출합니다. 화면별 별도 CSS 파일은 사용하지 않습니다.
+
+## CI/CD와 새 인프라 골격
 
 - GitHub Actions의 `.github/workflows/ci.yml`은 `dev`, `qa`, `main` 대상 PR과 각 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 자동 테스트 suite는 아직 CI에 포함하지 않았습니다.
 - `.github/workflows/deploy-oci.yml`은 `qa` 푸시를 `festival-qa` 네임스페이스에, `main` 푸시를 `festival` 네임스페이스에 배포합니다. 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`와 OCIR secrets가 필요합니다. `qa`와 `production` GitHub Environments에는 각 환경의 `APP_ORIGIN`, `KUBECONFIG_B64` 및 Temporal secrets를 따로 설정합니다.
