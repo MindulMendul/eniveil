@@ -21,8 +21,8 @@ export default defineConfig({
       },
     },
     font: {
-      sans: '\"Noto Sans KR\", sans-serif',
-      serif: '\"Noto Serif KR\", serif',
+      sans: '"Noto Sans KR", sans-serif',
+      serif: '"Noto Serif KR", serif',
     },
   },
 });
