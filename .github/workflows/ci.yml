@@ -18,12 +18,12 @@ jobs:
         with:
           bun-version: 1.4.4
       - name: Install locked dependencies
-        working-directory: festival
+        working-directory: .
         run: bun install --frozen-lockfile
       - name: Check and build
-        working-directory: festival
+        working-directory: .
         run: bun run check && bun run build
       - name: Build API container
-        run: docker build -f festival/deploy/Dockerfile festival
+        run: docker build -f deploy/Dockerfile .
       - name: Build Temporal worker container
-        run: docker build -f festival/deploy/temporal-worker.Dockerfile festival
+        run: docker build -f deploy/temporal-worker.Dockerfile .
