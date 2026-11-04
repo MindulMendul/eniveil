@@ -1,2 +1,3 @@
-import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
+import { vitePreprocess } from "@astrojs/svelte";
+
 export default { preprocess: vitePreprocess() };
