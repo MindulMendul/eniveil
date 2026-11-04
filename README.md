@@ -80,10 +80,10 @@ APP_ORIGIN=https://your-domain.example docker compose -f deploy/compose.yaml up 
 - 볼륨 `festival-data`를 유지해야 합니다. 삭제하면 데이터가 사라집니다.
 - SQLite 파일은 실행 중 단순 복사하지 말고 SQLite online backup 또는 정지 후 백업을 사용하세요.
 
-## CI/CD와 새 인프라 골격
+## 브랜치 운영\n\n- `feat/<작업명>` 브랜치에서 개발하고 PR을 `dev`로 보냅니다. `dev`에서 통합한 변경은 PR로 `qa`에 승격하고, QA가 끝난 변경은 PR로 `main`에 승격합니다.\n- `qa`에 반영되면 QA 환경에 자동 배포되고, `main`에 반영되면 production 환경에 배포됩니다. 방마다 Pod를 만들지 않고, 세션은 Temporal Workflow Execution으로 관리합니다.\n- PR은 항상 `feat/* → dev`, `dev → qa`, `qa → main` 순서로 엽니다.\n- 이 흐름을 강제하려면 GitHub Settings → Rules → Rulesets에서 `dev`, `qa`, `main`에 직접 push 금지와 PR 필수 규칙을 설정해야 합니다. `production` Environment에는 required reviewers를 지정해야 배포 승인 절차가 실제로 적용됩니다.\n\n## CI/CD와 새 인프라 골격
 
-- GitHub Actions의 `.github/workflows/ci.yml`은 PR과 `main` 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 기존 자동 테스트 suite는 이 CI에서 실행하지 않습니다.
-- `.github/workflows/deploy-oci.yml`은 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`, `APP_ORIGIN`이 준비된 경우 OCIR에 이미지를 올리고 k3s에 배포합니다. 필요한 Actions secrets는 `OCIR_USERNAME`, `OCIR_AUTH_TOKEN`, `KUBECONFIG_B64`입니다.
+- GitHub Actions의 `.github/workflows/ci.yml`은 `dev`, `qa`, `main` 대상 PR과 각 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 자동 테스트 suite는 아직 CI에 포함하지 않았습니다.
+- `.github/workflows/deploy-oci.yml`은 `qa` 푸시를 `festival-qa` 네임스페이스에, `main` 푸시를 `festival` 네임스페이스에 배포합니다. 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`와 OCIR secrets가 필요합니다. `qa`와 `production` GitHub Environments에는 각 환경의 `APP_ORIGIN`, `KUBECONFIG_B64` 및 Temporal secrets를 따로 설정합니다.
 - API의 k3s replicas는 1로 고정했습니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
 - Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. `TEMPORAL_ENABLED=true`일 때 별도 배포하며 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
 - 방마다 Pod를 띄우지 않습니다. 세션마다 Temporal Workflow Execution을 만들고, 공용 Worker Deployment가 task queue에서 여러 세션을 처리합니다. Worker는 부하에 따라 별도로 scale할 수 있습니다.
