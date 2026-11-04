@@ -1,6 +1,6 @@
 # 이상한 축제
 
-Svelte CSR + Hono + Bun 기반 머더 미스터리 모노레포. 배포 시 Bun 서버 하나가 정적 화면, HTTP API, WebSocket을 제공합니다.
+Astro 정적 사이트 + Svelte 5 인터랙티브 화면 + Hono + Bun 기반 머더 미스터리 모노레포. 배포 시 Bun 서버 하나가 정적 화면, HTTP API, WebSocket을 제공합니다.
 
 ## 빠른 시작
 
@@ -23,7 +23,7 @@ bun run start  # http://localhost:3000
 
 ## 구조
 
-- `apps/web`: Svelte 5 + Vite, SSR 없음. 게스트 진입·로비·대기방·게임 화면.
+- `apps/web`: Astro 정적 빌드가 Svelte 5 화면을 마운트합니다. 현재 게임 화면은 브라우저에서 동작하며 기존 Hono API를 `fetch`로 호출하고 WebSocket으로 실시간 상태를 받습니다.
 - `apps/server`: Hono HTTP + Bun WebSocket, 게스트 인증·방·세션·SQLite 저장.
 - `packages/shared`: Zod 입력 검증, API/WS 통신 타입. 비밀 콘텐츠 없음.
 - `deploy`: OCI용 Docker Compose와 Nginx 설정 예시.

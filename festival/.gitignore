@@ -3,3 +3,5 @@ apps/web/dist/
 data/
 .env
 *.sqlite*
+
+apps/web/.astro/

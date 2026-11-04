@@ -1,14 +1,23 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "astro/client"
+    ],
     "allowJs": true,
     "checkJs": true
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.svelte",
+    ".astro/types.d.ts",
+    "src/**/*",
     "../../packages/shared/src/**/*.ts"
+  ],
+  "exclude": [
+    "dist"
   ]
 }
