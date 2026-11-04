@@ -22,8 +22,8 @@ jobs:
           password: ${{ secrets.OCIR_AUTH_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
-          context: festival
-          file: festival/deploy/Dockerfile
+          context: .
+          file: deploy/Dockerfile
           push: true
           tags: ${{ env.OCI_IMAGE }}
       - uses: azure/setup-kubectl@v4
@@ -40,11 +40,11 @@ jobs:
         run: |
           test -n "$APP_ORIGIN" || { echo "APP_ORIGIN repository variable is required"; exit 1; }
           APP_HOST="${APP_ORIGIN#https://}"
-          sed -i "s|https://festival.example.com|$APP_ORIGIN|" festival/deploy/k8s/app.yaml
-          sed -i "s|festival.example.com|$APP_HOST|g" festival/deploy/k8s/app.yaml
-          sed -i "s|REPLACE_WITH_OCIR_IMAGE|$OCI_IMAGE|" festival/deploy/k8s/app.yaml
-          kubectl apply -f festival/deploy/k8s/namespace.yaml
-          kubectl apply -f festival/deploy/k8s/app.yaml
+          sed -i "s|https://festival.example.com|$APP_ORIGIN|" deploy/k8s/app.yaml
+          sed -i "s|festival.example.com|$APP_HOST|g" deploy/k8s/app.yaml
+          sed -i "s|REPLACE_WITH_OCIR_IMAGE|$OCI_IMAGE|" deploy/k8s/app.yaml
+          kubectl apply -f deploy/k8s/namespace.yaml
+          kubectl apply -f deploy/k8s/app.yaml
           kubectl rollout status deployment/festival-api -n festival --timeout=180s
 
   deploy-temporal-worker:
@@ -62,8 +62,8 @@ jobs:
           password: ${{ secrets.OCIR_AUTH_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
-          context: festival
-          file: festival/deploy/temporal-worker.Dockerfile
+          context: .
+          file: deploy/temporal-worker.Dockerfile
           push: true
           tags: ${{ env.OCI_IMAGE }}
       - uses: azure/setup-kubectl@v4
@@ -84,15 +84,15 @@ jobs:
           test -n "$TEMPORAL_ADDRESS" || { echo "TEMPORAL_ADDRESS secret is required"; exit 1; }
           test -n "$TEMPORAL_NAMESPACE" || { echo "TEMPORAL_NAMESPACE secret is required"; exit 1; }
           test -n "$TEMPORAL_GATEWAY_TOKEN" || { echo "TEMPORAL_GATEWAY_TOKEN secret is required"; exit 1; }
-          kubectl apply -f festival/deploy/k8s/namespace.yaml
+          kubectl apply -f deploy/k8s/namespace.yaml
           kubectl -n festival create secret generic festival-temporal \
             --from-literal=address="$TEMPORAL_ADDRESS" \
             --from-literal=namespace="$TEMPORAL_NAMESPACE" \
             --from-literal=api-key="$TEMPORAL_API_KEY" \
             --from-literal=gateway-token="$TEMPORAL_GATEWAY_TOKEN" \
             --dry-run=client -o yaml | kubectl apply -f -
-          sed -i "s|REPLACE_WITH_TEMPORAL_WORKER_IMAGE|$OCI_IMAGE|" festival/deploy/k8s/temporal-worker.yaml
-          kubectl apply -f festival/deploy/k8s/temporal-worker.yaml
+          sed -i "s|REPLACE_WITH_TEMPORAL_WORKER_IMAGE|$OCI_IMAGE|" deploy/k8s/temporal-worker.yaml
+          kubectl apply -f deploy/k8s/temporal-worker.yaml
           kubectl rollout status deployment/temporal-worker -n festival --timeout=180s
           kubectl rollout restart deployment/festival-api -n festival
           kubectl rollout status deployment/festival-api -n festival --timeout=180s
