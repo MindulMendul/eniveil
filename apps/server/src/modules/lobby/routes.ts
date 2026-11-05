@@ -42,7 +42,7 @@ export function createLobbyRoutes(deps: {
     const integer = (key: string, fallback: number, min: number, max: number) => {
       const raw = query[key];
       if (raw === undefined) return fallback;
-      if (!/^\\d+$/.test(raw)) throw Error(`Invalid ${key} parameter.`);
+      if (!/^\d+$/.test(raw)) throw Error(`Invalid ${key} parameter.`);
       const value = Number(raw);
       if (!Number.isSafeInteger(value) || value < min || value > max)
         throw Error(`${key} must be between ${min} and ${max}.`);
