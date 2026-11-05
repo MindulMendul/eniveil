@@ -233,7 +233,7 @@
   {/if}
 
   {#if loading}
-    <main class="main center"><p>축제의 문을 여는 중…</p></main>
+    <main class="main center"><p>{t("workshopLoading")}</p></main>
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} onLogin={login} />
   {:else if currentPath === "/workshop"}

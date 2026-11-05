@@ -9,11 +9,11 @@
 </script>
 
 <footer class="footer">
-  <span>THE STRANGE FESTIVAL</span>
+  <span>{t("brandSubtitle")}</span>
   <span class="footer-tagline">{t("footerTagline")}</span>
   {#if snapshot}
     <span class:offline={!connected}>{connected ? t("connected") : t("disconnected")}</span>
   {:else}
-    <span>MURDER MYSTERY CLUB</span>
+    <span>{t("homeTitle")}</span>
   {/if}
 </footer>

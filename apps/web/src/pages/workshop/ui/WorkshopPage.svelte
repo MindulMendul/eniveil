@@ -89,11 +89,11 @@
 <main class="main">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">THE STORY WORKSHOP</p>
+      <p class="eyebrow">INTERACTIVE STORY CATALOG</p>
       <h1 class="heading-one">{t("workshopTitle")}</h1>
       <p class="muted">{t("workshopDescription")}</p>
     </div>
-    <a class="text-button" href={locale === "en" ? "/en/" : "/"}>← {t("backToFestival")}</a>
+    <a class="text-button" href={locale === "en" ? "/en/" : "/"}>← {t("backToPlatform")}</a>
   </div>
 
   <aside class="panel mb-6" role="note"><p class="muted m-0">{t("workshopAuthoringSoon")}</p></aside>

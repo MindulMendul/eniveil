@@ -28,7 +28,7 @@
 <main class="main">
   <div class="page-heading">
     <div>
-      <p class="eyebrow">THE LOBBY</p>
+      <p class="eyebrow">{t("lobbyEyebrow")}</p>
       <h1 class="heading-one">{t("lobbyTitle")}</h1>
       <p class="muted">{t("lobbyDescription")}</p>
     </div>
@@ -70,7 +70,7 @@
     {#if !snapshot.rooms.length}
       <div class="empty">
         <span class="empty-symbol">✧</span>
-        <h3 class="heading-three">{t("quietFestival")}</h3>
+        <h3 class="heading-three">{t("noOpenRooms")}</h3>
         <p class="empty-copy">{t("createFirstRoom")}</p>
       </div>
     {:else}
