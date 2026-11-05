@@ -69,7 +69,7 @@
 
   function connect() {
     if (disposed) return;
-    socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`);
+    socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/lobby/ws`);
     socket.onopen = () => {
       connected = true;
       error = "";
@@ -99,7 +99,7 @@
       if (!disposed) {
         reconnectTimer = setTimeout(async () => {
           try {
-            snapshot = await api("/state");
+            snapshot = await api("/lobby/state");
             connect();
           } catch (cause) {
             if ((cause as { status?: number }).status === 401) {
@@ -146,24 +146,24 @@
 
   async function login() {
     await action(async () => {
-      await api("/guest", { nickname });
-      snapshot = await api("/state");
+      await api("/platform/guest", { nickname });
+      snapshot = await api("/lobby/state");
       connect();
     });
   }
 
   async function create(scenarioId: string) {
     await action(async () => {
-      await api("/rooms", { scenarioId });
-      snapshot = await api("/state");
+      await api("/lobby/rooms", { scenarioId });
+      snapshot = await api("/lobby/state");
       picker = false;
     });
   }
 
   async function join(invite = code) {
     await action(async () => {
-      await api("/rooms/join", { code: invite });
-      snapshot = await api("/state");
+      await api("/lobby/rooms/join", { code: invite });
+      snapshot = await api("/lobby/state");
       code = "";
     });
   }
@@ -187,7 +187,7 @@
     window.addEventListener("popstate", syncLocale);
     void (async () => {
       try {
-        snapshot = await api("/state");
+        snapshot = await api("/lobby/state");
         connect();
       } catch (cause) {
         if ((cause as { status?: number }).status !== 401) {
