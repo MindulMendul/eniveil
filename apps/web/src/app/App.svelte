@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
+  import { gameModes } from "./game-modes.js";
   import { getLocaleFromPath, localePath, translate } from "../shared/lib";
 
   import { EntryPage } from "../pages/entry";
@@ -147,8 +148,12 @@
 
   function startSolo() {
     if (!snapshot) return;
-    picker = false;
     soloActive = true;
+  }
+
+  function selectGameMode(modeId: string) {
+    if (modeId === "solo") startSolo();
+    if (modeId === "host") picker = true;
   }
 
   async function login() {
@@ -242,7 +247,8 @@
       {busy}
       {connected}
       {t}
-      onOpenStoryPicker={() => (picker = true)}
+      {gameModes}
+      onSelectMode={selectGameMode}
       onJoin={join}
     />
   {:else if !session}
@@ -272,6 +278,5 @@
   {t}
   onClose={() => (picker = false)}
   onWorkshop={openWorkshop}
-  onSolo={startSolo}
   onCreate={create}
 />
