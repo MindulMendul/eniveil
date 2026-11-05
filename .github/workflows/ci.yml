@@ -18,10 +18,8 @@ jobs:
         with:
           bun-version: 1.4.4
       - name: Install locked dependencies
-        working-directory: .
         run: bun install --frozen-lockfile
       - name: Check and build
-        working-directory: .
         run: bun run check && bun run build
       - name: Build API container
         run: docker build -t festival-api:${{ github.sha }} -f deploy/Dockerfile .
