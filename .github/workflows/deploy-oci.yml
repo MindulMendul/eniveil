@@ -1,4 +1,4 @@
-name: Deploy to OCI k3s
+name: Deploy to OCI with Docker Compose
 
 on:
   push:
@@ -17,6 +17,7 @@ jobs:
     environment:
       name: ${{ github.ref_name == 'main' && 'production' || 'qa' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       APP_NAMESPACE: ${{ github.ref_name == 'main' && 'festival' || 'festival-qa' }}
       OCI_IMAGE: ${{ vars.OCI_REGISTRY }}/festival-api:${{ github.sha }}
@@ -86,15 +87,19 @@ jobs:
         env:
           KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
         run: |
-          mkdir -p "$HOME/.kube"
-          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-      - name: Apply worker and Temporal credentials
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy latest main with Docker Compose
         env:
-          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS }}
-          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE }}
-          TEMPORAL_API_KEY: ${{ secrets.TEMPORAL_API_KEY }}
-          TEMPORAL_GATEWAY_TOKEN: ${{ secrets.TEMPORAL_GATEWAY_TOKEN }}
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           test -n "$TEMPORAL_ADDRESS" || { echo "TEMPORAL_ADDRESS secret is required"; exit 1; }
           test -n "$TEMPORAL_NAMESPACE" || { echo "TEMPORAL_NAMESPACE secret is required"; exit 1; }
