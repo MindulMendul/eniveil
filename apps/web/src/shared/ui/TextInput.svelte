@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { HTMLInputAttributes } from "svelte/elements";
+
   let {
     id,
     value = $bindable(""),
@@ -12,7 +14,7 @@
     maxlength?: number;
     placeholder?: string;
     required?: boolean;
-    autocomplete?: string;
+    autocomplete?: HTMLInputAttributes["autocomplete"];
   } = $props();
 </script>
 
