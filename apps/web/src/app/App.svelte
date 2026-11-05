@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
+  import { SoloGame } from "../pages/solo";
+  import { getLocaleFromPath, localePath, translate } from "../shared/lib";
 
   import { EntryPage } from "../pages/entry";
   import { GamePage } from "../pages/game";
@@ -20,6 +22,9 @@
   let loading = $state(true);
   let picker = $state(false);
   let copied = $state(false);
+  let locale = $state<"ko" | "en">(getLocaleFromPath(location.pathname));
+  let soloActive = $state(false);
+  const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
   let socket: WebSocket | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -125,6 +130,12 @@
     socket.send(JSON.stringify({ type, requestId, ...(targetId ? { targetId } : {}) }));
   }
 
+  function changeLocale(next: "ko" | "en") {
+    locale = next;
+    document.documentElement.lang = next;
+    history.pushState({}, "", `${localePath(next, location.pathname)}${location.search}${location.hash}`);
+  }
+
   async function login() {
     await action(async () => {
       await api("/guest", { nickname });
@@ -160,6 +171,11 @@
   }
 
   onMount(() => {
+    const syncLocale = () => {
+      locale = getLocaleFromPath(location.pathname);
+      document.documentElement.lang = locale;
+    };
+    window.addEventListener("popstate", syncLocale);
     void (async () => {
       try {
         snapshot = await api("/state");
@@ -176,6 +192,7 @@
 
     return () => {
       disposed = true;
+      window.removeEventListener("popstate", syncLocale);
       clearTimeout(reconnectTimer);
       for (const timeout of pending.values()) clearTimeout(timeout);
       socket?.close();
@@ -184,11 +201,11 @@
 </script>
 
 <svelte:head>
-  <title>{room ? `${room.title} · 이상한 축제` : "이상한 축제 · 머더 미스터리"}</title>
+  <title>{room ? `${room.title} · ${t("brand")}` : t("homeTitle")}</title>
 </svelte:head>
 
 <div class="shell">
-  <AppHeader {snapshot} {connected} />
+  <AppHeader {snapshot} {connected} {locale} {t} onLocaleChange={changeLocale} />
 
   {#if error}
     <ErrorNotice message={error} onDismiss={() => (error = "")} />
@@ -196,10 +213,21 @@
 
   {#if loading}
     <main class="main center"><p>축제의 문을 여는 중…</p></main>
+  {:else if soloActive}
+    <main class="main"><SoloGame {locale} onExit={() => (soloActive = false)} /></main>
   {:else if !snapshot}
-    <EntryPage bind:nickname {busy} onLogin={login} />
+    <EntryPage bind:nickname {busy} {t} onLogin={login} onSolo={() => (soloActive = true)} />
   {:else if !room}
-    <LobbyPage bind:code {snapshot} {busy} {connected} onOpenStoryPicker={() => (picker = true)} onJoin={join} />
+    <LobbyPage
+      bind:code
+      {snapshot}
+      {busy}
+      {connected}
+      {t}
+      onOpenStoryPicker={() => (picker = true)}
+      onJoin={join}
+      onSolo={() => (soloActive = true)}
+    />
   {:else if !session}
     <RoomPage
       {snapshot}
@@ -216,7 +244,7 @@
     <GamePage {room} {session} {host} {busy} {connected} onCommand={command} />
   {/if}
 
-  <AppFooter {snapshot} {connected} />
+  <AppFooter {snapshot} {connected} {t} />
 </div>
 
 <StoryPickerDialog
@@ -224,6 +252,7 @@
   scenarios={snapshot?.scenarios ?? []}
   {busy}
   {connected}
+  {t}
   onClose={() => (picker = false)}
   onCreate={create}
 />

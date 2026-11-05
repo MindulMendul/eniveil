@@ -4,6 +4,11 @@ import UnoCSS from "@unocss/astro";
 
 export default defineConfig({
   output: "static",
+  i18n: {
+    locales: ["ko", "en"],
+    defaultLocale: "ko",
+    routing: { prefixDefaultLocale: false },
+  },
   integrations: [svelte(), UnoCSS()],
   server: { host: "0.0.0.0", port: 5173 },
   vite: {

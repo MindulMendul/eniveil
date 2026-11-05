@@ -5,12 +5,13 @@
     code = $bindable(""),
     busy,
     connected,
+    t,
     onSubmit,
-  }: { code?: string; busy: boolean; connected: boolean; onSubmit: () => void } = $props();
+  }: { code?: string; busy: boolean; connected: boolean; t: (key: string) => string; onSubmit: () => void } = $props();
 </script>
 
 <form onsubmit={(event) => { event.preventDefault(); onSubmit(); }}>
-  <label class="input-label join-label" for="code">6자리 초대 코드</label>
+  <label class="input-label join-label" for="code">{t("inviteCodeLabel")}</label>
   <TextInput
     id="code"
     bind:value={code}
@@ -19,6 +20,6 @@
     autocomplete="off"
   />
   <Button variant="secondary" type="submit" disabled={busy || !connected || code.trim().length !== 6}>
-    코드로 입장 ↗
+    {t("joinByCode")} ↗
   </Button>
 </form>

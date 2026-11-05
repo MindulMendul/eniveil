@@ -1,7 +1,8 @@
 FROM node:24-bookworm-slim
 ENV NODE_ENV=production PORT=8081
 WORKDIR /app
-COPY temporal-worker/package.json temporal-worker/package-lock.json ./
+COPY temporal-worker/package.json ./package.json
+COPY temporal-worker/package-lock.json ./package-lock.json
 RUN npm ci --omit=dev
 COPY temporal-worker/src ./src
 USER node

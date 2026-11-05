@@ -8,6 +8,7 @@
     scenarios,
     busy,
     connected,
+    t,
     onClose,
     onCreate,
   }: {
@@ -15,6 +16,7 @@
     scenarios: Scenario[];
     busy: boolean;
     connected: boolean;
+    t: (key: string) => string;
     onClose: () => void;
     onCreate: (scenarioId: string) => void;
   } = $props();
@@ -37,7 +39,7 @@
         <p class="eyebrow section-eyebrow">CHOOSE YOUR STORY</p>
         <Button variant="dismiss" ariaLabel="작품 선택 닫기" onclick={onClose}>×</Button>
       </div>
-      <h2 class="modal-title" id="picker-title">어떤 이야기를 시작할까?</h2>
+      <h2 class="modal-title" id="picker-title">{t("chooseStory")}</h2>
       <div class="tabs">
         <span class="tab selected">오리지널 스토리</span>
         <Button variant="tab" class="tab" disabled title="준비 중">

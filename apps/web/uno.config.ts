@@ -155,7 +155,7 @@ export default defineConfig({
     "heading-three": "mt-0 mb-3 text-body-lg leading-body-lg font-medium",
     "room-title": "my-5 mb-2.5 font-serif text-title",
     "eyebrow": "mb-5 text-label leading-normal font-semibold tracking-eyebrow text-festival-gold",
-    intro: "m-0 text-body leading-intro text-festival-muted",
+    intro: "m-0 whitespace-pre-line text-body leading-intro text-festival-muted",
     ticket: "mt-14.5 flex justify-between border-y border-dashed border-festival-ticket-border py-5 text-label tracking-label text-festival-gold max-tablet:mt-7 max-mobile:text-mini",
     panel: "border border-festival-line bg-festival-panel p-7 max-mobile:p-5.5",
     login: "p-10 max-tablet:p-7",

@@ -1,26 +1,29 @@
-name: Deploy to OCI k3s
+name: Deploy to OCI with Docker Compose
 
 on:
   push:
-    branches: [main]
+    branches: [qa, main]
 
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   deploy-api:
     if: ${{ vars.OCI_REGISTRY != '' && vars.KUBERNETES_ENABLED == 'true' }}
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'qa' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
+      APP_NAMESPACE: ${{ github.ref_name == 'main' && 'festival' || 'festival-qa' }}
       OCI_IMAGE: ${{ vars.OCI_REGISTRY }}/festival-api:${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ vars.OCI_REGISTRY_HOST }}
-          username: ${{ secrets.OCIR_USERNAME }}
-          password: ${{ secrets.OCIR_AUTH_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           context: .
           file: deploy/Dockerfile
@@ -38,20 +41,26 @@ jobs:
         env:
           APP_ORIGIN: ${{ vars.APP_ORIGIN }}
         run: |
-          test -n "$APP_ORIGIN" || { echo "APP_ORIGIN repository variable is required"; exit 1; }
+          test -n "$APP_ORIGIN" || { echo "APP_ORIGIN environment variable is required"; exit 1; }
+          case "$APP_ORIGIN" in https://*) ;; *) echo "APP_ORIGIN must use HTTPS"; exit 1 ;; esac
           APP_HOST="${APP_ORIGIN#https://}"
+          sed -i "s|namespace: festival|namespace: $APP_NAMESPACE|g" deploy/k8s/app.yaml
+          sed -i "s|name: festival$|name: $APP_NAMESPACE|" deploy/k8s/namespace.yaml
           sed -i "s|https://festival.example.com|$APP_ORIGIN|" deploy/k8s/app.yaml
           sed -i "s|festival.example.com|$APP_HOST|g" deploy/k8s/app.yaml
           sed -i "s|REPLACE_WITH_OCIR_IMAGE|$OCI_IMAGE|" deploy/k8s/app.yaml
           kubectl apply -f deploy/k8s/namespace.yaml
           kubectl apply -f deploy/k8s/app.yaml
-          kubectl rollout status deployment/festival-api -n festival --timeout=180s
+          kubectl rollout status deployment/festival-api -n "$APP_NAMESPACE" --timeout=180s
 
   deploy-temporal-worker:
     if: ${{ vars.TEMPORAL_ENABLED == 'true' && vars.OCI_REGISTRY != '' && vars.KUBERNETES_ENABLED == 'true' }}
     needs: deploy-api
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'qa' }}
     runs-on: ubuntu-latest
     env:
+      APP_NAMESPACE: ${{ github.ref_name == 'main' && 'festival' || 'festival-qa' }}
       OCI_IMAGE: ${{ vars.OCI_REGISTRY }}/festival-temporal-worker:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -71,21 +80,27 @@ jobs:
         env:
           KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
         run: |
-          mkdir -p "$HOME/.kube"
-          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-      - name: Apply worker and Temporal credentials
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy latest main with Docker Compose
         env:
-          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS }}
-          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE }}
-          TEMPORAL_API_KEY: ${{ secrets.TEMPORAL_API_KEY }}
-          TEMPORAL_GATEWAY_TOKEN: ${{ secrets.TEMPORAL_GATEWAY_TOKEN }}
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           test -n "$TEMPORAL_ADDRESS" || { echo "TEMPORAL_ADDRESS secret is required"; exit 1; }
           test -n "$TEMPORAL_NAMESPACE" || { echo "TEMPORAL_NAMESPACE secret is required"; exit 1; }
           test -n "$TEMPORAL_GATEWAY_TOKEN" || { echo "TEMPORAL_GATEWAY_TOKEN secret is required"; exit 1; }
+          sed -i "s|namespace: festival|namespace: $APP_NAMESPACE|g" deploy/k8s/temporal-worker.yaml
+          sed -i "s|name: festival$|name: $APP_NAMESPACE|" deploy/k8s/namespace.yaml
           kubectl apply -f deploy/k8s/namespace.yaml
-          kubectl -n festival create secret generic festival-temporal \
+          kubectl -n "$APP_NAMESPACE" create secret generic festival-temporal \
             --from-literal=address="$TEMPORAL_ADDRESS" \
             --from-literal=namespace="$TEMPORAL_NAMESPACE" \
             --from-literal=api-key="$TEMPORAL_API_KEY" \
@@ -93,6 +108,6 @@ jobs:
             --dry-run=client -o yaml | kubectl apply -f -
           sed -i "s|REPLACE_WITH_TEMPORAL_WORKER_IMAGE|$OCI_IMAGE|" deploy/k8s/temporal-worker.yaml
           kubectl apply -f deploy/k8s/temporal-worker.yaml
-          kubectl rollout status deployment/temporal-worker -n festival --timeout=180s
-          kubectl rollout restart deployment/festival-api -n festival
-          kubectl rollout status deployment/festival-api -n festival --timeout=180s
+          kubectl rollout status deployment/temporal-worker -n "$APP_NAMESPACE" --timeout=180s
+          kubectl rollout restart deployment/festival-api -n "$APP_NAMESPACE"
+          kubectl rollout status deployment/festival-api -n "$APP_NAMESPACE" --timeout=180s

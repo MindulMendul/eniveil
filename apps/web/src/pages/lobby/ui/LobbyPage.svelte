@@ -8,16 +8,20 @@
     snapshot,
     busy,
     connected,
+    t,
     code = $bindable(""),
     onOpenStoryPicker,
     onJoin,
+    onSolo,
   }: {
     snapshot: Snapshot;
     busy: boolean;
     connected: boolean;
+    t: (key: string) => string;
     code?: string;
     onOpenStoryPicker: () => void;
     onJoin: (code?: string) => void;
+    onSolo: () => void;
   } = $props();
 </script>
 
@@ -25,8 +29,8 @@
   <div class="page-heading">
     <div>
       <p class="eyebrow">THE LOBBY</p>
-      <h1 class="heading-one">오늘의 축제</h1>
-      <p class="muted">함께할 사람들을 모으고, 첫 번째 이야기를 열어 봐.</p>
+      <h1 class="heading-one">{t("lobbyTitle")}</h1>
+      <p class="muted">{t("lobbyDescription")}</p>
     </div>
     <span class="count">{snapshot.rooms.length}개의 방</span>
   </div>
@@ -34,14 +38,14 @@
   <div class="lobby-grid">
     <section>
       <div class="section-heading">
-        <h2 class="heading-two section-title">열려 있는 방</h2><span class="tag">LIVE</span>
+        <h2 class="heading-two section-title">{t("openRooms")}</h2><span class="tag">LIVE</span>
       </div>
       {#if !snapshot.rooms.length}
         <div class="empty">
           <span class="empty-symbol">✧</span>
-          <h3 class="heading-three">아직 조용한 축제야.</h3>
-          <p class="empty-copy">첫 번째 방을 만들고 친구를 초대해 봐.</p>
-          <Button variant="secondary" class="secondary-compact" onclick={onOpenStoryPicker}>첫 방 만들기 ↗</Button>
+          <h3 class="heading-three">{t("quietFestival")}</h3>
+          <p class="empty-copy">{t("createFirstRoom")}</p>
+          <Button variant="secondary" class="secondary-compact" onclick={onOpenStoryPicker}>{t("createRoom")} ↗</Button>
         </div>
       {:else}
         <div class="rooms">
@@ -55,13 +59,18 @@
     <aside class="sidebar">
       <Panel>
         <p class="eyebrow">HOST A STORY</p>
-        <h2 class="heading-two sidebar-title">이야기 시작하기</h2>
+        <h2 class="heading-two sidebar-title">{t("createStory")}</h2>
         <p class="muted">작품을 선택하고<br />우리만의 방을 만들어.</p>
-        <Button disabled={!connected} onclick={onOpenStoryPicker}>방 만들기 <span>＋</span></Button>
+        <Button disabled={!connected} onclick={onOpenStoryPicker}>{t("createRoom")} <span>＋</span></Button>
       </Panel>
       <Panel>
-        <h3 class="heading-three">초대받았어?</h3>
-        <JoinRoomForm bind:code {busy} {connected} onSubmit={() => onJoin()} />
+        <h3 class="heading-three">{t("soloLabel")}</h3>
+        <p class="muted">{t("soloDescription")}</p>
+        <Button variant="secondary" onclick={onSolo}>{t("startCase")} ↗</Button>
+      </Panel>
+      <Panel>
+        <h3 class="heading-three">{t("invited")}</h3>
+        <JoinRoomForm bind:code {busy} {connected} {t} onSubmit={() => onJoin()} />
       </Panel>
     </aside>
   </div>

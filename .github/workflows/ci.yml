@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [dev, qa, main]
   push:
-    branches: [main]
+    branches: [dev, qa, main]
 
 permissions:
   contents: read
@@ -18,12 +18,28 @@ jobs:
         with:
           bun-version: 1.4.4
       - name: Install locked dependencies
-        working-directory: .
         run: bun install --frozen-lockfile
       - name: Check and build
-        working-directory: .
         run: bun run check && bun run build
       - name: Build API container
-        run: docker build -f deploy/Dockerfile .
+        run: docker build -t festival-api:${{ github.sha }} -f deploy/Dockerfile .
+      - name: Scan API image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: festival-api:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
       - name: Build Temporal worker container
-        run: docker build -f deploy/temporal-worker.Dockerfile .
+        run: docker build -t festival-temporal-worker:${{ github.sha }} -f deploy/temporal-worker.Dockerfile .
+      - name: Scan Temporal worker image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: festival-temporal-worker:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
