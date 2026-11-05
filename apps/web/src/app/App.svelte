@@ -70,7 +70,7 @@
 
   function connect() {
     if (disposed) return;
-    socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/ws`);
+    socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/lobby/ws`);
     socket.onopen = () => {
       connected = true;
       error = "";

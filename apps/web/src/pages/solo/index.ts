@@ -1,1 +1,1 @@
-export { default as SoloGame } from "./ui/SoloGame.svelte";
+export { default as SoloGame } from "../../features/game/SoloGame.svelte";

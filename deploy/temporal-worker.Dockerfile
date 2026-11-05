@@ -4,7 +4,7 @@ WORKDIR /app
 COPY temporal-worker/package.json ./package.json
 COPY temporal-worker/package-lock.json ./package-lock.json
 RUN apt-get update \
-    && apt-get upgrade --yes \
+    && apt-get upgrade --yes --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && npm ci --omit=dev \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
