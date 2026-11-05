@@ -17,5 +17,9 @@ const title = locale === "en" ? "The Strange Festival · Murder Mystery" : "이�
   </head>
   <body class="m-0 bg-festival-bg font-sans text-festival-text font-normal [font-synthesis:none]">
     <App client:only="svelte" />
+    <script>
+      import { initRUM } from "../rum";
+      initRUM();
+    </script>
   </body>
 </html>
