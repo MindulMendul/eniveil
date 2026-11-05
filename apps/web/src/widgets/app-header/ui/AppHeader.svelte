@@ -23,6 +23,7 @@
     <span>{t("brand")}<small class="brand-subtitle">{t("brandSubtitle")}</small></span>
   </a>
   <div class="flex items-center gap-4">
+    <a class="text-button" href={localePath(locale, "/workshop")}>{t("workshopNav")}</a>
     <label class="sr-only" for="language">{t("language")}</label>
     <select
       class="border border-festival-line bg-festival-panel-input px-2 py-2 text-xs text-festival-text focus-visible:outline-2 focus-visible:outline-festival-gold"
