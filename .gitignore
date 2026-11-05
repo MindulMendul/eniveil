@@ -5,3 +5,5 @@ data/
 *.sqlite*
 
 apps/web/.astro/
+
+__pycache__/

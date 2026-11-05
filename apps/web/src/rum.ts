@@ -74,7 +74,7 @@ export function rumAPI(route: string, status: number, duration: number) {
     duration_ms: String(Math.round(duration)),
   });
   if (status >= 400 && status !== 401) {
-    if (route === "/api/rooms/join") rumEvent("room_join_failed", { status: String(status) });
-    if (route === "/api/rooms") rumEvent("room_create_failed", { status: String(status) });
+    if (route === "/api/lobby/rooms/join") rumEvent("room_join_failed", { status: String(status) });
+    if (route === "/api/lobby/rooms") rumEvent("room_create_failed", { status: String(status) });
   }
 }
