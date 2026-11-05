@@ -12,7 +12,6 @@
     code = $bindable(""),
     onOpenStoryPicker,
     onJoin,
-    onSolo,
   }: {
     snapshot: Snapshot;
     busy: boolean;
@@ -21,7 +20,6 @@
     code?: string;
     onOpenStoryPicker: () => void;
     onJoin: (code?: string) => void;
-    onSolo: () => void;
   } = $props();
 </script>
 
@@ -62,11 +60,6 @@
         <h2 class="heading-two sidebar-title">{t("createStory")}</h2>
         <p class="muted">작품을 선택하고<br />우리만의 방을 만들어.</p>
         <Button disabled={!connected} onclick={onOpenStoryPicker}>{t("createRoom")} <span>＋</span></Button>
-      </Panel>
-      <Panel>
-        <h3 class="heading-three">{t("soloLabel")}</h3>
-        <p class="muted">{t("soloDescription")}</p>
-        <Button variant="secondary" onclick={onSolo}>{t("startCase")} ↗</Button>
       </Panel>
       <Panel>
         <h3 class="heading-three">{t("invited")}</h3>
