@@ -41,13 +41,13 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
         },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
-    expect((await req("/api/state")).status).toBe(401);
+    expect((await req("/api/lobby/state")).status).toBe(401);
     expect(
-      (await req("/api/guest", "", { nickname: "bad" }, "https://evil.invalid"))
+      (await req("/api/platform/guest", "", { nickname: "bad" }, "https://evil.invalid"))
         .status,
     ).toBe(403);
     const guest = async (nickname: string) => {
-      const r = await req("/api/guest", "", { nickname });
+      const r = await req("/api/platform/guest", "", { nickname });
       expect(r.status).toBe(201);
       return {
         cookie: r.headers.get("set-cookie")!.split(";")[0],
@@ -59,7 +59,7 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     const connect = async (cookie: string) => {
       let latest: Snapshot | undefined;
       const events: ServerEvent[] = [];
-      const ws = new WebSocket(origin.replace("http", "ws") + "/ws", {
+      const ws = new WebSocket(origin.replace("http", "ws") + "/api/lobby/ws", {
         headers: { Cookie: cookie, Origin: origin },
       });
       sockets.push(ws);
@@ -80,11 +80,11 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     const aa = await connect(a.cookie),
       bb = await connect(b.cookie);
     expect(
-      (await req("/api/rooms", a.cookie, { scenarioId: "rehearsal" })).status,
+      (await req("/api/lobby/rooms", a.cookie, { scenarioId: "rehearsal" })).status,
     ).toBe(201);
     await wait(() => !!aa.latest.room);
     expect(
-      (await req("/api/rooms/join", b.cookie, { code: aa.latest.room!.code }))
+      (await req("/api/lobby/rooms/join", b.cookie, { code: aa.latest.room!.code }))
         .status,
     ).toBe(200);
     await wait(() => aa.latest.room?.count === 2);

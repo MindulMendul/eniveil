@@ -1,6 +1,7 @@
 import { test, expect, afterEach } from "bun:test";
 import { Store } from "./store";
 import { Game } from "./game";
+import { storyCatalog } from "./modules/platform/stories/catalog";
 const stores: Store[] = [];
 afterEach(() => {
   for (const s of stores.splice(0)) s.close();
@@ -8,7 +9,7 @@ afterEach(() => {
 function setup() {
   const store = new Store(":memory:");
   stores.push(store);
-  const game = new Game(store);
+  const game = new Game(store, storyCatalog);
   const a = { id: "a", nickname: "안내" },
     b = { id: "b", nickname: "무대" },
     c = { id: "c", nickname: "손님" };
@@ -90,7 +91,7 @@ test("database survives process restart with role assignments and guest identity
   const path = `/tmp/festival-test-${crypto.randomUUID()}.sqlite`;
   const store = new Store(path);
   stores.push(store);
-  const game = new Game(store);
+  const game = new Game(store, storyCatalog);
   const a = { id: "a", nickname: "A" },
     b = { id: "b", nickname: "B" };
   store.state.guests = { a, b };
@@ -104,5 +105,5 @@ test("database survives process restart with role assignments and guest identity
   const restored = new Store(path);
   stores.push(restored);
   expect(restored.authenticate(token)).toEqual(a);
-  expect(new Game(restored).snapshot(a).room!.session!.id).toBe(id);
+  expect(new Game(restored, storyCatalog).snapshot(a).room!.session!.id).toBe(id);
 });

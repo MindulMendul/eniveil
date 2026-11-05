@@ -24,11 +24,15 @@ bun run start  # http://localhost:3000
 ## 구조
 
 - `apps/web`: Astro 정적 빌드가 Svelte 5 화면을 마운트합니다. 현재 게임 화면은 브라우저에서 동작하며 기존 Hono API를 `fetch`로 호출하고 WebSocket으로 실시간 상태를 받습니다.
-- `apps/server`: Hono HTTP + Bun WebSocket, 게스트 인증·방·세션·SQLite 저장.
+- `apps/server`: Hono HTTP + Bun WebSocket. `modules/game`은 방·세션 규칙, `modules/platform/stories`는 스토리 카탈로그를 담당하고 `infrastructure/sqlite`가 영속성을 구현합니다.
 - `packages/shared`: Zod 입력 검증, API/WS 통신 타입. 비밀 콘텐츠 없음.
 - `deploy`: OCI용 Docker Compose와 Nginx 설정 예시.
 
 의존성 설치와 실행 명령은 루트에서 관리합니다. 프론트·백은 별도 workspace 패키지이며 함께 빌드·배포할 수 있습니다.
+
+### 백엔드 모듈 경계
+
+멀티플레이 도메인은 저장소·스토리 카탈로그 포트에 의존하고, HTTP 라우트와 인프라 구현은 조립 지점에서 연결합니다. 단독 스토리 세션은 카탈로그와 플레이 기록 저장소를 통해 동작합니다.
 
 ## 현재 구현
 
@@ -58,9 +62,9 @@ bun run start  # http://localhost:3000
 
 ## 통신과 권한
 
-HTTP: `POST /api/guest`, `GET /api/state`, `GET /api/stories`, `POST /api/rooms`, `POST /api/rooms/join`, `GET /api/health`. Story catalog filters, sorting and pagination are documented in [docs/api.md](docs/api.md).
+HTTP: `POST /api/platform/guest`, `GET /api/lobby/state`, `POST /api/lobby/rooms`, `POST /api/lobby/rooms/join`, `GET /api/health`. Story catalog filters, sorting and pagination are documented in [docs/api.md](docs/api.md).
 
-WS: `/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `advance`, `vote`, `return`, `leave`이며 requestId를 포함합니다. 서버는 개인화된 `snapshot`, `ack`, `error`를 전달합니다. 서버가 방장 권한·정원·단계·중복 투표를 검증합니다. 시작을 재요청하면 이미 진행 중인 세션을 유지합니다. 클라이언트는 끊긴 연결을 2초 뒤 재연결하고 서버 snapshot으로 화면을 복원합니다. 서버는 30초마다 snapshot을 전송합니다.
+WS: `/api/lobby/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `advance`, `vote`, `return`, `leave`이며 requestId를 포함합니다. 서버는 개인화된 `snapshot`, `ack`, `error`를 전달합니다. 서버가 방장 권한·정원·단계·중복 투표를 검증합니다. 시작을 재요청하면 이미 진행 중인 세션을 유지합니다. 클라이언트는 끊긴 연결을 2초 뒤 재연결하고 서버 snapshot으로 화면을 복원합니다. 서버는 30초마다 snapshot을 전송합니다.
 
 ## OCI 배포
 
@@ -101,6 +105,10 @@ Wind4가 의존하는 최신 CSS 기능 기준은 [UnoCSS Wind4 호환성 안내
 - `.github/workflows/supabase-keepalive.yml`은 매월 1·6·11·16·21·26·31일 UTC 03:17에 Supabase REST API를 요청합니다. `SUPABASE_URL`과 `SUPABASE_ANON_KEY`를 Actions secrets에 등록해야 합니다. GitHub 예약 실행은 정확한 분 단위 실행을 보장하지 않습니다.
 
 현재 단계에서 Supabase는 앱의 저장소로 연결하지 않았습니다. Keepalive는 프로젝트의 REST API를 호출할 뿐 SQLite 데이터를 Supabase로 옮기지 않습니다. Temporal Service 자체도 현재 Docker Compose 앱과 함께 설치·실행되지 않습니다.
+
+### GA4 이벤트
+
+측정 ID가 설정된 빌드에서 페이지 조회, 언어 전환, 스토리 선택·시작·완료·중도 이탈, 플레이 시간과 조사 행동을 전송합니다. 광고 노출·클릭 이벤트는 실제 광고 슬롯에서 호출하도록 준비돼 있습니다.
 
 ## 범위와 다음 구현 지점
 
