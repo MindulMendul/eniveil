@@ -4,8 +4,8 @@ const buckets = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10];
 const requests = new Map<string, { count: number; sum: number; buckets: number[] }>();
 const routes = new Set([
   "/api/health",
-  "/api/platform/health",
   "/api/platform/guest",
+  "/api/platform/health",
   "/api/platform/analytics/vitals",
   "/api/lobby/state",
   "/api/lobby/rooms",
