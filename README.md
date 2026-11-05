@@ -36,10 +36,10 @@ bun run start  # http://localhost:3000
 
 ### 백엔드 모듈 경계
 
-- 게임 모듈은 플랫폼 스토리 구현체나 SQLite 세부사항에 직접 의존하지 않습니다. 게임 상태 저장소와 스토리 카탈로그 포트를 통해 필요한 기능을 받습니다.
-- 플랫폼 스토리 모듈은 작품 목록과 버전별 게임 콘텐츠를 제공합니다. 현재 구현은 메모리 카탈로그이며, 아직 SQLite·`.mstory` 파일에서 읽지 않습니다.
-- SQLite 구현과 Hono 서버 조립은 각각 `infrastructure/sqlite`와 `src/index.ts`에 둡니다. 지금은 단일 서버·단일 배포를 유지합니다.
-- 다음 단계에서 SQLite 스토리 저장소나 `.mstory` importer를 추가해도 게임 규칙 모듈을 수정하지 않도록 경계를 둔 상태입니다.
+- 백엔드는 모듈형 모놀리스입니다. `modules/game`은 멀티플레이 방·세션 규칙을 소유하고 `GameStateStore`와 `StoryCatalog` 계약에 의존합니다.
+- 단독 스토리 플레이 규칙은 `modules/platform/stories/session-service.ts`에 있습니다. 이 서비스는 `ports/story-catalog.ts`와 `StoryRunStore` 계약으로 콘텐츠 조회와 플레이 기록 저장을 요청하며, 파일이나 SQLite 구현에 직접 의존하지 않습니다.
+- `FileStoryCatalog`는 버전이 있는 `.mstory` 패키지를 읽고, `infrastructure/sqlite`는 게임 상태와 스토리 플레이 기록 저장을 구현합니다. `src/index.ts`가 현재 구현들을 만들고 HTTP·WebSocket 연결과 함께 조립합니다.
+- 이는 기존 코드를 한 번에 재작성하지 않고 스토리 플레이 수직 경계부터 적용한 단계입니다. HTTP 라우트와 조립 책임은 아직 `src/index.ts`에 함께 있어 후속 분리 대상입니다.
 
 ## 현재 구현
 

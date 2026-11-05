@@ -1,10 +1,10 @@
 import type { StoryPackage } from "@festival/shared";
 import type { StoryRun, StoryRunStore } from "./run-store";
-import type { FileStoryCatalog } from "./file-catalog";
+import type { StoryCatalog } from "./ports/story-catalog";
 
 export class StorySessionService {
   constructor(
-    private readonly catalog: FileStoryCatalog,
+    private readonly catalog: StoryCatalog,
     private readonly runs: StoryRunStore,
   ) {}
 
