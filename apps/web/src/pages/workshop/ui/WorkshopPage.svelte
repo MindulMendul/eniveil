@@ -21,7 +21,6 @@
   let error = $state("");
   let query = $state("");
   let mode = $state<"all" | "solo" | "multiplayer">("all");
-  let selectedStory = $state<StoryCatalogItem | null>(null);
 
   let filteredStories = $derived(
     stories.filter((story) => {
@@ -90,6 +89,8 @@
     <a class="text-button" href={locale === "en" ? "/en/" : "/"}>← {t("backToFestival")}</a>
   </div>
 
+  <aside class="panel mb-6" role="note"><p class="muted m-0">{t("workshopAuthoringSoon")}</p></aside>
+
   <section class="panel mb-6">
     <label class="input-label" for="story-search">{t("workshopSearchPlaceholder")}</label>
     <input class="input-field" id="story-search" bind:value={query} type="search" placeholder={t("workshopSearchPlaceholder")} />
@@ -120,20 +121,9 @@
             <span>{t("workshopPlayers")}: {story.playerCount.min}{story.playerCount.max !== story.playerCount.min ? "–" + story.playerCount.max : ""}</span>
             <span>{t("workshopMinutes")}: {story.estimatedMinutes} min</span>
           </div>
-          <button class="secondary mt-4" aria-pressed={selectedStory?.id === story.id} onclick={() => (selectedStory = selectedStory?.id === story.id ? null : story)}>
-            {selectedStory?.id === story.id ? t("workshopBack") : t("workshopDetail")} ↗
-          </button>
         </article>
       {/each}
     </div>
   {/if}
 
-  {#if selectedStory}
-    <section class="panel mt-6" aria-live="polite">
-      <p class="eyebrow">STORY DETAILS · v{selectedStory.version}</p>
-      <h2 class="heading-two">{selectedStory.title}</h2>
-      <p class="muted">{selectedStory.subtitle}</p>
-      <p class="fine">{t("workshopAuthoringSoon")}</p>
-    </section>
-  {/if}
 </main>
