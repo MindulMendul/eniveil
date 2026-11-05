@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from 'svelte';
   import { translate } from './i18n.js';
   import { trackEvent } from './analytics.js';
@@ -10,7 +10,7 @@
   /** @param {Parameters<typeof translate>[1]} key */
   const t = (key) => translate(locale, key);
 
-  let storyPackage = $state(/** @type {import('@festival/shared').StoryPackage | null} */ (null));
+  let storyPackage = $state<import('@festival/shared').StoryPackage | null>(null);
   let storyLoadError = $state('');
   let mechanics = $derived(
     storyPackage?.content.mechanics.type === 'solo-investigation'
