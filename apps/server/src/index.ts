@@ -12,6 +12,7 @@ import {
 } from "@festival/shared";
 import { Store } from "./store";
 import { Game } from "./game";
+import { storyCatalog } from "./modules/platform/stories/catalog";
 import type { WSContext } from "hono/ws";
 const production = process.env.NODE_ENV === "production";
 if (production && !process.env.APP_ORIGIN)
@@ -19,7 +20,7 @@ if (production && !process.env.APP_ORIGIN)
 export const store = new Store(
   process.env.DATABASE_PATH ?? "./data/festival.sqlite",
 );
-export const game = new Game(store);
+export const game = new Game(store, storyCatalog);
 const app = new Hono<{ Variables: { guest: Guest } }>();
 const { upgradeWebSocket, websocket } = createBunWebSocket();
 const sockets = new Map<WSContext, Guest>();

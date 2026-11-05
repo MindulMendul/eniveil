@@ -24,7 +24,7 @@ bun run start  # http://localhost:3000
 ## 구조
 
 - `apps/web`: Astro 정적 빌드가 Svelte 5 화면을 마운트합니다. 현재 게임 화면은 브라우저에서 동작하며 기존 Hono API를 `fetch`로 호출하고 WebSocket으로 실시간 상태를 받습니다.
-- `apps/server`: Hono HTTP + Bun WebSocket, 게스트 인증·방·세션·SQLite 저장.
+- `apps/server`: Hono HTTP + Bun WebSocket 조립 지점. `src/modules/game`은 방·세션·투표 규칙과 저장소 포트를, `src/modules/platform/stories`는 작품 목록·콘텐츠 카탈로그를 소유합니다. `src/infrastructure/sqlite`는 SQLite 저장 구현을 둡니다.
 - `packages/shared`: Zod 입력 검증, API/WS 통신 타입. 비밀 콘텐츠 없음.
 - `deploy`: OCI용 Docker Compose와 Nginx 설정 예시.
 
@@ -33,6 +33,13 @@ bun run start  # http://localhost:3000
 웹 UI는 UnoCSS의 Wind4 프리셋을 사용합니다. `apps/web/uno.config.ts`에 축제 색상과 폰트 토큰이 있고, Astro와 Svelte 컴포넌트에서 `bg-festival-panel`, `text-festival-text`, `font-serif` 같은 유틸리티를 사용할 수 있습니다. 기존 CSS는 유지하며 새 UI부터 점진적으로 적용합니다.
 
 의존성 설치와 실행 명령은 루트에서 관리합니다. 프론트·백은 별도 workspace 패키지이며 함께 빌드·배포할 수 있습니다.
+
+### 백엔드 모듈 경계
+
+- 게임 모듈은 플랫폼 스토리 구현체나 SQLite 세부사항에 직접 의존하지 않습니다. 게임 상태 저장소와 스토리 카탈로그 포트를 통해 필요한 기능을 받습니다.
+- 플랫폼 스토리 모듈은 작품 목록과 버전별 게임 콘텐츠를 제공합니다. 현재 구현은 메모리 카탈로그이며, 아직 SQLite·`.mstory` 파일에서 읽지 않습니다.
+- SQLite 구현과 Hono 서버 조립은 각각 `infrastructure/sqlite`와 `src/index.ts`에 둡니다. 지금은 단일 서버·단일 배포를 유지합니다.
+- 다음 단계에서 SQLite 스토리 저장소나 `.mstory` importer를 추가해도 게임 규칙 모듈을 수정하지 않도록 경계를 둔 상태입니다.
 
 ## 현재 구현
 
