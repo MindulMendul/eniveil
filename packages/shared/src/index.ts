@@ -37,6 +37,7 @@ export type Scenario = {
   minutes: number;
   available: boolean;
   kind: "original" | "demo";
+  difficulty?: "easy" | "normal" | "hard" | null;
 };
 export type RoomSummary = {
   id: string;
