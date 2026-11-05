@@ -1,4 +1,4 @@
-name: Deploy to OCI k3s
+name: Deploy to OCI with Docker Compose
 
 on:
   push:
@@ -7,92 +7,98 @@ on:
 permissions:
   contents: read
 
-jobs:
-  deploy-api:
-    if: ${{ vars.OCI_REGISTRY != '' && vars.KUBERNETES_ENABLED == 'true' }}
-    runs-on: ubuntu-latest
-    env:
-      OCI_IMAGE: ${{ vars.OCI_REGISTRY }}/festival-api:${{ github.sha }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ vars.OCI_REGISTRY_HOST }}
-          username: ${{ secrets.OCIR_USERNAME }}
-          password: ${{ secrets.OCIR_AUTH_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/Dockerfile
-          push: true
-          tags: ${{ env.OCI_IMAGE }}
-      - uses: azure/setup-kubectl@v4
-      - name: Configure cluster access
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-        run: |
-          mkdir -p "$HOME/.kube"
-          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-      - name: Apply API manifests
-        env:
-          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
-        run: |
-          test -n "$APP_ORIGIN" || { echo "APP_ORIGIN repository variable is required"; exit 1; }
-          APP_HOST="${APP_ORIGIN#https://}"
-          sed -i "s|https://festival.example.com|$APP_ORIGIN|" deploy/k8s/app.yaml
-          sed -i "s|festival.example.com|$APP_HOST|g" deploy/k8s/app.yaml
-          sed -i "s|REPLACE_WITH_OCIR_IMAGE|$OCI_IMAGE|" deploy/k8s/app.yaml
-          kubectl apply -f deploy/k8s/namespace.yaml
-          kubectl apply -f deploy/k8s/app.yaml
-          kubectl rollout status deployment/festival-api -n festival --timeout=180s
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
-  deploy-temporal-worker:
-    if: ${{ vars.TEMPORAL_ENABLED == 'true' && vars.OCI_REGISTRY != '' && vars.KUBERNETES_ENABLED == 'true' }}
-    needs: deploy-api
+jobs:
+  deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
-      OCI_IMAGE: ${{ vars.OCI_REGISTRY }}/festival-temporal-worker:${{ github.sha }}
+      DEPLOY_HOST: 129.154.220.233
+      DEPLOY_USER: ubuntu
+      DEPLOY_PATH: ${{ vars.OCI_DEPLOY_PATH || '/home/ubuntu/murder-parker' }}
+      APP_ORIGIN: https://mindul-murder-mystery.duckdns.org
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          registry: ${{ vars.OCI_REGISTRY_HOST }}
-          username: ${{ secrets.OCIR_USERNAME }}
-          password: ${{ secrets.OCIR_AUTH_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/temporal-worker.Dockerfile
-          push: true
-          tags: ${{ env.OCI_IMAGE }}
-      - uses: azure/setup-kubectl@v4
-      - name: Configure cluster access
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Verify SSH host
         run: |
-          mkdir -p "$HOME/.kube"
-          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-      - name: Apply worker and Temporal credentials
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy latest main with Docker Compose
         env:
-          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS }}
-          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE }}
-          TEMPORAL_API_KEY: ${{ secrets.TEMPORAL_API_KEY }}
-          TEMPORAL_GATEWAY_TOKEN: ${{ secrets.TEMPORAL_GATEWAY_TOKEN }}
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
-          test -n "$TEMPORAL_ADDRESS" || { echo "TEMPORAL_ADDRESS secret is required"; exit 1; }
-          test -n "$TEMPORAL_NAMESPACE" || { echo "TEMPORAL_NAMESPACE secret is required"; exit 1; }
-          test -n "$TEMPORAL_GATEWAY_TOKEN" || { echo "TEMPORAL_GATEWAY_TOKEN secret is required"; exit 1; }
-          kubectl apply -f deploy/k8s/namespace.yaml
-          kubectl -n festival create secret generic festival-temporal \
-            --from-literal=address="$TEMPORAL_ADDRESS" \
-            --from-literal=namespace="$TEMPORAL_NAMESPACE" \
-            --from-literal=api-key="$TEMPORAL_API_KEY" \
-            --from-literal=gateway-token="$TEMPORAL_GATEWAY_TOKEN" \
-            --dry-run=client -o yaml | kubectl apply -f -
-          sed -i "s|REPLACE_WITH_TEMPORAL_WORKER_IMAGE|$OCI_IMAGE|" deploy/k8s/temporal-worker.yaml
-          kubectl apply -f deploy/k8s/temporal-worker.yaml
-          kubectl rollout status deployment/temporal-worker -n festival --timeout=180s
-          kubectl rollout restart deployment/festival-api -n festival
-          kubectl rollout status deployment/festival-api -n festival --timeout=180s
+          case "$DEPLOY_PATH" in
+            /*) ;;
+            *) echo "OCI_DEPLOY_PATH must be an absolute path"; exit 1 ;;
+          esac
+          if ! printf '%s' "$DEPLOY_PATH" | grep -Eq '^/[A-Za-z0-9._/-]+$'; then
+            echo "OCI_DEPLOY_PATH contains unsupported characters"
+            exit 1
+          fi
+
+          ssh -o BatchMode=yes "$DEPLOY_USER@$DEPLOY_HOST" "bash -s -- '$DEPLOY_PATH' '$EXPECTED_SHA'" <<'REMOTE'
+          set -euo pipefail
+          deploy_path="$1"
+          expected_sha="$2"
+          repo_url="https://github.com/MindulMendul/murder-parker.git"
+
+          if [ ! -d "$deploy_path/.git" ]; then
+            if [ -e "$deploy_path" ]; then
+              echo "Deploy path exists but is not a Git checkout: $deploy_path" >&2
+              exit 1
+            fi
+            mkdir -p "$(dirname "$deploy_path")"
+            git clone --branch main --single-branch "$repo_url" "$deploy_path"
+          fi
+
+          if [ -n "$(git -C "$deploy_path" status --porcelain)" ]; then
+            echo "Server checkout has local changes; refusing to overwrite them." >&2
+            exit 1
+          fi
+
+          git -C "$deploy_path" remote set-url origin "$repo_url"
+          git -C "$deploy_path" fetch --prune origin main
+          if git -C "$deploy_path" show-ref --verify --quiet refs/heads/main; then
+            git -C "$deploy_path" switch main
+          else
+            git -C "$deploy_path" switch --track -c main origin/main
+          fi
+          git -C "$deploy_path" merge --ff-only origin/main
+
+          deployed_sha="$(git -C "$deploy_path" rev-parse HEAD)"
+          if [ "$deployed_sha" != "$expected_sha" ]; then
+            echo "Expected $expected_sha but checked out $deployed_sha; refusing stale deployment." >&2
+            exit 1
+          fi
+
+          cd "$deploy_path"
+          APP_ORIGIN="https://mindul-murder-mystery.duckdns.org" docker compose -f deploy/compose.yaml up -d --build --remove-orphans
+
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null; then
+              echo "Application health check passed."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker compose -f deploy/compose.yaml logs --tail=100 festival
+          echo "Application did not become healthy." >&2
+          exit 1
+          REMOTE
