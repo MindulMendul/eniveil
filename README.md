@@ -86,13 +86,13 @@ APP_ORIGIN=https://your-domain.example docker compose -f deploy/compose.yaml up 
 
 ## CI/CD와 새 인프라 골격
 
-- GitHub Actions의 `.github/workflows/ci.yml`은 PR과 `main` 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 기존 자동 테스트 suite는 이 CI에서 실행하지 않습니다.
+- GitHub Actions의 `.github/workflows/ci.yml`은 `dev`·`qa`·`main` 대상 PR과 해당 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드와 Trivy 취약점 검사를 실행합니다. 수정 가능한 High/Critical 취약점이 있으면 CI를 실패 처리합니다. 기존 자동 테스트 suite는 이 CI에서 실행하지 않습니다.
 - `.github/workflows/deploy-oci.yml`은 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`, `APP_ORIGIN`이 준비된 경우 OCIR에 이미지를 올리고 k3s에 배포합니다. 필요한 Actions secrets는 `OCIR_USERNAME`, `OCIR_AUTH_TOKEN`, `KUBECONFIG_B64`입니다.
 - API의 k3s replicas는 1로 고정했습니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
 - Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. `TEMPORAL_ENABLED=true`일 때 별도 배포하며 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
 - 방마다 Pod를 띄우지 않습니다. 세션마다 Temporal Workflow Execution을 만들고, 공용 Worker Deployment가 task queue에서 여러 세션을 처리합니다. Worker는 부하에 따라 별도로 scale할 수 있습니다.
 - 앱 이미지에는 HTTPS 도메인과 Ingress TLS secret을 반영해야 합니다. `festival.example.com`과 `festival-tls`는 배포 전에 교체·프로비저닝해야 합니다.
-- `.pr_agent.toml`은 Qodo PR reviewer가 멀티플레이 권한, 역할 비밀 노출, WebSocket, 데이터 일관성과 배포 안전을 우선 검토하도록 설정합니다. 저장소에 Qodo Merge GitHub App을 설치하면 적용되며, AI 리뷰는 merge gate가 아니라 보조 의견으로 둡니다.
+- `.pr_agent.toml`은 Qodo GitHub App이 PR 생성과 새 커밋 푸시 때 `/agentic_review`를 실행하도록 설정합니다. 저장소에 Qodo GitHub App을 설치해야 동작하며, AI 리뷰는 merge gate가 아니라 보조 의견으로 둡니다.
 - `.github/workflows/supabase-keepalive.yml`은 매월 1·6·11·16·21·26·31일 UTC 03:17에 Supabase REST API를 요청합니다. `SUPABASE_URL`과 `SUPABASE_ANON_KEY`를 Actions secrets에 등록해야 합니다. GitHub 예약 실행은 정확한 분 단위 실행을 보장하지 않습니다.
 
 현재 단계에서 Supabase는 앱의 저장소로 연결하지 않았습니다. Keepalive는 프로젝트의 REST API를 호출할 뿐 SQLite 데이터를 Supabase로 옮기지 않습니다. 또한 Temporal Service 자체는 k3s 안에 설치하지 않습니다. Temporal Cloud 또는 별도 Temporal Service 주소가 있어야 Worker가 준비 상태가 됩니다.
