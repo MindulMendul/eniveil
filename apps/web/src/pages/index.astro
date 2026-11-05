@@ -2,3 +2,7 @@
 import AppLayout from "../layouts/AppLayout.astro";
 ---
 <AppLayout locale="ko" />
+<script>
+  import { initRUM } from "../rum";
+  initRUM();
+</script>
