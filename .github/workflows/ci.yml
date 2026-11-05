@@ -23,8 +23,8 @@ jobs:
         run: |
           case "$PR_BASE" in
             dev)
-              if [[ "$PR_HEAD" == "qa" || "$PR_HEAD" == "main" ]]; then
-                echo "Only work branches may target dev; qa and main cannot be merged back into dev."
+              if [[ "$PR_HEAD" != feat/* ]]; then
+                echo "Only feat/* branches may target dev; received: $PR_HEAD."
                 exit 1
               fi
               ;;
