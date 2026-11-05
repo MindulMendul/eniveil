@@ -64,19 +64,9 @@ WS: `/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `ad
 
 ## OCI 배포
 
-main 브랜치에 변경이 push되면 GitHub Actions가 SSH로 OCI 인스턴스(ubuntu@129.154.220.233)에 접속해 저장소의 main을 fast-forward하고 Docker Compose로 앱을 빌드·재시작합니다. 공개 주소는 https://mindul-murder-mystery.duckdns.org 입니다.
-
-- GitHub Actions repository secret SSH_PRIVATE_KEY에 서버 접속용 OpenSSH 개인키를 등록합니다.
-- 배포 경로 기본값은 /home/ubuntu/murder-parker입니다. 서버의 저장소 경로가 다르면 Actions repository variable OCI_DEPLOY_PATH에 절대 경로를 설정합니다.
-- SSH 호스트 키 검증에는 Actions secret SSH_KNOWN_HOSTS를 설정할 수 있습니다. 비어 있으면 workflow가 배포 시점에 ssh-keyscan으로 호스트 키를 수집합니다.
-- 서버에 Docker Compose v2, Git, curl이 설치되어 있어야 하며, Ubuntu 사용자가 Docker를 실행할 수 있어야 합니다.
-- 기존 Caddy/Nginx가 HTTPS 도메인을 호스트의 127.0.0.1:3000으로 프록시해야 합니다. 앱 health check는 /api/health를 확인합니다.
-- 데이터는 Compose named volume festival-data에 남습니다. 배포 때 해당 볼륨을 삭제하지 않습니다.
-- 서버 checkout에 추적 파일 변경이 있으면 자동 배포는 덮어쓰지 않고 실패합니다. 서버에서 변경을 커밋하거나 폐기한 뒤 다시 배포해야 합니다.
-
-수동 기동/갱신 명령은 다음과 같습니다.
-
-    APP_ORIGIN=https://mindul-murder-mystery.duckdns.org docker compose -f deploy/compose.yaml up -d --build
+현재 서버는 Docker Compose + Caddy를 사용합니다. `main`은 운영,
+`qa`는 QA로 배포합니다. [배포 설정과 복구 절차](deploy/README.md)를 확인하세요.
+Kubernetes·OCIR 변수와 인증 정보는 현재 배포에 필요하지 않습니다.
 
 ## 디자인 시스템과 브라우저 지원
 
@@ -102,7 +92,7 @@ Wind4가 의존하는 최신 CSS 기능 기준은 [UnoCSS Wind4 호환성 안내
 ## CI/CD와 새 인프라 골격
 
 - GitHub Actions의 `.github/workflows/ci.yml`은 `dev`, `qa`, `main` 대상 PR과 각 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 자동 테스트 suite는 아직 CI에 포함하지 않았습니다.
-- `.github/workflows/deploy-oci.yml`은 `qa` 푸시를 `festival-qa` 네임스페이스에, `main` 푸시를 `festival` 네임스페이스에 배포합니다. 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`와 OCIR secrets가 필요합니다. `qa`와 `production` GitHub Environments에는 각 환경의 `APP_ORIGIN`, `KUBECONFIG_B64` 및 Temporal secrets를 따로 설정합니다.
+- `.github/workflows/deploy-oci.yml`은 앱 검사·빌드 및 배포 테스트 후 SSH로 정확한 커밋을 기존 Compose 프로젝트에 배포합니다. 설정은 `deploy/README.md`를 참조하세요.
 - API의 k3s replicas는 1로 고정했습니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
 - Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. `TEMPORAL_ENABLED=true`일 때 별도 배포하며 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
 - 방마다 Pod를 띄우지 않습니다. 세션마다 Temporal Workflow Execution을 만들고, 공용 Worker Deployment가 task queue에서 여러 세션을 처리합니다. Worker는 부하에 따라 별도로 scale할 수 있습니다.

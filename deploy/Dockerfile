@@ -3,6 +3,8 @@ RUN apt-get update \
   && apt-get install -y --only-upgrade apt libapt-pkg7.0 \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+ARG PUBLIC_GA_MEASUREMENT_ID=
+ENV PUBLIC_GA_MEASUREMENT_ID=$PUBLIC_GA_MEASUREMENT_ID
 COPY . .
 ARG APP_RELEASE=local
 ARG PUBLIC_FARO_COLLECTOR_URL=/telemetry/collect
