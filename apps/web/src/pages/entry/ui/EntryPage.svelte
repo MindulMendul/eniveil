@@ -7,13 +7,11 @@
     busy,
     t,
     onLogin,
-    onSolo,
   }: {
     nickname?: string;
     busy: boolean;
     t: (key: string) => string;
     onLogin: () => void;
-    onSolo: () => void;
   } = $props();
 </script>
 
@@ -34,7 +32,6 @@
     <h2 class="heading-two">{t("enterFestival")}</h2>
     <p class="muted">{t("namePrompt")}</p>
     <GuestLoginForm bind:nickname {busy} {t} onSubmit={onLogin} />
-    <button class="secondary" onclick={onSolo}>{t("soloPlay")} <span>↗</span></button>
     <p class="fine">가입 없이 시작해. 같은 브라우저에서 다시 접속하면<br />참가 정보가 이어져.</p>
   </Panel>
 </main>
