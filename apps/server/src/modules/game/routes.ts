@@ -1,0 +1,83 @@
+import { Hono } from "hono";
+import {
+  accuseStorySchema,
+  inspectStoryEvidenceSchema,
+  startStorySessionSchema,
+} from "@festival/shared";
+import type { SQLiteStoryRunStore } from "../../infrastructure/sqlite/story-run-store";
+import type { FileStoryCatalog } from "../platform/stories/file-catalog";
+import type { StorySessionService } from "./story-session-service";
+
+export function createGameRoutes(deps: {
+  stories: FileStoryCatalog;
+  runs: SQLiteStoryRunStore;
+  sessions: StorySessionService;
+}) {
+  const app = new Hono();
+
+  app.get("/stories/:id", (c) => {
+    const story = deps.stories.get(c.req.param("id"));
+    if (
+      !story ||
+      story.story.mode !== "solo" ||
+      story.content.mechanics.type !== "solo-investigation"
+    )
+      return c.json({ error: "찾을 수 없는 스토리야." }, 404);
+    deps.runs.record({
+      id: crypto.randomUUID(),
+      runId: null,
+      storyId: story.story.id,
+      type: "story_impression",
+      occurredAt: new Date().toISOString(),
+      value: null,
+      metadata: { version: story.story.version },
+    });
+    const { solution: _privateSolution, ...publicMechanics } = story.content.mechanics;
+    return c.json({
+      ...story,
+      content: {
+        ...story.content,
+        scenes: story.content.scenes.filter((scene) => scene.id !== "resolution"),
+        mechanics: publicMechanics,
+      },
+    });
+  });
+
+  app.post("/sessions", async (c) => {
+    const { storyId } = startStorySessionSchema.parse(await c.req.json());
+    const session = deps.sessions.start(storyId);
+    deps.runs.record({
+      id: crypto.randomUUID(),
+      runId: session.runId,
+      storyId,
+      type: "story_click",
+      occurredAt: new Date().toISOString(),
+      value: null,
+      metadata: { version: session.story.version },
+    });
+    return c.json(session, 201);
+  });
+  app.post("/sessions/:id/advance", (c) =>
+    c.json(deps.sessions.advance(c.req.param("id"))),
+  );
+  app.post("/sessions/:id/evidence", async (c) => {
+    const { evidenceId } = inspectStoryEvidenceSchema.parse(await c.req.json());
+    return c.json(deps.sessions.inspectEvidence(c.req.param("id"), evidenceId));
+  });
+  app.post("/sessions/:id/accuse", async (c) => {
+    const { suspectId, evidenceIds } = accuseStorySchema.parse(await c.req.json());
+    return c.json(deps.sessions.accuse(c.req.param("id"), suspectId, evidenceIds));
+  });
+  app.post("/sessions/:id/abandon", (c) => {
+    deps.sessions.abandon(c.req.param("id"));
+    return c.body(null, 204);
+  });
+  app.post("/sessions/:id/rating", async (c) => {
+    const { rating } = await c.req.json();
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5)
+      return c.json({ error: "평점은 1점부터 5점까지 입력해 줘." }, 400);
+    return c.json(deps.sessions.rate(c.req.param("id"), rating));
+  });
+
+  return app;
+}

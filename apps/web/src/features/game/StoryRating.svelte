@@ -7,7 +7,7 @@
   async function submit(rating: number) {
     error = "";
     try {
-      const response = await fetch(`/api/story-sessions/${runId}/rating`, {
+      const response = await fetch(`/api/game/sessions/${runId}/rating`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rating }),

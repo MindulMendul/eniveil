@@ -59,7 +59,7 @@
     const pageLoadMs = navigation instanceof PerformanceNavigationTiming && navigation.loadEventEnd > 0
       ? navigation.loadEventEnd - navigation.startTime
       : performance.now();
-    void fetch('/api/analytics/vitals', {
+    void fetch('/api/platform/analytics/vitals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       keepalive: true,
@@ -71,7 +71,7 @@
         route: '/solo',
       }),
     }).catch(() => {});
-    void fetch('/api/stories/deokil-trading-murder')
+    void fetch('/api/game/stories/deokil-trading-murder')
       .then(async (response) => {
         if (!response.ok) throw new Error('스토리를 불러오지 못했어.');
         storyPackage = await response.json();
@@ -81,7 +81,7 @@
       });
     const recordAbandonment = () => {
       if (!startedAt || phase === 'win' || phase === 'fail') return;
-      if (runId) navigator.sendBeacon(`/api/story-sessions/${runId}/abandon`, new Blob([], { type: 'application/json' }));
+      if (runId) navigator.sendBeacon(`/api/game/sessions/${runId}/abandon`, new Blob([], { type: 'application/json' }));
       trackEvent('story_abandon', {
         story_id: storyPackage?.story.id ?? 'deokil-trading-murder',
         play_duration_seconds: Math.round((Date.now() - startedAt) / 1000),
@@ -99,7 +99,7 @@
     storyLoadError = '';
     resolutionCues = [];
     try {
-      const response = await fetch('/api/story-sessions', {
+      const response = await fetch('/api/game/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storyId: storyPackage.story.id }),
@@ -128,7 +128,7 @@
 
   async function finishOpening() {
     if (runId) {
-      const response = await fetch(`/api/story-sessions/${runId}/advance`, { method: 'POST' });
+      const response = await fetch(`/api/game/sessions/${runId}/advance`, { method: 'POST' });
       if (!response.ok) {
         const data = await response.json();
         storyLoadError = data.error ?? '다음 장면을 불러오지 못했어.';
@@ -149,7 +149,7 @@
   async function inspect(id) {
     if (runId) {
       try {
-        const response = await fetch(`/api/story-sessions/${runId}/evidence`, {
+        const response = await fetch(`/api/game/sessions/${runId}/evidence`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ evidenceId: id }),
@@ -197,7 +197,7 @@
 
   async function arrest() {
     if (!runId) return;
-    const response = await fetch(`/api/story-sessions/${runId}/accuse`, {
+    const response = await fetch(`/api/game/sessions/${runId}/accuse`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ suspectId: selectedSuspect, evidenceIds: accusation }),
