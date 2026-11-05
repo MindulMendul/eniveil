@@ -46,6 +46,7 @@
   let sort = $state("latest");
   let page = $state(1);
   let pages = $state(0);
+  let retry = $state(0);
 
   function openDialog(node: HTMLDialogElement, initiallyOpen: boolean) {
     if (initiallyOpen && !node.open) node.showModal();
@@ -59,6 +60,7 @@
 
   $effect(() => {
     if (!open) return;
+    retry;
 
     const params = new URLSearchParams({
       page: String(page),
@@ -112,11 +114,11 @@
     <dialog class="modal max-h-[88vh] overflow-y-auto" use:openDialog={open} oncancel={onClose} aria-labelledby="picker-title">
       <div class="section-heading">
         <p class="eyebrow section-eyebrow">CHOOSE YOUR STORY</p>
-        <Button variant="dismiss" ariaLabel="작품 선택 닫기" onclick={onClose}>×</Button>
+        <Button variant="dismiss" ariaLabel={t("closeStoryPicker")} onclick={onClose}>×</Button>
       </div>
       <h2 class="modal-title" id="picker-title">{t("chooseStory")}</h2>
       <div class="tabs">
-        <span class="tab selected">오리지널 스토리</span>
+        <span class="tab selected">{t("platformStories")}</span>
         <Button variant="tab" class="tab" onclick={onWorkshop}>창작마당 ↗</Button>
       </div>
 
@@ -170,7 +172,7 @@
       {#if loading}
         <div class="empty" role="status"><p>{t("workshopLoading")}</p></div>
       {:else if error}
-        <div class="empty" role="alert"><p>{error}</p></div>
+        <div class="empty" role="alert"><p>{error}</p><Button variant="secondary" onclick={() => (retry += 1)}>{t("workshopRetry")} ↻</Button></div>
       {:else if !stories.length}
         <div class="empty"><span class="empty-symbol">✧</span><h3 class="heading-three">{t("workshopNoMatches")}</h3></div>
       {:else}
