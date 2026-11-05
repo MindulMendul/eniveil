@@ -271,6 +271,23 @@ export const storyPackageSchema = z
     }
   });
 
+export const storyCatalogItemSchema = z.strictObject({
+  id: storyId,
+  version: z.number().int().positive(),
+  mode: z.enum(["solo", "multiplayer"]),
+  locale: z.string().regex(/^[a-z]{2}(?:-[A-Z]{2})?$/),
+  title: text,
+  subtitle: text,
+  playerCount: z.strictObject({
+    min: z.number().int().positive(),
+    max: z.number().int().positive(),
+  }),
+  estimatedMinutes: z.number().int().positive(),
+});
+export const storyCatalogResponseSchema = z.strictObject({
+  items: z.array(storyCatalogItemSchema),
+});
+
 export const startStorySessionSchema = z.strictObject({ storyId });
 export const inspectStoryEvidenceSchema = z.strictObject({ evidenceId: storyId });
 export const accuseStorySchema = z.strictObject({
@@ -287,3 +304,5 @@ export const rumVitalSchema = z.strictObject({
 
 export type StoryCue = z.infer<typeof storyCueSchema>;
 export type StoryPackage = z.infer<typeof storyPackageSchema>;
+export type StoryCatalogItem = z.infer<typeof storyCatalogItemSchema>;
+export type StoryCatalogResponse = z.infer<typeof storyCatalogResponseSchema>;
