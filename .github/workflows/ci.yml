@@ -2,7 +2,6 @@ name: CI
 
 on:
   pull_request:
-    branches: [dev, qa, main]
   push:
     branches: [dev, qa, main]
 
@@ -19,6 +18,8 @@ jobs:
         env:
           PR_BASE: ${{ github.base_ref }}
           PR_HEAD: ${{ github.head_ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_REPO: ${{ github.repository }}
         run: |
           case "$PR_BASE" in
             dev)
@@ -28,14 +29,14 @@ jobs:
               fi
               ;;
             qa)
-              if [[ "$PR_HEAD" != "dev" ]]; then
-                echo "Only dev may target qa; received: $PR_HEAD."
+              if [[ "$PR_HEAD" != "dev" || "$PR_HEAD_REPO" != "$PR_BASE_REPO" ]]; then
+                echo "Only the dev branch in $PR_BASE_REPO may target qa; received $PR_HEAD from $PR_HEAD_REPO."
                 exit 1
               fi
               ;;
             main)
-              if [[ "$PR_HEAD" != "qa" ]]; then
-                echo "Only qa may target main; received: $PR_HEAD."
+              if [[ "$PR_HEAD" != "qa" || "$PR_HEAD_REPO" != "$PR_BASE_REPO" ]]; then
+                echo "Only the qa branch in $PR_BASE_REPO may target main; received $PR_HEAD from $PR_HEAD_REPO."
                 exit 1
               fi
               ;;
