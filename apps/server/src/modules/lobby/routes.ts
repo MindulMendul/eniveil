@@ -37,6 +37,41 @@ export function createLobbyRoutes(deps: {
     c.header("Cache-Control", "no-store");
     await next();
   });
+  app.get("/stories", (c) => {
+    const query = c.req.query();
+    const integer = (key: string, fallback: number, min: number, max: number) => {
+      const raw = query[key];
+      if (raw === undefined) return fallback;
+      if (!/^\\d+$/.test(raw)) throw Error(`Invalid ${key} parameter.`);
+      const value = Number(raw);
+      if (!Number.isSafeInteger(value) || value < min || value > max)
+        throw Error(`${key} must be between ${min} and ${max}.`);
+      return value;
+    };
+    const origin = query.origin;
+    if (origin && origin !== "original" && origin !== "demo")
+      throw Error("origin must be original or demo.");
+    const difficulty = query.difficulty;
+    if (difficulty && !["easy", "normal", "hard", "unset"].includes(difficulty))
+      throw Error("difficulty must be easy, normal, hard, or unset.");
+    const sort = query.sort ?? "latest";
+    if (sort !== "latest" && sort !== "rating" && sort !== "popular")
+      throw Error("sort must be latest, rating, or popular.");
+    if (query.q && query.q.length > 100)
+      throw Error("q must be 100 characters or less.");
+
+    return c.json(deps.game.catalog({
+      q: query.q,
+      origin: origin as "original" | "demo" | undefined,
+      difficulty: difficulty as "easy" | "normal" | "hard" | "unset" | undefined,
+      players: query.players !== undefined
+        ? integer("players", 1, 1, 20)
+        : undefined,
+      sort,
+      limit: integer("limit", 12, 1, 100),
+      offset: integer("offset", 0, 0, 1000000),
+    }));
+  });
   app.get("/state", (c) => c.json(deps.game.snapshot(c.get("guest"))));
   app.post("/rooms", async (c) => {
     const { scenarioId } = createRoomSchema.parse(await c.req.json());
