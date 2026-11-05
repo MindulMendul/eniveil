@@ -1,4 +1,89 @@
 import { defineConfig, presetWind4 } from "unocss";
+import { readFileSync } from "node:fs";
+
+type DtcgNode = {
+  $type?: string;
+  $value?: unknown;
+  [key: string]: unknown;
+};
+
+type ThemeTokens = Record<string, string | ThemeTokens>;
+
+const tokens = JSON.parse(
+  readFileSync(new URL("./design-tokens.tokens.json", import.meta.url), "utf8"),
+) as DtcgNode;
+
+function dimensionToCss(value: unknown): string {
+  const dimension = value as { value: number; unit: string };
+  return `${dimension.value}${dimension.unit}`;
+}
+
+function colorToCss(value: unknown): string {
+  if (typeof value === "string") return value;
+  const color = value as { hex?: string; alpha?: number; components?: number[] };
+  if (!color.hex) throw new Error("Design token color is missing its hex fallback.");
+  if (color.alpha === undefined || color.alpha >= 1 || !color.components) return color.hex;
+  const channels = color.components.map((channel) => Math.round(channel * 255)).join(" ");
+  return `rgb(${channels} / ${color.alpha})`;
+}
+
+function tokenToCss(value: unknown, type: string): string {
+  if (type === "dimension") return dimensionToCss(value);
+  if (type === "number") return String(value);
+  if (type === "color") return colorToCss(value);
+  if (type === "fontFamily") {
+    const families = Array.isArray(value) ? value : [value];
+    return families
+      .map((family) => {
+        const name = String(family);
+        return name.includes(" ") ? `\"${name}\"` : name;
+      })
+      .join(", ");
+  }
+  if (type === "shadow") {
+    const shadows = Array.isArray(value) ? value : [value];
+    return shadows
+      .map((item) => {
+        const shadow = item as {
+          color: unknown;
+          offsetX: unknown;
+          offsetY: unknown;
+          blur: unknown;
+          spread: unknown;
+          inset?: boolean;
+        };
+        return [
+          shadow.inset ? "inset" : "",
+          dimensionToCss(shadow.offsetX),
+          dimensionToCss(shadow.offsetY),
+          dimensionToCss(shadow.blur),
+          dimensionToCss(shadow.spread),
+          colorToCss(shadow.color),
+        ]
+          .filter(Boolean)
+          .join(" ");
+      })
+      .join(", ");
+  }
+  throw new Error(`Unsupported design token type: ${type}`);
+}
+
+function toThemeTokens(node: DtcgNode, inheritedType = ""): ThemeTokens | string {
+  const type = typeof node.$type === "string" ? node.$type : inheritedType;
+  if ("$value" in node) return tokenToCss(node.$value, type);
+
+  return Object.fromEntries(
+    Object.entries(node)
+      .filter(([key]) => !key.startsWith("$"))
+      .map(([key, value]) => [key, toThemeTokens(value as DtcgNode, type)]),
+  );
+}
+
+const extensions = tokens.$extensions as DtcgNode;
+const unoExtensions = extensions["com.murderparker.unocss"] as DtcgNode;
+const viewportSizing = unoExtensions.viewportSizing as Record<string, string>;
+const typography = tokens.typography as DtcgNode;
+const typeScale = typography.size as DtcgNode;
 
 export default defineConfig({
   presets: [
@@ -10,112 +95,23 @@ export default defineConfig({
     filesystem: ["src/**/*.{astro,svelte,html}"],
   },
   theme: {
-    // Tokens extend Wind4's spacing and text scales. New UI values belong here,
-    // rather than in arbitrary-value utilities inside Svelte/Astro markup.
-    breakpoint: {
-      mobile: "520px",
-      tablet: "850px",
-    },
+    // DTCG tokens are the source of truth; viewport-relative sizes are UnoCSS extensions.
+    breakpoint: toThemeTokens(tokens.breakpoint as DtcgNode) as Record<string, string>,
     spacing: {
-      modal: "43.75rem",
-      entrance: "42.5rem",
-      "modal-height": "90vh",
-      viewport: "100dvh",
+      ...(toThemeTokens(tokens.layout as DtcgNode) as Record<string, string>),
+      ...viewportSizing,
     },
-    text: {
-      micro: { fontSize: "9px" },
-      label: { fontSize: "10px" },
-      caption: { fontSize: "11px" },
-      "body-sm": { fontSize: "13px" },
-      body: { fontSize: "15px" },
-      "body-lg": { fontSize: "17px" },
-      "title-sm": { fontSize: "18px" },
-      title: { fontSize: "22px" },
-      "title-lg": { fontSize: "23px" },
-      "title-xl": { fontSize: "25px" },
-      "display-sm": { fontSize: "33px" },
-      display: { fontSize: "42px" },
-      "display-lg": { fontSize: "38px" },
-      "display-xl": { fontSize: "46px" },
-      "brand-tablet": { fontSize: "19px" },
-      symbol: { fontSize: "50px" },
-      code: { fontSize: "34px" },
-      mini: { fontSize: "8px" },
-    },
-    leading: {
-      display: "1.55",
-      title: "1.6",
-      "body-lg": "1.7",
-      readable: "1.8",
-      body: "1.9",
-      copy: "2",
-      intro: "2.1",
-      narrative: "2.2",
-    },
-    tracking: {
-      display: "-1.6px",
-      label: "1px",
-      brand: "2.3px",
-      eyebrow: "2.5px",
-      code: "6px",
-    },
-    radius: {
-      none: "0px",
-      control: "0px",
-      panel: "0px",
-    },
-    shadow: {
-      live: "0 0 10px #b3ce9230",
-    },
-    colors: {
-      festival: {
-        bg: "#171c1a",
-        text: "#e9e5da",
-        muted: "#a1aaa2",
-        line: "#384139",
-        gold: "#d8bb79",
-        "gold-border": "#6d6041",
-        "gold-hover": "#e4cb94",
-        panel: "#202722",
-        "panel-input": "#181e19",
-        "panel-hover": "#30392c",
-        "copy": "#d6dacd",
-        "copy-soft": "#d4d9cb",
-        "copy-strong": "#e2e6d7",
-        "muted-light": "#c2c8be",
-        "muted-dark": "#69766b",
-        "muted-green": "#829080",
-        "muted-olive": "#788674",
-        "muted-vacant": "#7e8c79",
-        "symbol": "#8b987b",
-        "live": "#b3ce92",
-        "avatar": "#303b2d",
-        "avatar-border": "#4d5a42",
-        "input-border": "#465143",
-        "empty-border": "#46513f",
-        "ticket-border": "#596250",
-        "button-border": "#626d57",
-        "button-text": "#dedcca",
-        "button-hover-border": "#69715e",
-        "member-vacant": "#423126",
-        "notice": "#423126",
-        "notice-border": "#86664f",
-        "notice-text": "#f1d3ad",
-        "avatar-live-shadow": "#b3ce9230",
-        "modal-backdrop": "#080e0bd9",
-        "modal-border": "#5a644d",
-        "dialog-text": "#e9e5da",
-        "scenario-bg": "#182019",
-        "scenario-text": "#e2e6d7",
-        "scenario-small": "#a6b094",
-        "status-offline": "#777777",
-        "button-foreground": "#22291f",
-      },
-    },
-    font: {
-      sans: '"Noto Sans KR", sans-serif',
-      serif: '"Noto Serif KR", serif',
-    },
+    text: Object.fromEntries(
+      Object.entries(toThemeTokens(typeScale as DtcgNode) as Record<string, string>).map(
+        ([name, fontSize]) => [name, { fontSize }],
+      ),
+    ),
+    leading: toThemeTokens(typography["line-height"] as DtcgNode) as Record<string, string>,
+    tracking: toThemeTokens(typography["letter-spacing"] as DtcgNode) as Record<string, string>,
+    radius: toThemeTokens(tokens.radius as DtcgNode) as Record<string, string>,
+    shadow: toThemeTokens(tokens.shadow as DtcgNode) as Record<string, string>,
+    colors: toThemeTokens(tokens.color as DtcgNode) as Record<string, Record<string, string>>,
+    font: toThemeTokens(typography.family as DtcgNode) as Record<string, string>,
   },
   rules: [
     ["grid-entrance", { "grid-template-columns": "1.3fr 1fr" }],
