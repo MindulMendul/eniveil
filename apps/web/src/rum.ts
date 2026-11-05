@@ -15,7 +15,7 @@ const allowedHosts = new Set([
 ]);
 
 export function initRUM() {
-  const collectorUrl = import.meta.env.PUBLIC_FARO_COLLECTOR_URL as string | undefined;
+  const collectorUrl = (import.meta.env.PUBLIC_FARO_COLLECTOR_URL as string | undefined) || `${location.origin}/telemetry/collect`;
   if (
     faro ||
     !collectorUrl ||
