@@ -75,19 +75,9 @@ WS: `/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `ad
 
 ## OCI 배포
 
-main 브랜치에 변경이 push되면 GitHub Actions가 SSH로 OCI 인스턴스(ubuntu@129.154.220.233)에 접속해 저장소의 main을 fast-forward하고 Docker Compose로 앱을 빌드·재시작합니다. 공개 주소는 https://mindul-murder-mystery.duckdns.org 입니다.
-
-- GitHub Actions repository secret SSH_PRIVATE_KEY에 서버 접속용 OpenSSH 개인키를 등록합니다.
-- 배포 경로 기본값은 /home/ubuntu/murder-parker입니다. 서버의 저장소 경로가 다르면 Actions repository variable OCI_DEPLOY_PATH에 절대 경로를 설정합니다.
-- SSH 호스트 키 검증에는 Actions secret SSH_KNOWN_HOSTS를 설정할 수 있습니다. 비어 있으면 workflow가 배포 시점에 ssh-keyscan으로 호스트 키를 수집합니다.
-- 서버에 Docker Compose v2, Git, curl이 설치되어 있어야 하며, Ubuntu 사용자가 Docker를 실행할 수 있어야 합니다.
-- 기존 Caddy/Nginx가 HTTPS 도메인을 호스트의 127.0.0.1:3000으로 프록시해야 합니다. 앱 health check는 /api/health를 확인합니다.
-- 데이터는 Compose named volume festival-data에 남습니다. 배포 때 해당 볼륨을 삭제하지 않습니다.
-- 서버 checkout에 추적 파일 변경이 있으면 자동 배포는 덮어쓰지 않고 실패합니다. 서버에서 변경을 커밋하거나 폐기한 뒤 다시 배포해야 합니다.
-
-수동 기동/갱신 명령은 다음과 같습니다.
-
-    APP_ORIGIN=https://mindul-murder-mystery.duckdns.org docker compose -f deploy/compose.yaml up -d --build
+현재 서버는 Docker Compose + Caddy를 사용합니다. `main`은 운영,
+`qa`는 QA로 배포합니다. [배포 설정과 복구 절차](deploy/README.md)를 확인하세요.
+Kubernetes·OCIR 변수와 인증 정보는 현재 배포에 필요하지 않습니다.
 
 ## UI 스타일
 
@@ -96,15 +86,15 @@ main 브랜치에 변경이 push되면 GitHub Actions가 SSH로 OCI 인스턴스
 ## CI/CD와 새 인프라 골격
 
 - GitHub Actions의 `.github/workflows/ci.yml`은 `dev`, `qa`, `main` 대상 PR과 각 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 자동 테스트 suite는 아직 CI에 포함하지 않았습니다.
-- `.github/workflows/deploy-oci.yml`은 `qa` 푸시를 `festival-qa` 네임스페이스에, `main` 푸시를 `festival` 네임스페이스에 배포합니다. 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`와 OCIR secrets가 필요합니다. `qa`와 `production` GitHub Environments에는 각 환경의 `APP_ORIGIN`, `KUBECONFIG_B64` 및 Temporal secrets를 따로 설정합니다. GA4를 사용하려면 각 Environment에 공개 변수 `GA_MEASUREMENT_ID`를 설정합니다. 비워 두면 GA 스크립트와 이벤트 전송은 비활성 상태입니다.
+- `.github/workflows/deploy-oci.yml`은 앱 검사·빌드 및 배포 테스트 후 SSH로 정확한 커밋을 기존 Compose 프로젝트에 배포합니다. 설정은 `deploy/README.md`를 참조하세요.
 
 ### GA4 이벤트
 
 웹은 측정 ID가 설정된 빌드에서만 GA4를 불러옵니다. 기본 페이지 조회와 활성 탭 체류 시간, 언어 전환, 스토리 선택·시작·완료·중도 이탈, 플레이 시간, 장소·증거 조사, 심문, 힌트 사용을 이벤트로 보냅니다. 광고 슬롯은 실제 노출과 클릭 시 `trackAdImpression` 및 `trackAdClick`을 호출해 배치·캠페인·소재별 성과를 기록할 수 있습니다. 광고 링크에는 `utm_source`, `utm_medium`, `utm_campaign`을 붙여 유입 캠페인도 구분합니다. GA4 리포트에서 광고 배치나 플레이 이벤트 매개변수를 세분화하려면 해당 매개변수를 맞춤 측정기준 또는 측정항목으로 등록해야 합니다.
-- API의 k3s replicas는 1로 고정했습니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
-- Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. `TEMPORAL_ENABLED=true`일 때 별도 배포하며 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
+- `deploy/k8s`는 현재 서버에서 사용하지 않는 참고 설정입니다. API는 단일 인스턴스로 실행합니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
+- Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. 현재 Compose 자동 배포 대상에는 포함되지 않으며 별도 Worker 배포 구성과 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
 - 방마다 Pod를 띄우지 않습니다. 세션마다 Temporal Workflow Execution을 만들고, 공용 Worker Deployment가 task queue에서 여러 세션을 처리합니다. Worker는 부하에 따라 별도로 scale할 수 있습니다.
-- 앱 이미지에는 HTTPS 도메인과 Ingress TLS secret을 반영해야 합니다. `festival.example.com`과 `festival-tls`는 배포 전에 교체·프로비저닝해야 합니다.
+- 현재 HTTPS 도메인과 인증서는 인프라 저장소의 Caddy에서 관리합니다.
 - `.pr_agent.toml`은 Qodo PR reviewer가 멀티플레이 권한, 역할 비밀 노출, WebSocket, 데이터 일관성과 배포 안전을 우선 검토하도록 설정합니다. 저장소에 Qodo Merge GitHub App을 설치하면 적용되며, AI 리뷰는 merge gate가 아니라 보조 의견으로 둡니다.
 - `.github/workflows/supabase-keepalive.yml`은 매월 1·6·11·16·21·26·31일 UTC 03:17에 Supabase REST API를 요청합니다. `SUPABASE_URL`과 `SUPABASE_ANON_KEY`를 Actions secrets에 등록해야 합니다. GitHub 예약 실행은 정확한 분 단위 실행을 보장하지 않습니다.
 
