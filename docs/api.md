@@ -14,7 +14,7 @@ Returns a filterable, sorted, paginated catalog for the story picker.
 | --- | --- | --- | --- | --- |
 | `search` | string | Up to 100 characters | — | Case-insensitive substring match against title and subtitle. |
 | `origin` | string | `original`, `demo` | — | Filter by original story or demo. |
-| `difficulty` | string | `easy`, `normal`, `hard` | — | Filter by difficulty. Stories without a configured difficulty have `null` and do not match this filter. |
+| `difficulty` | string | `easy`, `normal`, `hard`, `unset` | — | Filter by difficulty. Use `unset` for stories whose difficulty is `null`. |
 | `players` | integer | 1–20 | — | Exact supported player count. |
 | `sort` | string | `latest`, `rating`, `popular` | `latest` | Sort order described below. |
 | `page` | integer | 1–100000 | 1 | 1-based page number. |
