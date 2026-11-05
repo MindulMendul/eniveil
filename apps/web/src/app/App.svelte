@@ -234,10 +234,10 @@
 
   {#if loading}
     <main class="main center"><p>축제의 문을 여는 중…</p></main>
-  {:else if currentPath === "/workshop"}
-    <WorkshopPage {locale} />
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} onLogin={login} />
+  {:else if currentPath === "/workshop"}
+    <WorkshopPage {locale} />
   {:else if soloActive}
     <main class="main"><SoloGame {locale} onExit={() => (soloActive = false)} /></main>
   {:else if !room}
