@@ -1,5 +1,5 @@
 <script>
-  import { translate } from './i18n.js';
+  import { translate } from '../../../shared/lib/i18n.js';
 
   /** @type {{ locale?: 'ko' | 'en', onExit?: () => void }} */
   let { locale = 'ko', onExit = () => {} } = $props();

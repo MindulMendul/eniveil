@@ -28,10 +28,6 @@ bun run start  # http://localhost:3000
 - `packages/shared`: Zod 입력 검증, API/WS 통신 타입. 비밀 콘텐츠 없음.
 - `deploy`: OCI용 Docker Compose와 Nginx 설정 예시.
 
-## UI 스타일
-
-웹 UI는 UnoCSS의 Wind4 프리셋을 사용합니다. `apps/web/uno.config.ts`에 축제 색상과 폰트 토큰이 있고, Astro와 Svelte 컴포넌트에서 `bg-festival-panel`, `text-festival-text`, `font-serif` 같은 유틸리티를 사용할 수 있습니다. 기존 CSS는 유지하며 새 UI부터 점진적으로 적용합니다.
-
 의존성 설치와 실행 명령은 루트에서 관리합니다. 프론트·백은 별도 workspace 패키지이며 함께 빌드·배포할 수 있습니다.
 
 ## 현재 구현
@@ -82,9 +78,26 @@ main 브랜치에 변경이 push되면 GitHub Actions가 SSH로 OCI 인스턴스
 
     APP_ORIGIN=https://mindul-murder-mystery.duckdns.org docker compose -f deploy/compose.yaml up -d --build
 
-## UI 스타일
+## 디자인 시스템과 브라우저 지원
 
-`apps/web`는 UnoCSS Wind4 프리셋만으로 화면 스타일을 생성합니다. 색상·폰트 토큰과 공통 화면 단축 클래스는 `apps/web/uno.config.ts`에서 관리하며, Svelte/Astro 마크업의 클래스를 UnoCSS가 추출합니다. 화면별 별도 CSS 파일은 사용하지 않습니다.
+`apps/web`의 모든 화면 스타일은 UnoCSS Wind4에서 생성합니다. 별도 CSS 파일, Svelte `<style>`, 인라인 `style`은 추가하지 않습니다. Svelte/Astro 마크업은 토큰 기반 유틸리티와 `uno.config.ts`의 공통 단축 클래스를 사용합니다.
+
+색상, 간격/크기, 글자 크기·행간·자간, 폰트, 반응형 중단점, 모서리, 그림자, 모션은 `apps/web/uno.config.ts`에서 관리합니다. 화면에서 임의 수치가 필요해지면 먼저 기존 토큰을 적용하고, 반복되거나 의미 있는 값이면 공통 토큰으로 등록합니다. 컴포넌트 조합은 단축 클래스로 정의합니다.
+
+## 프론트엔드 구조
+
+`apps/web/src`는 FSD 계층으로 나눕니다. `app`은 앱 상태와 조립, `pages`는 주요 화면, `widgets`는 화면 단위 복합 UI, `features`는 사용자 액션, `entities`는 도메인 표현, `shared/ui`는 재사용 가능한 기본 UI를 담당합니다. 각 slice는 `index.ts`를 공개 진입점으로 사용하며, 의존성은 `app → pages → widgets → features → entities → shared` 방향으로만 둡니다. 의미 있는 경계가 없는 코드는 계층을 채우기 위해 억지로 쪼개지 않습니다.
+
+Wind4가 의존하는 최신 CSS 기능 기준은 [UnoCSS Wind4 호환성 안내](https://unocss.dev/presets/wind4#compatibility)와 [Tailwind CSS 브라우저 지원표](https://tailwindcss.com/docs/compatibility)에 맞춥니다. 아래 버전은 해당 기준의 최소선이며, 구형 브라우저와 Internet Explorer는 지원하지 않습니다.
+
+| 엔진/브라우저 | 최소 기준 |
+| --- | --- |
+| Chromium 계열 (Chrome, Edge 등) | Chromium 111+ |
+| Firefox | Firefox 128+ |
+| Safari / iOS Safari | Safari 16.4+ |
+| Android Chrome | Chromium 111+ |
+
+모바일에서는 세로·가로 화면, 좁은 폭, 소프트 키보드가 열린 상태, 터치 조작을 확인합니다. `520px`과 `850px`은 화면 폭에 따른 레이아웃 중단점이며 기기 종류를 판별하지 않습니다. 브라우저 엔진별 시각 QA는 이 기준의 각 엔진에서 진행하며, 이 문서만으로 QA 완료를 의미하지 않습니다.
 
 ## CI/CD와 새 인프라 골격
 
@@ -108,7 +121,7 @@ main 브랜치에 변경이 push되면 GitHub Actions가 SSH로 OCI 인스턴스
 - 브라우저 쿠키를 지우면 기존 게스트를 복구할 수 없습니다. 로그아웃/계정 연결은 미구현입니다.
 - 대화는 대면/디스코드 사용. 음성·채팅·결제·관리자 화면은 없습니다.
 - 요청 크기·WS 빈도와 게스트 생성에 기본 제한만 적용했습니다. 게스트 생성은 현재 인스턴스 전체 분당 30회 제한입니다. 공개 운영에는 프록시 단위 속도 제한과 유휴 데이터 정리가 필요합니다.
-- UI는 컴파일·타입 검사를 수행했습니다. 실제 브라우저 시각 QA와 Docker 이미지 실행 검증은 수행하지 않았습니다.
+- 이번 UnoCSS 토큰 개편 후 컴파일·타입 검사, 브라우저별 시각 QA, Docker 이미지 실행 검증은 아직 수행하지 않았습니다.
 
 ## 검증
 
