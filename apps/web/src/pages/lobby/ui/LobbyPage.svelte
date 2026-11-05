@@ -9,16 +9,18 @@
     busy,
     connected,
     t,
+    modes,
     code = $bindable(""),
-    onOpenStoryPicker,
+    onSelectMode,
     onJoin,
   }: {
     snapshot: Snapshot;
     busy: boolean;
     connected: boolean;
     t: (key: string) => string;
+    modes: { id: string; titleKey: string; descriptionKey: string; actionKey: string }[];
     code?: string;
-    onOpenStoryPicker: () => void;
+    onSelectMode: (modeId: string) => void;
     onJoin: (code?: string) => void;
   } = $props();
 </script>
@@ -33,38 +35,50 @@
     <span class="count">{snapshot.rooms.length}개의 방</span>
   </div>
 
-  <div class="lobby-grid">
-    <section>
-      <div class="section-heading">
-        <h2 class="heading-two section-title">{t("openRooms")}</h2><span class="tag">LIVE</span>
-      </div>
-      {#if !snapshot.rooms.length}
-        <div class="empty">
-          <span class="empty-symbol">✧</span>
-          <h3 class="heading-three">{t("quietFestival")}</h3>
-          <p class="empty-copy">{t("createFirstRoom")}</p>
-          <Button variant="secondary" class="secondary-compact" onclick={onOpenStoryPicker}>{t("createRoom")} ↗</Button>
-        </div>
-      {:else}
-        <div class="rooms">
-          {#each snapshot.rooms as room (room.id)}
-            <RoomCard {room} {busy} {connected} onJoin={onJoin} />
-          {/each}
-        </div>
-      {/if}
-    </section>
+  <section class="mb-8">
+    <div class="section-heading">
+      <h2 class="heading-two section-title">{t("gameModes")}</h2>
+      <span class="tag">PLAY</span>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {#each modes as mode (mode.id)}
+        <Panel>
+          <p class="eyebrow">{t("gameModeLabel")}</p>
+          <h3 class="heading-three">{t(mode.titleKey)}</h3>
+          <p class="muted mb-5">{t(mode.descriptionKey)}</p>
+          {#if mode.id === "join"}
+            <JoinRoomForm bind:code {busy} {connected} {t} onSubmit={() => onJoin()} />
+          {:else}
+            <Button
+              class="w-full"
+              disabled={mode.id === "host" && !connected}
+              onclick={() => onSelectMode(mode.id)}
+            >
+              {t(mode.actionKey)} <span>↗</span>
+            </Button>
+          {/if}
+        </Panel>
+      {/each}
+    </div>
+  </section>
 
-    <aside class="sidebar">
-      <Panel>
-        <p class="eyebrow">HOST A STORY</p>
-        <h2 class="heading-two sidebar-title">{t("createStory")}</h2>
-        <p class="muted">작품을 선택하고<br />우리만의 방을 만들어.</p>
-        <Button disabled={!connected} onclick={onOpenStoryPicker}>{t("createRoom")} <span>＋</span></Button>
-      </Panel>
-      <Panel>
-        <h3 class="heading-three">{t("invited")}</h3>
-        <JoinRoomForm bind:code {busy} {connected} {t} onSubmit={() => onJoin()} />
-      </Panel>
-    </aside>
-  </div>
+  <section>
+    <div class="section-heading">
+      <h2 class="heading-two section-title">{t("openRooms")}</h2>
+      <span class="tag">LIVE</span>
+    </div>
+    {#if !snapshot.rooms.length}
+      <div class="empty">
+        <span class="empty-symbol">✧</span>
+        <h3 class="heading-three">{t("quietFestival")}</h3>
+        <p class="empty-copy">{t("createFirstRoom")}</p>
+      </div>
+    {:else}
+      <div class="rooms">
+        {#each snapshot.rooms as room (room.id)}
+          <RoomCard {room} {busy} {connected} onJoin={onJoin} />
+        {/each}
+      </div>
+    {/if}
+  </section>
 </main>
