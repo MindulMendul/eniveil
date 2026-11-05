@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 5857)
-Total output lines: 254
-
 <script>
   import { translate } from '../../../shared/lib/i18n.js';
 
@@ -171,7 +168,42 @@ Total output lines: 254
 <svelte:head><title>덕일상사 살인사건 · 이상한 축제</title></svelte:head>
 
 {#if hintMessage}
-  <aside class="…857 tokens truncated…6" onclick={() => { phase = 'explore'; }}>{t('investigate')} <span>→</span></button>
+  <aside class="mx-auto mb-6 flex max-w-[960px] items-start justify-between gap-4 border border-festival-gold-border bg-festival-panel px-5 py-4" role="status"><p class="m-0 text-sm leading-[1.9] text-festival-copy"><span class="mr-2 text-festival-gold">힌트</span>{hintMessage}</p><button class="dismiss" aria-label="힌트 닫기" onclick={() => hintMessage = ''}>×</button></aside>
+{/if}
+
+{#if phase === 'title'}
+  <section class="mx-auto max-w-[760px] border border-festival-line bg-festival-panel p-8 text-center max-[520px]:p-5">
+    <p class="eyebrow">A CASE FOR ONE DETECTIVE</p>
+    <div class="mb-7 border-y border-festival-line py-8">
+      <span class="text-5xl text-festival-gold" aria-hidden="true">✳</span>
+      <p class="my-4 text-[11px] tracking-[3px] text-festival-muted">{locale === 'en' ? 'DEOKIL TRADING · 23:00' : '덕일상사 · 23:00'}</p>
+      <h1 class="m-0 font-serif text-[38px] font-medium leading-[1.5] tracking-[-1px] max-[520px]:text-[30px]">{t('caseTitle')}</h1>
+      <p class="mt-3 text-sm leading-[1.9] text-festival-muted">{t('caseSubtitle')}</p>
+    </div>
+    <div class="mx-auto grid max-w-[540px] grid-cols-3 gap-3 text-left max-[520px]:grid-cols-1">
+      {#each [{ number: '01', label: '현장 조사' }, { number: '02', label: '진술 검증' }, { number: '03', label: '범인 지목' }] as step}
+        <div class="border border-festival-line px-4 py-3"><span class="text-[10px] tracking-[1px] text-festival-gold">{step.number}</span><p class="mb-0 mt-2 text-sm">{step.label}</p></div>
+      {/each}
+    </div>
+    <button class="primary mx-auto max-w-[540px]" onclick={startOver}>{t('caseStart')} <span>→</span></button>
+    <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>{t('backToFestival')}</button>
+  </section>
+{:else if phase === 'intro'}
+  <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-9 text-center max-[520px]:p-6">
+    <p class="eyebrow">{t('caseIntro')} · {String(introIndex + 1).padStart(2, '0')} / {intro.length}</p>
+    <div class="my-8 border-y border-festival-line py-10"><span class="text-4xl text-festival-gold" aria-hidden="true">✳</span><p class="mx-auto my-7 max-w-[520px] font-serif text-[20px] leading-[2] text-festival-copy">{intro[introIndex]}</p></div>
+    <button class="primary mx-auto max-w-[400px]" onclick={nextIntro}>{introIndex === intro.length - 1 ? t('suspectsTitle') : t('next')} <span>→</span></button>
+  </section>
+{:else if phase === 'cast'}
+  <section class="mx-auto max-w-[840px]">
+    <p class="eyebrow">THE SUSPECTS</p><h1 class="heading-one page-title">{t('suspectsTitle')}</h1><p class="muted mb-7">{t('suspectDescription')}</p>
+    <div class="grid grid-cols-2 gap-4 max-[650px]:grid-cols-1">
+      <article class="panel"><span class="eyebrow">{t('victim')}</span><h2 class="heading-two mb-2">박대리</h2><p class="muted">인망 좋기로 소문난 덕일상사 직원. 진급을 앞두고 있었고, 23시에 사망했다.</p></article>
+      {#each suspects as suspect, i}
+        <article class="panel"><div class="section-heading"><span class="eyebrow section-eyebrow">SUSPECT 0{i + 1}</span><span class="tag">{t('suspect')}</span></div><h2 class="heading-two mb-2 mt-4">{suspect.name}</h2><p class="muted">{suspect.details}</p></article>
+      {/each}
+    </div>
+    <button class="primary mt-6" onclick={() => { phase = 'explore'; }}>{t('investigate')} <span>→</span></button>
   </section>
 {:else if phase === 'explore'}
   <section class="mx-auto max-w-[960px]">
