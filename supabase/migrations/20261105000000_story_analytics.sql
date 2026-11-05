@@ -212,3 +212,5 @@ alter table public.story_rum_vitals enable row level security;
 revoke all on public.stories, public.story_versions, public.story_plays,
   public.story_events, public.story_ratings, public.story_rum_vitals
   from anon, authenticated;
+
+revoke all on public.story_metrics from anon, authenticated;
