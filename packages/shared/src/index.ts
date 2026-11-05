@@ -73,3 +73,13 @@ export type ServerEvent =
   | { type: "snapshot"; data: Snapshot }
   | { type: "ack"; requestId: string }
   | { type: "error"; requestId?: string; message: string };
+
+export {
+  storyCueSchema,
+  storyPackageSchema,
+  startStorySessionSchema,
+  inspectStoryEvidenceSchema,
+  accuseStorySchema,
+  rumVitalSchema,
+} from "./story";
+export type { StoryCue, StoryPackage } from "./story";

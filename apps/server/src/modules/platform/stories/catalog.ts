@@ -2,6 +2,7 @@ import type { Scenario } from "@festival/shared";
 import type {
   StoryCatalog,
   StoryContent,
+  StoryVersion,
 } from "../../game/story-catalog";
 
 const scenarios: Scenario[] = [

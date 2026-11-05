@@ -8,11 +8,18 @@ import {
   guestSchema,
   createRoomSchema,
   joinRoomSchema,
+  startStorySessionSchema,
+  inspectStoryEvidenceSchema,
+  accuseStorySchema,
+  rumVitalSchema,
   type Guest,
 } from "@festival/shared";
 import { Store } from "./store";
 import { Game } from "./game";
 import { storyCatalog } from "./modules/platform/stories/catalog";
+import { fileStoryCatalog } from "./modules/platform/stories/file-catalog";
+import { SQLiteStoryRunStore } from "./infrastructure/sqlite/story-run-store";
+import { StorySessionService } from "./modules/platform/stories/session-service";
 import type { WSContext } from "hono/ws";
 const production = process.env.NODE_ENV === "production";
 if (production && !process.env.APP_ORIGIN)
@@ -21,6 +28,8 @@ export const store = new Store(
   process.env.DATABASE_PATH ?? "./data/festival.sqlite",
 );
 export const game = new Game(store, storyCatalog);
+const storyRunStore = new SQLiteStoryRunStore(store.db);
+const storySessions = new StorySessionService(fileStoryCatalog, storyRunStore);
 const app = new Hono<{ Variables: { guest: Guest } }>();
 const { upgradeWebSocket, websocket } = createBunWebSocket();
 const sockets = new Map<WSContext, Guest>();
@@ -77,6 +86,91 @@ app.use("*", async (c, next) => {
   await next();
 });
 app.get("/api/health", (c) => c.json({ ok: true }));
+app.get("/api/stories/:id", (c) => {
+  const story = fileStoryCatalog.get(c.req.param("id"));
+  if (
+    !story ||
+    story.story.mode !== "solo" ||
+    story.content.mechanics.type !== "solo-investigation"
+  )
+    return c.json({ error: "찾을 수 없는 스토리야." }, 404);
+  storyRunStore.record({
+    id: crypto.randomUUID(),
+    runId: null,
+    storyId: story.story.id,
+    type: "story_impression",
+    occurredAt: new Date().toISOString(),
+    value: null,
+    metadata: { version: story.story.version },
+  });
+  const { solution: _privateSolution, ...publicMechanics } = story.content.mechanics;
+  return c.json({
+    ...story,
+    content: {
+      ...story.content,
+      scenes: story.content.scenes.filter((scene) => scene.id !== "resolution"),
+      mechanics: publicMechanics,
+    },
+  });
+});
+app.post("/api/story-sessions", async (c) => {
+  const { storyId } = startStorySessionSchema.parse(await c.req.json());
+  const session = storySessions.start(storyId);
+  storyRunStore.record({
+    id: crypto.randomUUID(),
+    runId: session.runId,
+    storyId,
+    type: "story_click",
+    occurredAt: new Date().toISOString(),
+    value: null,
+    metadata: { version: session.story.version },
+  });
+  return c.json(session, 201);
+});
+app.post("/api/story-sessions/:id/advance", (c) =>
+  c.json(storySessions.advance(c.req.param("id"))),
+);
+app.post("/api/story-sessions/:id/evidence", async (c) => {
+  const { evidenceId } = inspectStoryEvidenceSchema.parse(await c.req.json());
+  return c.json(storySessions.inspectEvidence(c.req.param("id"), evidenceId));
+});
+app.post("/api/story-sessions/:id/accuse", async (c) => {
+  const { suspectId, evidenceIds } = accuseStorySchema.parse(await c.req.json());
+  return c.json(storySessions.accuse(c.req.param("id"), suspectId, evidenceIds));
+});
+app.post("/api/story-sessions/:id/abandon", (c) => {
+  storySessions.abandon(c.req.param("id"));
+  return c.body(null, 204);
+});
+app.post("/api/story-sessions/:id/rating", async (c) => {
+  const { rating } = await c.req.json();
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5)
+    return c.json({ error: "평점은 1점부터 5점까지 입력해 줘." }, 400);
+  return c.json(storySessions.rate(c.req.param("id"), rating));
+});
+app.post("/api/analytics/vitals", async (c) => {
+  const vital = rumVitalSchema.parse(await c.req.json());
+  const story = fileStoryCatalog.get(vital.storyId);
+  if (!story || story.story.mode !== "solo")
+    return c.json({ error: "측정할 스토리를 찾을 수 없어." }, 404);
+  storyRunStore.recordVital({
+    id: crypto.randomUUID(),
+    storyId: vital.storyId,
+    metricName: vital.metricName,
+    value: vital.value,
+    navigationId: vital.navigationId,
+    route: vital.route,
+    occurredAt: new Date().toISOString(),
+  });
+  return c.body(null, 202);
+});
+app.get("/api/admin/stories/:id/metrics", (c) => {
+  const adminToken = process.env.STORY_ADMIN_TOKEN;
+  if (!adminToken) return c.json({ error: "관리자 통계 API가 설정되지 않았어." }, 503);
+  if (c.req.header("authorization") !== `Bearer ${adminToken}`)
+    return c.json({ error: "관리자 인증이 필요해." }, 401);
+  return c.json(storyRunStore.metrics(c.req.param("id")));
+});
 const attempts = new Map<string, { count: number; until: number }>();
 app.post("/api/guest", async (c) => {
   const ip = "global";
