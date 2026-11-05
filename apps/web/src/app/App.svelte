@@ -247,7 +247,7 @@
       {busy}
       {connected}
       {t}
-      {gameModes}
+      modes={gameModes}
       onSelectMode={selectGameMode}
       onJoin={join}
     />
