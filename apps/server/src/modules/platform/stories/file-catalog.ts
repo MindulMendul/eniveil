@@ -1,9 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { storyPackageSchema, type StoryPackage } from "@festival/shared";
+import type { StoryCatalog } from "./ports/story-catalog";
 
 /** Loads versioned story source packages from the server-owned stories directory. */
-export class FileStoryCatalog {
+export class FileStoryCatalog implements StoryCatalog {
   private readonly packages = new Map<string, StoryPackage>();
 
   constructor(directory = resolve(import.meta.dir, "../../../../stories")) {
