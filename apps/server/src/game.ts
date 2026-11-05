@@ -86,7 +86,7 @@ export class Game {
   catalog(query: {
     search?: string;
     origin?: "original" | "demo";
-    difficulty?: "easy" | "normal" | "hard";
+    difficulty?: "easy" | "normal" | "hard" | "unset";
     players?: number;
     sort: "latest" | "rating" | "popular";
     page: number;
@@ -110,7 +110,7 @@ export class Game {
       };
     }).filter((story) => {
       if (query.origin && story.origin !== query.origin) return false;
-      if (query.difficulty && story.difficulty !== query.difficulty) return false;
+      if (query.difficulty && (query.difficulty === "unset" ? story.difficulty !== null : story.difficulty !== query.difficulty)) return false;
       if (query.players && story.players !== query.players) return false;
       const keyword = query.search?.trim().toLocaleLowerCase();
       return !keyword ||
