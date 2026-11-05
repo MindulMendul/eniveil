@@ -148,6 +148,7 @@
               <option value="easy">{t("difficultyEasy")}</option>
               <option value="normal">{t("difficultyNormal")}</option>
               <option value="hard">{t("difficultyHard")}</option>
+              <option value="unset">{t("difficultyUndetermined")}</option>
             </select>
           </label>
           <label class="input-label">
