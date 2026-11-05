@@ -1,6 +1,6 @@
 import type { StoryPackage } from "@festival/shared";
-import type { StoryRun, StoryRunStore } from "./run-store";
-import type { StoryCatalog } from "./ports/story-catalog";
+import type { StoryRun, StoryRunStore } from "../platform/stories/run-store";
+import type { StoryCatalog } from "../platform/stories/ports/story-catalog";
 
 export class StorySessionService {
   constructor(
