@@ -146,7 +146,7 @@ app.get("/api/stories", (c) => {
     search,
     origin: origin as "original" | "demo" | undefined,
     difficulty: difficulty as "easy" | "normal" | "hard" | undefined,
-    players: query.players ? integer("players", 1, 20) : undefined,
+    players: query.players !== undefined ? integer("players", 1, 20) : undefined,
     sort,
     page: integer("page", 1, 100000),
     limit: integer("limit", 12, 50),
