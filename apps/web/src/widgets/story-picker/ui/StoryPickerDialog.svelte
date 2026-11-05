@@ -119,7 +119,7 @@
       <h2 class="modal-title" id="picker-title">{t("chooseStory")}</h2>
       <div class="tabs">
         <span class="tab selected">{t("platformStories")}</span>
-        <Button variant="tab" class="tab" onclick={onWorkshop}>창작마당 ↗</Button>
+        <Button variant="tab" class="tab" onclick={onWorkshop}>{t("workshopNav")} ↗</Button>
       </div>
 
       <section class="panel mb-4 mt-4">
@@ -186,10 +186,11 @@
               <h3 class="heading-three mt-3">{story.title}</h3>
               <p class="muted grow">{story.subtitle}</p>
               <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-festival-line pt-3 text-xs text-festival-muted">
-                <div><dt>{t("workshopPlayers")}</dt><dd>{story.players}</dd></div>
+                <div><dt>{t("workshopPlayers")}</dt><dd>{story.players}{t("playerUnit")}</dd></div>
                 <div><dt>{t("storyDifficulty")}</dt><dd>{story.difficulty ? t(`difficulty${story.difficulty[0].toUpperCase()}${story.difficulty.slice(1)}`) : t("difficultyUndetermined")}</dd></div>
                 <div><dt>{t("storyRating")}</dt><dd>{story.averageRating === null ? t("noRatingYet") : `${story.averageRating.toFixed(1)} / 5 (${story.ratingCount})`}</dd></div>
                 <div><dt>{t("storyUniquePlayers")}</dt><dd>{story.uniquePlayers}</dd></div>
+                <div><dt>{t("storyCompletedPlays")}</dt><dd>{story.completedPlays}</dd></div>
               </dl>
               <Button class="mt-4 w-full" disabled={!story.available || busy || !connected} onclick={() => onCreate(story.id)}>
                 {story.available ? t("createRoom") : t("storyComingSoon")}
