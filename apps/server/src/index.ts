@@ -86,6 +86,20 @@ app.use("*", async (c, next) => {
   await next();
 });
 app.get("/api/health", (c) => c.json({ ok: true }));
+app.get("/api/stories", (c) =>
+  c.json({
+    items: fileStoryCatalog.list().map(({ story }) => ({
+      id: story.id,
+      version: story.version,
+      mode: story.mode,
+      locale: story.locale,
+      title: story.title,
+      subtitle: story.subtitle,
+      playerCount: story.playerCount,
+      estimatedMinutes: story.estimatedMinutes,
+    })),
+  }),
+);
 app.get("/api/stories/:id", (c) => {
   const story = fileStoryCatalog.get(c.req.param("id"));
   if (
