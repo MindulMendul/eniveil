@@ -9,12 +9,12 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  branch-flow:
+    name: branch-flow
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - name: Enforce branch promotion flow
-        if: github.event_name == 'pull_request'
         env:
           PR_BASE: ${{ github.base_ref }}
           PR_HEAD: ${{ github.head_ref }}
@@ -23,8 +23,8 @@ jobs:
         run: |
           case "$PR_BASE" in
             dev)
-              if [[ "$PR_HEAD" == "qa" || "$PR_HEAD" == "main" ]]; then
-                echo "Only work branches may target dev; qa and main cannot be merged back into dev."
+              if [[ "$PR_HEAD" != feat/* ]]; then
+                echo "Only feat/* branches may target dev; received: $PR_HEAD."
                 exit 1
               fi
               ;;
@@ -45,6 +45,10 @@ jobs:
               exit 1
               ;;
           esac
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
