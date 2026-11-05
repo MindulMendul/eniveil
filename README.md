@@ -87,7 +87,11 @@ APP_ORIGIN=https://your-domain.example docker compose -f deploy/compose.yaml up 
 ## CI/CD와 새 인프라 골격
 
 - GitHub Actions의 `.github/workflows/ci.yml`은 `dev`, `qa`, `main` 대상 PR과 각 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 자동 테스트 suite는 아직 CI에 포함하지 않았습니다.
-- `.github/workflows/deploy-oci.yml`은 `qa` 푸시를 `festival-qa` 네임스페이스에, `main` 푸시를 `festival` 네임스페이스에 배포합니다. 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`와 OCIR secrets가 필요합니다. `qa`와 `production` GitHub Environments에는 각 환경의 `APP_ORIGIN`, `KUBECONFIG_B64` 및 Temporal secrets를 따로 설정합니다.
+- `.github/workflows/deploy-oci.yml`은 `qa` 푸시를 `festival-qa` 네임스페이스에, `main` 푸시를 `festival` 네임스페이스에 배포합니다. 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`와 OCIR secrets가 필요합니다. `qa`와 `production` GitHub Environments에는 각 환경의 `APP_ORIGIN`, `KUBECONFIG_B64` 및 Temporal secrets를 따로 설정합니다. GA4를 사용하려면 각 Environment에 공개 변수 `GA_MEASUREMENT_ID`를 설정합니다. 비워 두면 GA 스크립트와 이벤트 전송은 비활성 상태입니다.
+
+### GA4 이벤트
+
+웹은 측정 ID가 설정된 빌드에서만 GA4를 불러옵니다. 기본 페이지 조회와 활성 탭 체류 시간, 언어 전환, 스토리 선택·시작·완료·중도 이탈, 플레이 시간, 장소·증거 조사, 심문, 힌트 사용을 이벤트로 보냅니다. 광고 슬롯은 실제 노출과 클릭 시 `trackAdImpression` 및 `trackAdClick`을 호출해 배치·캠페인·소재별 성과를 기록할 수 있습니다. 광고 링크에는 `utm_source`, `utm_medium`, `utm_campaign`을 붙여 유입 캠페인도 구분합니다. GA4 리포트에서 광고 배치나 플레이 이벤트 매개변수를 세분화하려면 해당 매개변수를 맞춤 측정기준 또는 측정항목으로 등록해야 합니다.
 - API의 k3s replicas는 1로 고정했습니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
 - Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. `TEMPORAL_ENABLED=true`일 때 별도 배포하며 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
 - 방마다 Pod를 띄우지 않습니다. 세션마다 Temporal Workflow Execution을 만들고, 공용 Worker Deployment가 task queue에서 여러 세션을 처리합니다. Worker는 부하에 따라 별도로 scale할 수 있습니다.

@@ -31,6 +31,8 @@ jobs:
         with:
           context: .
           file: deploy/Dockerfile
+          build-args: |
+            PUBLIC_GA_MEASUREMENT_ID=${{ vars.GA_MEASUREMENT_ID }}
           push: true
           tags: ${{ env.OCI_IMAGE }}
       - uses: azure/setup-kubectl@v4

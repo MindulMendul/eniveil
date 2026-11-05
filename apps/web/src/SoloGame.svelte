@@ -1,5 +1,7 @@
 <script>
+  import { onMount } from 'svelte';
   import { translate } from './i18n.js';
+  import { trackEvent } from './analytics.js';
 
   /** @type {{ locale?: 'ko' | 'en', onExit?: () => void }} */
   let { locale = 'ko', onExit = () => {} } = $props();
@@ -81,13 +83,30 @@
   let accusation = $state([]);
   let resultMessage = $state('');
   let hintMessage = $state('');
+  let startedAt = $state(0);
   /** @type {Record<string, number>} */
   let hintIndex = $state({});
 
   let selectedRoom = $derived(rooms.find((room) => room.id === roomId));
   let selected = $derived(suspects.find((suspect) => suspect.id === selectedSuspect));
 
+  onMount(() => {
+    const recordAbandonment = () => {
+      if (!startedAt || phase === 'win' || phase === 'fail') return;
+      trackEvent('story_abandon', {
+        story_id: 'deokil-trading-murder',
+        play_duration_seconds: Math.round((Date.now() - startedAt) / 1000),
+        clue_count: found.length,
+        language: locale,
+      });
+    };
+    window.addEventListener('pagehide', recordAbandonment);
+    return () => window.removeEventListener('pagehide', recordAbandonment);
+  });
+
   function startOver() {
+    startedAt = Date.now();
+    trackEvent('story_start', { story_id: 'deokil-trading-murder', language: locale });
     phase = 'intro';
     introIndex = 0;
     roomId = '';
@@ -111,12 +130,14 @@
 
   /** @param {string} id */
   function enterRoom(id) {
+    trackEvent('case_location_open', { story_id: 'deokil-trading-murder', location_id: id, language: locale });
     roomId = id;
     currentEvidence = '';
   }
 
   /** @param {string} id */
   function inspect(id) {
+    trackEvent('case_clue_open', { story_id: 'deokil-trading-murder', clue_id: id, language: locale });
     if (!found.includes(id)) found = [...found, id];
     currentEvidence = id;
   }
@@ -129,12 +150,14 @@
 
   /** @param {number} index */
   function askAlibi(index) {
+    trackEvent('case_question', { story_id: 'deokil-trading-murder', suspect_id: selectedSuspect, question_type: index === 0 ? 'alibi' : 'relationship', language: locale });
     const text = alibis[selectedSuspect][index];
     responses = [...responses, { text, source: index === 0 ? '알리바이' : '피해자와의 관계' }];
   }
 
   /** @param {string} id */
   function presentEvidence(id) {
+    trackEvent('case_evidence_present', { story_id: 'deokil-trading-murder', suspect_id: selectedSuspect, clue_id: id, language: locale });
     const response = reactions[selectedSuspect]?.[id];
     const text = response?.[0] ?? '…그 증거가 저와 무슨 상관이죠?';
     responses = [...responses, { text, source: evidence[id].name }];
@@ -142,14 +165,19 @@
 
   /** @param {string} id */
   function toggleAccusation(id) {
+    trackEvent('case_accusation_evidence_select', { story_id: 'deokil-trading-murder', clue_id: id, selected: !accusation.includes(id), language: locale });
     if (accusation.includes(id)) accusation = accusation.filter((item) => item !== id);
     else if (accusation.length < 3) accusation = [...accusation, id];
   }
 
   function arrest() {
     const relevant = accusation.filter((id) => ['e1', 'e2', 'e3', 'e5'].includes(id));
-    if (selectedSuspect === 'sa' && relevant.length >= 2) phase = 'win';
+    if (selectedSuspect === 'sa' && relevant.length >= 2) {
+      trackEvent('story_attempt_end', { story_id: 'deokil-trading-murder', outcome: 'success', clue_count: found.length, play_duration_seconds: Math.round((Date.now() - startedAt) / 1000), language: locale });
+      phase = 'win';
+    }
     else {
+      trackEvent('story_attempt_end', { story_id: 'deokil-trading-murder', outcome: 'failure', clue_count: found.length, play_duration_seconds: Math.round((Date.now() - startedAt) / 1000), language: locale });
       resultMessage = selectedSuspect !== 'sa'
         ? `${selected?.name}은(는) 범인이 아니었다. 진범은 그 사이 유유히 사라졌다…`
         : '증거가 부족했다. 최사원은 결정적 증거 없이 풀려났고 사건은 미궁에 빠졌다…';
@@ -162,6 +190,7 @@
     const index = Math.min(hintIndex[phase] ?? 0, list.length - 1);
     hintIndex = { ...hintIndex, [phase]: index + 1 };
     hintMessage = list[index];
+    trackEvent('case_hint_view', { story_id: 'deokil-trading-murder', stage: phase, hint_number: index + 1, language: locale });
   }
 </script>
 
