@@ -43,10 +43,12 @@ spec:
               value: /data/festival.sqlite
             - name: APP_ORIGIN
               value: https://festival.example.com
-            - name: APP_RELEASE
-              value: REPLACE_WITH_APP_RELEASE
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: REPLACE_WITH_OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: festival-observability
+                  key: otlp-endpoint
+                  optional: true
             - name: METRICS_BEARER_TOKEN
               valueFrom:
                 secretKeyRef:
