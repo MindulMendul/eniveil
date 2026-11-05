@@ -9,7 +9,7 @@ WORKDIR /app
 COPY --from=build /app /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATABASE_PATH=/data/festival.sqlite
 RUN apt-get update \
-    && apt-get install --only-upgrade -y apt \
+    && apt-get install --no-install-recommends --only-upgrade -y apt \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir /data \
     && chown bun:bun /data
