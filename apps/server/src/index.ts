@@ -134,7 +134,7 @@ app.get("/api/stories", (c) => {
   if (origin && origin !== "original" && origin !== "demo")
     throw Error("origin must be original or demo.");
   const difficulty = query.difficulty;
-  if (difficulty && !["easy", "normal", "hard"].includes(difficulty))
+  if (difficulty && !["easy", "normal", "hard", "unset"].includes(difficulty))
     throw Error("difficulty must be easy, normal, or hard.");
   const sort = query.sort ?? "latest";
   if (sort !== "latest" && sort !== "rating" && sort !== "popular")
@@ -145,7 +145,7 @@ app.get("/api/stories", (c) => {
   return c.json(game.catalog({
     search,
     origin: origin as "original" | "demo" | undefined,
-    difficulty: difficulty as "easy" | "normal" | "hard" | undefined,
+    difficulty: difficulty as "easy" | "normal" | "hard" | "unset" | undefined,
     players: query.players !== undefined ? integer("players", 1, 20) : undefined,
     sort,
     page: integer("page", 1, 100000),
