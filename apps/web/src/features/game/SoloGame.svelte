@@ -22,11 +22,11 @@
   let rooms = $derived((mechanics?.locations ?? []).map((location) => ({ ...location, evidence: location.evidenceIds })));
   let alibis = $derived(Object.fromEntries((mechanics?.alibis ?? []).map(({ suspectId, statements }) => [suspectId, statements])));
   /** @type {Record<string, Record<string, [string, boolean?]>>} */
-  let reactions = $derived(Object.fromEntries((mechanics?.reactions ?? []).reduce((bySuspect, item) => {
+  let reactions = $derived((mechanics?.reactions ?? []).reduce((bySuspect, item) => {
     bySuspect[item.suspectId] ??= {};
     bySuspect[item.suspectId][item.evidenceId] = [item.lines.join('\n'), item.revealsTruth];
     return bySuspect;
-  }, {})));
+  }, /** @type {Record<string, Record<string, [string, boolean?]>>} */ ({})));
   /** @type {import('@festival/shared').StoryCue[]} */
   let openingCues = $state([]);
   /** @type {import('@festival/shared').StoryCue[]} */
