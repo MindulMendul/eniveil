@@ -119,6 +119,39 @@ app.use("/api/*", async (c, next) => {
   c.header("Cache-Control", "no-store");
   await next();
 });
+app.get("/api/stories", (c) => {
+  const query = c.req.query();
+  const integer = (key: string, fallback: number, max: number) => {
+    const raw = query[key];
+    if (raw === undefined) return fallback;
+    if (!/^\\d+$/.test(raw)) throw Error(`Invalid ${key} parameter.`);
+    const value = Number(raw);
+    if (!Number.isSafeInteger(value) || value < 1 || value > max)
+      throw Error(`${key} must be between 1 and ${max}.`);
+    return value;
+  };
+  const origin = query.origin;
+  if (origin && origin !== "original" && origin !== "demo")
+    throw Error("origin must be original or demo.");
+  const difficulty = query.difficulty;
+  if (difficulty && !["easy", "normal", "hard"].includes(difficulty))
+    throw Error("difficulty must be easy, normal, or hard.");
+  const sort = query.sort ?? "latest";
+  if (sort !== "latest" && sort !== "rating" && sort !== "popular")
+    throw Error("sort must be latest, rating, or popular.");
+  const search = query.search?.trim();
+  if (search && search.length > 100) throw Error("search must be 100 characters or less.");
+
+  return c.json(game.catalog({
+    search,
+    origin: origin as "original" | "demo" | undefined,
+    difficulty: difficulty as "easy" | "normal" | "hard" | undefined,
+    players: query.players ? integer("players", 1, 20) : undefined,
+    sort,
+    page: integer("page", 1, 100000),
+    limit: integer("limit", 12, 50),
+  }));
+});
 app.get("/api/state", (c) => c.json(game.snapshot(c.get("guest"))));
 app.post("/api/rooms", async (c) => {
   const { scenarioId } = createRoomSchema.parse(await c.req.json());
