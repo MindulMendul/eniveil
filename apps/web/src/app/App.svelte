@@ -145,6 +145,12 @@
     history.pushState({}, "", localePath(locale, "/workshop"));
   }
 
+  function startSolo() {
+    if (!snapshot) return;
+    picker = false;
+    soloActive = true;
+  }
+
   async function login() {
     await action(async () => {
       await api("/guest", { nickname });
@@ -225,10 +231,10 @@
     <main class="main center"><p>축제의 문을 여는 중…</p></main>
   {:else if currentPath === "/workshop"}
     <WorkshopPage {locale} />
+  {:else if !snapshot}
+    <EntryPage bind:nickname {busy} {t} onLogin={login} />
   {:else if soloActive}
     <main class="main"><SoloGame {locale} onExit={() => (soloActive = false)} /></main>
-  {:else if !snapshot}
-    <EntryPage bind:nickname {busy} {t} onLogin={login} onSolo={() => (soloActive = true)} />
   {:else if !room}
     <LobbyPage
       bind:code
@@ -238,7 +244,6 @@
       {t}
       onOpenStoryPicker={() => (picker = true)}
       onJoin={join}
-      onSolo={() => (soloActive = true)}
     />
   {:else if !session}
     <RoomPage
@@ -267,5 +272,6 @@
   {t}
   onClose={() => (picker = false)}
   onWorkshop={openWorkshop}
+  onSolo={startSolo}
   onCreate={create}
 />
