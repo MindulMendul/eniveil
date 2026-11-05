@@ -4,11 +4,16 @@ const buckets = [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10];
 const requests = new Map<string, { count: number; sum: number; buckets: number[] }>();
 const routes = new Set([
   "/api/health",
-  "/api/guest",
-  "/api/state",
-  "/api/rooms",
-  "/api/rooms/join",
-  "/ws",
+  "/api/platform/guest",
+  "/api/platform/health",
+  "/api/platform/analytics/vitals",
+  "/api/lobby/state",
+  "/api/lobby/rooms",
+  "/api/lobby/rooms/join",
+  "/api/lobby/ws",
+  "/api/game/sessions",
+  "/api/game/stories",
+  "/api/workshop/stories",
 ]);
 const spans: object[] = [];
 const environment = process.env.APP_ORIGIN?.includes("qa-") ? "qa" : "production";
@@ -68,7 +73,7 @@ setInterval(() => {
 }, 5000).unref();
 
 export const observeHTTP: MiddlewareHandler = async (c, next) => {
-  if (!c.req.path.startsWith("/api/") && c.req.path !== "/ws") return next();
+  if (!c.req.path.startsWith("/api/") && c.req.path !== "/api/lobby/ws") return next();
 
   const started = performance.now();
   const epoch = Date.now();
@@ -88,7 +93,7 @@ export const observeHTTP: MiddlewareHandler = async (c, next) => {
     });
     requests.set(key, metric);
 
-    if (route !== "/api/health") {
+    if (route !== "/api/health" && route !== "/api/platform/health") {
       enqueueSpan(c.req.header("traceparent"), method, route, status, epoch, duration);
     }
   }

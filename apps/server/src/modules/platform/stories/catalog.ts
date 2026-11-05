@@ -1,5 +1,11 @@
 import type { Scenario } from "@festival/shared";
-export const scenarios: Scenario[] = [
+import type {
+  StoryCatalog,
+  StoryContent,
+  StoryVersion,
+} from "../../game/story-catalog";
+
+const scenarios: Scenario[] = [
   {
     id: "rehearsal",
     version: 1,
@@ -41,8 +47,8 @@ export const scenarios: Scenario[] = [
     kind: "original",
   },
 ];
-// Never import this module into the client. Production story content stays server-side.
-export const demoContent = {
+
+const rehearsalContent: StoryContent = {
   roles: [
     {
       name: "축제 안내원",
@@ -62,3 +68,40 @@ export const demoContent = {
   answer:
     "초대장을 옮긴 사람은 무대 담당자다. 비를 피하려고 무대 서랍에 보관했다. 이 이야기는 기능 검증용이며 오리지널 3부작과 무관하다.",
 };
+
+/** Current catalog adapter. Database and package-file adapters can replace it. */
+export class InMemoryStoryCatalog implements StoryCatalog {
+  private readonly versions = new Map<string, StoryVersion>();
+
+  constructor() {
+    for (const scenario of scenarios) {
+      this.versions.set(this.key(scenario.id, scenario.version), {
+        scenario,
+        content: scenario.id === "rehearsal" ? rehearsalContent : emptyContent(),
+      });
+    }
+  }
+
+  list() {
+    return scenarios.map((scenario) => ({ ...scenario }));
+  }
+
+  get(id: string, version?: number) {
+    const scenario = scenarios.find(
+      (item) => item.id === id && (version === undefined || item.version === version),
+    );
+    return scenario
+      ? this.versions.get(this.key(id, scenario.version))
+      : undefined;
+  }
+
+  private key(id: string, version: number) {
+    return `${id}:${version}`;
+  }
+}
+
+function emptyContent(): StoryContent {
+  return { roles: [], clues: [], answer: "" };
+}
+
+export const storyCatalog: StoryCatalog = new InMemoryStoryCatalog();

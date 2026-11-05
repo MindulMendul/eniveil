@@ -22,11 +22,18 @@ jobs:
       APP_NAMESPACE: ${{ github.ref_name == 'main' && 'festival' || 'festival-qa' }}
       OCI_IMAGE: ${{ vars.OCI_REGISTRY }}/festival-api:${{ github.sha }}
     steps:
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ vars.OCI_REGISTRY_HOST }}
+          username: ${{ secrets.OCIR_USERNAME }}
+          password: ${{ secrets.OCIR_AUTH_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: deploy/Dockerfile
+          build-args: |
+            PUBLIC_GA_MEASUREMENT_ID=${{ vars.GA_MEASUREMENT_ID }}
           push: true
           tags: ${{ env.OCI_IMAGE }}
       - uses: azure/setup-kubectl@v4

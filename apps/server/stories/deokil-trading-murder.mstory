@@ -1,0 +1,118 @@
+{
+  "format": "murder-parker-story",
+  "formatVersion": 1,
+  "story": {
+    "id": "deokil-trading-murder",
+    "version": 1,
+    "mode": "solo",
+    "locale": "ko",
+    "title": "덕일상사 살인사건",
+    "subtitle": "단서와 진술을 모아 범인을 밝혀내는 1인 추리극",
+    "playerCount": { "min": 1, "max": 1 },
+    "estimatedMinutes": 25,
+    "startSceneId": "opening"
+  },
+  "content": {
+    "characters": [],
+    "assets": [],
+    "scenes": [
+      {
+        "id": "opening",
+        "cues": [
+          { "type": "dialogue.show", "speaker": "내레이션", "text": "덕일상사 빌딩, 새벽 0시 10분." },
+          { "type": "dialogue.show", "speaker": "내레이션", "text": "순찰 중이던 경비가 탕비실 불을 끄러 갔다가 쓰러진 사람을 발견했다." },
+          { "type": "dialogue.show", "speaker": "내레이션", "text": "피해자는 박대리. 입엔 거품, 오른손엔 젓가락, 다리엔 뜨거운 물에 데인 자국. 사망 추정 시각은 오후 11시." },
+          { "type": "dialogue.show", "speaker": "내레이션", "text": "인망 좋던 사원의 죽음. 용의자는 네 명. 탐정, 당신의 차례다." },
+          { "type": "transition.play", "effect": "fade", "durationMs": 700 }
+        ],
+        "nextSceneId": "investigation"
+      },
+      { "id": "investigation", "cues": [], "nextSceneId": "resolution" },
+      {
+        "id": "resolution",
+        "cues": [
+          { "type": "dialogue.show", "speaker": "내레이션", "text": "탐정은 최사원 앞에 증거를 하나씩 늘어놓았다." },
+          { "type": "dialogue.show", "speaker": "최사원", "text": "9시에 퇴근했어요. 맞아요. 하지만 그 전에… 그 사람의 컵라면에 손을 댔어요." },
+          { "type": "dialogue.show", "speaker": "내레이션", "text": "오부장의 딸, 그리고 박대리의 거짓말. 배신감이 그녀를 무너뜨렸다." },
+          { "type": "dialogue.show", "speaker": "최사원", "text": "말리고 싶어서 보냈다가 지웠어요. 먹지 않기를 바라면서도… 먹길 바랐어요." },
+          { "type": "dialogue.show", "speaker": "내레이션", "text": "새벽, 덕일상사 앞. 최사원은 경찰차에 올랐다. 사건 종결." }
+        ]
+      }
+    ],
+    "roles": [],
+    "information": [],
+    "items": [],
+    "mechanics": {
+      "type": "solo-investigation",
+      "victim": {
+        "name": "박대리",
+        "details": "인망 좋기로 소문난 덕일상사 직원. 진급을 앞두고 있었고, 23시에 사망했다."
+      },
+      "suspects": [
+        { "id": "dae", "name": "최대리", "details": "박대리와 함께 진급시험을 봤다가 밀려난 동료. 야근 후 22:30 귀가했다고 진술했다." },
+        { "id": "bu", "name": "오부장", "details": "덕일상사 부장. 18:00에 퇴근했고, 박대리와는 업무 관계였다고 말한다." },
+        { "id": "sa", "name": "최사원", "details": "박대리와 사귄다는 소문이 돌던 친한 후배. 21:00에 야근을 마쳤다고 한다." },
+        { "id": "gwa", "name": "서과장", "details": "박대리와 같은 부서의 상사. 19:00에 퇴근했다고 진술했다." }
+      ],
+      "evidence": [
+        { "id": "e1", "icon": "🍜", "name": "컵라면 용기", "place": "탕비실", "detail": "바닥의 용기. 스프 잔여물에서만 독이 검출됐다." },
+        { "id": "e2", "icon": "📦", "name": "이름표 컵라면", "place": "탕비실", "detail": "선반 위 박대리 이름표가 붙은 컵라면. 포장을 다시 붙인 흔적이 있다." },
+        { "id": "e3", "icon": "🧤", "name": "장갑과 약병 라벨", "place": "탕비실", "detail": "쓰레기통에서 발견한 일회용 장갑과 약병 라벨 조각. 립밤 향이 난다." },
+        { "id": "e4", "icon": "💊", "name": "영양제 병", "place": "박대리 책상", "detail": "박대리 서랍에서 발견. 오부장의 지문과 독이 묻어 있지만 컵라면의 독과 성분이 다르다." },
+        { "id": "e5", "icon": "📱", "name": "복원된 메시지", "place": "박대리 책상", "detail": "삭제된 메시지: ‘오늘은 야식 먹지 말고 그냥 퇴근해.’ 발신자는 최사원." },
+        { "id": "e6", "icon": "🪜", "name": "계단 장갑·출입기록", "place": "비상계단", "detail": "난간에서 장갑 한 짝과 22:20 비상계단 출입기록을 찾았다. 최대리의 물건이다." },
+        { "id": "e7", "icon": "🪪", "name": "출입카드 기록", "place": "경비실", "detail": "서과장이 22:40에 사무실로 다시 들어온 기록." },
+        { "id": "e8", "icon": "📋", "name": "감식 보고서", "place": "경비실", "detail": "사인은 컵라면 스프의 독. 영양제의 독과 성분이 다르다. 사망 시각은 23:00." },
+        { "id": "e9", "icon": "🎙️", "name": "협박 녹음·커터", "place": "박대리 책상", "detail": "박대리 PC에 서과장을 협박하는 녹음이 남아 있고, 책상 위에서 커터가 발견됐다." }
+      ],
+      "locations": [
+        { "id": "desk", "name": "박대리 책상", "evidenceIds": ["e4", "e5", "e9"], "mood": "기록과 개인 물건" },
+        { "id": "pantry", "name": "탕비실", "evidenceIds": ["e1", "e2", "e3"], "mood": "야식이 놓여 있던 곳" },
+        { "id": "stairs", "name": "비상계단", "evidenceIds": ["e6"], "mood": "누군가 기다렸던 곳" },
+        { "id": "guard", "name": "경비실", "evidenceIds": ["e7", "e8"], "mood": "출입 기록과 감식 결과" }
+      ],
+      "alibis": [
+        { "suspectId": "dae", "statements": ["10시 반에 퇴근했습니다. 야근 중이었고요.", "동기일 뿐입니다. 진급은… 실력대로 된 거죠."] },
+        { "suspectId": "bu", "statements": ["6시에 퇴근했네. 집에서 가족과 있었지.", "일 잘하는 부하였지. 그 이상은 없네."] },
+        { "suspectId": "sa", "statements": ["9시쯤 야근 마치고 퇴근했어요.", "…친한 선후배예요. 소문일 뿐이에요."] },
+        { "suspectId": "gwa", "statements": ["7시에 퇴근했어요. 그 뒤로는 오지 않았고요.", "같은 부서 상사로 가끔 밥 먹는 사이였죠."] }
+      ],
+      "reactions": [
+        { "suspectId": "dae", "evidenceId": "e6", "lines": ["…맞아요. 22시 20분, 계단에서 기다렸어요. 죽이려 했죠. 근데 끝내 안 나왔어요. 독이요? 전 모릅니다."], "revealsTruth": true },
+        { "suspectId": "dae", "evidenceId": "e8", "lines": ["독이라고요…? 전 그렇게 치밀한 사람이 못 돼요."] },
+        { "suspectId": "bu", "evidenceId": "e4", "lines": ["…내가 했네. 영양제에 손을 댔어. 딸을 가지고 논 놈이니까. 하지만 그걸 먹진 않았다고?"], "revealsTruth": true },
+        { "suspectId": "bu", "evidenceId": "e8", "lines": ["성분이 다르다고? 그럼 내가 범인이 아니란 걸 자네는 아는군."] },
+        { "suspectId": "sa", "evidenceId": "e1", "lines": ["스프에서 독이요…? 누가 미리 넣어둔 거네요."] },
+        { "suspectId": "sa", "evidenceId": "e2", "lines": ["포장이요? 원래 그런 거 아닌가요… 박대리님이 자주 사다 두셨어요."] },
+        { "suspectId": "sa", "evidenceId": "e3", "lines": ["제 거라는 증거 있어요? …아니, 몰라요!"] },
+        { "suspectId": "sa", "evidenceId": "e8", "lines": ["사망이 11시면… 전 이미 퇴근했는데요?"] },
+        { "suspectId": "sa", "evidenceId": "e5", "lines": ["…그걸 복원했어요?! 그건 걱정돼서 보낸 거예요. (손이 떨린다)"] },
+        { "suspectId": "gwa", "evidenceId": "e7", "lines": ["…맞아요, 22시 40분에 다시 왔어요. 협박당했거든요. 하지만 죽이진 않았어요."] },
+        { "suspectId": "gwa", "evidenceId": "e9", "lines": ["그가 협박한 건 사실이에요. 하지만 제가 갔을 땐 컵라면에 물을 붓고 있었고, 말다툼 후 나왔어요. 그땐 멀쩡했어요!"], "revealsTruth": true },
+        { "suspectId": "gwa", "evidenceId": "e1", "lines": ["컵라면에 독이요? 제가 나올 땐 아직 먹기 전이었어요."] }
+      ],
+      "hints": {
+        "explore": ["박대리 책상, 탕비실, 비상계단, 경비실을 모두 살펴봐.", "아직 조사하지 않은 증거가 있는 장소를 확인해.", "사망 시각과 퇴근 시각만으로 범인을 단정하지 마."],
+        "alibi": ["서과장의 7시 퇴근 진술을 출입기록과 비교해 봐.", "독은 사망 시각에 넣었을 필요가 없어.", "다음 단계에서 증거를 보여주며 진술을 확인해."],
+        "cross": ["영양제 병과 감식 보고서를 오부장에게 보여줘. 두 독은 달라.", "서과장에게 협박 녹음을 보여주면 사망 직전 박대리의 상태를 알 수 있어.", "컵라면 관련 증거와 복원된 메시지를 최사원에게 보여줘."],
+        "accuse": ["범인은 퇴근한 뒤에도 범행이 가능했던 사람이야.", "컵라면 용기, 이름표 컵라면, 장갑·약병 라벨, 복원된 메시지가 핵심 증거야.", "박대리와 가장 가까웠던 사람의 말을 다시 떠올려 봐."]
+      },
+      "solution": {
+        "culpritId": "sa",
+        "requiredEvidenceIds": ["e1", "e2", "e3", "e5"],
+        "minimumEvidenceCount": 2,
+        "failureMessages": {
+          "wrongSuspect": "은(는) 범인이 아니었다. 진범은 그 사이 유유히 사라졌다…",
+          "insufficientEvidence": "증거가 부족했다. 최사원은 결정적 증거 없이 풀려났고 사건은 미궁에 빠졌다…"
+        },
+        "resolutionLines": [
+          "탐정은 최사원 앞에 증거를 하나씩 늘어놓았다.",
+          "9시에 퇴근했어요. 맞아요. 하지만 그 전에… 그 사람의 컵라면에 손을 댔어요.",
+          "오부장의 딸, 그리고 박대리의 거짓말. 배신감이 그녀를 무너뜨렸다.",
+          "말리고 싶어서 보냈다가 지웠어요. 먹지 않기를 바라면서도… 먹길 바랐어요.",
+          "새벽, 덕일상사 앞. 최사원은 경찰차에 올랐다. 사건 종결."
+        ]
+      }
+    }
+  }
+}
