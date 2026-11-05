@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@festival/shared": "workspace:*",
+    "@grafana/faro-web-sdk": "2.13.0",
+    "@grafana/faro-web-tracing": "2.13.0",
     "svelte": "^5.0.0"
   },
   "devDependencies": {
