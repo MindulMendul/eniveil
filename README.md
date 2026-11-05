@@ -24,22 +24,15 @@ bun run start  # http://localhost:3000
 ## 구조
 
 - `apps/web`: Astro 정적 빌드가 Svelte 5 화면을 마운트합니다. 현재 게임 화면은 브라우저에서 동작하며 기존 Hono API를 `fetch`로 호출하고 WebSocket으로 실시간 상태를 받습니다.
-- `apps/server`: Hono HTTP + Bun WebSocket 조립 지점. `src/modules/game`은 방·세션·투표 규칙과 저장소 포트를, `src/modules/platform/stories`는 작품 목록·콘텐츠 카탈로그를 소유합니다. `src/infrastructure/sqlite`는 SQLite 저장 구현을 둡니다.
+- `apps/server`: Hono HTTP + Bun WebSocket. `modules/game`은 방·세션 규칙, `modules/platform/stories`는 스토리 카탈로그를 담당하고 `infrastructure/sqlite`가 영속성을 구현합니다.
 - `packages/shared`: Zod 입력 검증, API/WS 통신 타입. 비밀 콘텐츠 없음.
 - `deploy`: OCI용 Docker Compose와 Nginx 설정 예시.
-
-## UI 스타일
-
-웹 UI는 UnoCSS의 Wind4 프리셋을 사용합니다. `apps/web/uno.config.ts`에 축제 색상과 폰트 토큰이 있고, Astro와 Svelte 컴포넌트에서 `bg-festival-panel`, `text-festival-text`, `font-serif` 같은 유틸리티를 사용할 수 있습니다. 기존 CSS는 유지하며 새 UI부터 점진적으로 적용합니다.
 
 의존성 설치와 실행 명령은 루트에서 관리합니다. 프론트·백은 별도 workspace 패키지이며 함께 빌드·배포할 수 있습니다.
 
 ### 백엔드 모듈 경계
 
-- 백엔드는 모듈형 모놀리스입니다. `modules/game`은 멀티플레이 방·세션 규칙을 소유하고 `GameStateStore`와 `StoryCatalog` 계약에 의존합니다.
-- 단독 스토리 플레이 규칙은 `modules/platform/stories/session-service.ts`에 있습니다. 이 서비스는 `ports/story-catalog.ts`와 `StoryRunStore` 계약으로 콘텐츠 조회와 플레이 기록 저장을 요청하며, 파일이나 SQLite 구현에 직접 의존하지 않습니다.
-- `FileStoryCatalog`는 버전이 있는 `.mstory` 패키지를 읽고, `infrastructure/sqlite`는 게임 상태와 스토리 플레이 기록 저장을 구현합니다. `src/index.ts`가 현재 구현들을 만들고 HTTP·WebSocket 연결과 함께 조립합니다.
-- 이는 기존 코드를 한 번에 재작성하지 않고 스토리 플레이 수직 경계부터 적용한 단계입니다. HTTP 라우트와 조립 책임은 아직 `src/index.ts`에 함께 있어 후속 분리 대상입니다.
+멀티플레이 도메인은 저장소·스토리 카탈로그 포트에 의존하고, HTTP 라우트와 인프라 구현은 조립 지점에서 연결합니다. 단독 스토리 세션은 카탈로그와 플레이 기록 저장소를 통해 동작합니다.
 
 ## 현재 구현
 
@@ -69,9 +62,9 @@ bun run start  # http://localhost:3000
 
 ## 통신과 권한
 
-HTTP: `POST /api/guest`, `GET /api/state`, `POST /api/rooms`, `POST /api/rooms/join`, `GET /api/health`.
+HTTP: `POST /api/platform/guest`, `GET /api/lobby/state`, `POST /api/lobby/rooms`, `POST /api/lobby/rooms/join`, `GET /api/health`.
 
-WS: `/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `advance`, `vote`, `return`, `leave`이며 requestId를 포함합니다. 서버는 개인화된 `snapshot`, `ack`, `error`를 전달합니다. 서버가 방장 권한·정원·단계·중복 투표를 검증합니다. 시작을 재요청하면 이미 진행 중인 세션을 유지합니다. 클라이언트는 끊긴 연결을 2초 뒤 재연결하고 서버 snapshot으로 화면을 복원합니다. 서버는 30초마다 snapshot을 전송합니다.
+WS: `/api/lobby/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `advance`, `vote`, `return`, `leave`이며 requestId를 포함합니다. 서버는 개인화된 `snapshot`, `ack`, `error`를 전달합니다. 서버가 방장 권한·정원·단계·중복 투표를 검증합니다. 시작을 재요청하면 이미 진행 중인 세션을 유지합니다. 클라이언트는 끊긴 연결을 2초 뒤 재연결하고 서버 snapshot으로 화면을 복원합니다. 서버는 30초마다 snapshot을 전송합니다.
 
 ## OCI 배포
 
@@ -79,26 +72,43 @@ WS: `/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `ad
 `qa`는 QA로 배포합니다. [배포 설정과 복구 절차](deploy/README.md)를 확인하세요.
 Kubernetes·OCIR 변수와 인증 정보는 현재 배포에 필요하지 않습니다.
 
-## UI 스타일
+## 디자인 시스템과 브라우저 지원
 
-`apps/web`는 UnoCSS Wind4 프리셋만으로 화면 스타일을 생성합니다. 색상·폰트 토큰과 공통 화면 단축 클래스는 `apps/web/uno.config.ts`에서 관리하며, Svelte/Astro 마크업의 클래스를 UnoCSS가 추출합니다. 화면별 별도 CSS 파일은 사용하지 않습니다.
+`apps/web`의 모든 화면 스타일은 UnoCSS Wind4에서 생성합니다. 별도 CSS 파일, Svelte `<style>`, 인라인 `style`은 추가하지 않습니다. Svelte/Astro 마크업은 토큰 기반 유틸리티와 `uno.config.ts`의 공통 단축 클래스를 사용합니다.
+
+색상, 간격/크기, 글자 크기·행간·자간, 폰트, 반응형 중단점, 모서리, 그림자, 모션은 `apps/web/uno.config.ts`에서 관리합니다. 화면에서 임의 수치가 필요해지면 먼저 기존 토큰을 적용하고, 반복되거나 의미 있는 값이면 공통 토큰으로 등록합니다. 컴포넌트 조합은 단축 클래스로 정의합니다.
+
+## 프론트엔드 구조
+
+`apps/web/src`는 FSD 계층으로 나눕니다. `app`은 앱 상태와 조립, `pages`는 주요 화면, `widgets`는 화면 단위 복합 UI, `features`는 사용자 액션, `entities`는 도메인 표현, `shared/ui`는 재사용 가능한 기본 UI를 담당합니다. 각 slice는 `index.ts`를 공개 진입점으로 사용하며, 의존성은 `app → pages → widgets → features → entities → shared` 방향으로만 둡니다. 의미 있는 경계가 없는 코드는 계층을 채우기 위해 억지로 쪼개지 않습니다.
+
+Wind4가 의존하는 최신 CSS 기능 기준은 [UnoCSS Wind4 호환성 안내](https://unocss.dev/presets/wind4#compatibility)와 [Tailwind CSS 브라우저 지원표](https://tailwindcss.com/docs/compatibility)에 맞춥니다. 아래 버전은 해당 기준의 최소선이며, 구형 브라우저와 Internet Explorer는 지원하지 않습니다.
+
+| 엔진/브라우저 | 최소 기준 |
+| --- | --- |
+| Chromium 계열 (Chrome, Edge 등) | Chromium 111+ |
+| Firefox | Firefox 128+ |
+| Safari / iOS Safari | Safari 16.4+ |
+| Android Chrome | Chromium 111+ |
+
+모바일에서는 세로·가로 화면, 좁은 폭, 소프트 키보드가 열린 상태, 터치 조작을 확인합니다. `520px`과 `850px`은 화면 폭에 따른 레이아웃 중단점이며 기기 종류를 판별하지 않습니다. 브라우저 엔진별 시각 QA는 이 기준의 각 엔진에서 진행하며, 이 문서만으로 QA 완료를 의미하지 않습니다.
 
 ## CI/CD와 새 인프라 골격
 
 - GitHub Actions의 `.github/workflows/ci.yml`은 `dev`, `qa`, `main` 대상 PR과 각 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다. 자동 테스트 suite는 아직 CI에 포함하지 않았습니다.
 - `.github/workflows/deploy-oci.yml`은 앱 검사·빌드 및 배포 테스트 후 SSH로 정확한 커밋을 기존 Compose 프로젝트에 배포합니다. 설정은 `deploy/README.md`를 참조하세요.
-
-### GA4 이벤트
-
-웹은 측정 ID가 설정된 빌드에서만 GA4를 불러옵니다. 기본 페이지 조회와 활성 탭 체류 시간, 언어 전환, 스토리 선택·시작·완료·중도 이탈, 플레이 시간, 장소·증거 조사, 심문, 힌트 사용을 이벤트로 보냅니다. 광고 슬롯은 실제 노출과 클릭 시 `trackAdImpression` 및 `trackAdClick`을 호출해 배치·캠페인·소재별 성과를 기록할 수 있습니다. 광고 링크에는 `utm_source`, `utm_medium`, `utm_campaign`을 붙여 유입 캠페인도 구분합니다. GA4 리포트에서 광고 배치나 플레이 이벤트 매개변수를 세분화하려면 해당 매개변수를 맞춤 측정기준 또는 측정항목으로 등록해야 합니다.
-- `deploy/k8s`는 현재 서버에서 사용하지 않는 참고 설정입니다. API는 단일 인스턴스로 실행합니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
-- Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. 현재 Compose 자동 배포 대상에는 포함되지 않으며 별도 Worker 배포 구성과 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
+- API의 k3s replicas는 1로 고정했습니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
+- Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. `TEMPORAL_ENABLED=true`일 때 별도 배포하며 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
 - 방마다 Pod를 띄우지 않습니다. 세션마다 Temporal Workflow Execution을 만들고, 공용 Worker Deployment가 task queue에서 여러 세션을 처리합니다. Worker는 부하에 따라 별도로 scale할 수 있습니다.
-- 현재 HTTPS 도메인과 인증서는 인프라 저장소의 Caddy에서 관리합니다.
+- 앱 이미지에는 HTTPS 도메인과 Ingress TLS secret을 반영해야 합니다. `festival.example.com`과 `festival-tls`는 배포 전에 교체·프로비저닝해야 합니다.
 - `.pr_agent.toml`은 Qodo PR reviewer가 멀티플레이 권한, 역할 비밀 노출, WebSocket, 데이터 일관성과 배포 안전을 우선 검토하도록 설정합니다. 저장소에 Qodo Merge GitHub App을 설치하면 적용되며, AI 리뷰는 merge gate가 아니라 보조 의견으로 둡니다.
 - `.github/workflows/supabase-keepalive.yml`은 매월 1·6·11·16·21·26·31일 UTC 03:17에 Supabase REST API를 요청합니다. `SUPABASE_URL`과 `SUPABASE_ANON_KEY`를 Actions secrets에 등록해야 합니다. GitHub 예약 실행은 정확한 분 단위 실행을 보장하지 않습니다.
 
-현재 단계에서 Supabase는 앱의 저장소로 연결하지 않았습니다. Keepalive는 프로젝트의 REST API를 호출할 뿐 SQLite 데이터를 Supabase로 옮기지 않습니다. Temporal Service 자체도 Docker Compose 앱이나 k3s 안에 설치·실행되지 않습니다. Temporal Cloud 또는 별도 Temporal Service 주소가 있어야 Worker가 준비 상태가 됩니다.
+현재 단계에서 Supabase는 앱의 저장소로 연결하지 않았습니다. Keepalive는 프로젝트의 REST API를 호출할 뿐 SQLite 데이터를 Supabase로 옮기지 않습니다. Temporal Service 자체도 현재 Docker Compose 앱과 함께 설치·실행되지 않습니다.
+
+### GA4 이벤트
+
+측정 ID가 설정된 빌드에서 페이지 조회, 언어 전환, 스토리 선택·시작·완료·중도 이탈, 플레이 시간과 조사 행동을 전송합니다. 광고 노출·클릭 이벤트는 실제 광고 슬롯에서 호출하도록 준비돼 있습니다.
 
 ## 범위와 다음 구현 지점
 
@@ -109,7 +119,7 @@ Kubernetes·OCIR 변수와 인증 정보는 현재 배포에 필요하지 않습
 - 브라우저 쿠키를 지우면 기존 게스트를 복구할 수 없습니다. 로그아웃/계정 연결은 미구현입니다.
 - 대화는 대면/디스코드 사용. 음성·채팅·결제·관리자 화면은 없습니다.
 - 요청 크기·WS 빈도와 게스트 생성에 기본 제한만 적용했습니다. 게스트 생성은 현재 인스턴스 전체 분당 30회 제한입니다. 공개 운영에는 프록시 단위 속도 제한과 유휴 데이터 정리가 필요합니다.
-- UI는 컴파일·타입 검사를 수행했습니다. 실제 브라우저 시각 QA와 Docker 이미지 실행 검증은 수행하지 않았습니다.
+- 이번 UnoCSS 토큰 개편 후 컴파일·타입 검사, 브라우저별 시각 QA, Docker 이미지 실행 검증은 아직 수행하지 않았습니다.
 
 ## 검증
 

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { translate } from '../../i18n.js';
+  import { translate } from '../../shared/lib/i18n.js';
   import { trackEvent } from '../../analytics.js';
   import StoryCuePlayer from './StoryCuePlayer.svelte';
   import StoryRating from './StoryRating.svelte';
