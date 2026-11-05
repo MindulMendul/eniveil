@@ -3,111 +3,69 @@ name: Deploy to OCI with Docker Compose
 on:
   push:
     branches: [qa, main]
+  pull_request:
+    branches: [qa, main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: murder-parker-compose
   cancel-in-progress: false
 
 jobs:
-  deploy-api:
-    if: ${{ vars.OCI_REGISTRY != '' && vars.KUBERNETES_ENABLED == 'true' }}
-    environment:
-      name: ${{ github.ref_name == 'main' && 'production' || 'qa' }}
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    env:
-      APP_NAMESPACE: ${{ github.ref_name == 'main' && 'festival' || 'festival-qa' }}
-      OCI_IMAGE: ${{ vars.OCI_REGISTRY }}/festival-api:${{ github.sha }}
-    steps:
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
-        with:
-          context: .
-          file: deploy/Dockerfile
-          push: true
-          tags: ${{ env.OCI_IMAGE }}
-      - uses: azure/setup-kubectl@v4
-      - name: Configure cluster access
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-        run: |
-          mkdir -p "$HOME/.kube"
-          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-      - name: Apply API manifests
-        env:
-          APP_ORIGIN: ${{ vars.APP_ORIGIN }}
-        run: |
-          test -n "$APP_ORIGIN" || { echo "APP_ORIGIN environment variable is required"; exit 1; }
-          case "$APP_ORIGIN" in https://*) ;; *) echo "APP_ORIGIN must use HTTPS"; exit 1 ;; esac
-          APP_HOST="${APP_ORIGIN#https://}"
-          sed -i "s|namespace: festival|namespace: $APP_NAMESPACE|g" deploy/k8s/app.yaml
-          sed -i "s|name: festival$|name: $APP_NAMESPACE|" deploy/k8s/namespace.yaml
-          sed -i "s|https://festival.example.com|$APP_ORIGIN|" deploy/k8s/app.yaml
-          sed -i "s|festival.example.com|$APP_HOST|g" deploy/k8s/app.yaml
-          sed -i "s|REPLACE_WITH_OCIR_IMAGE|$OCI_IMAGE|" deploy/k8s/app.yaml
-          kubectl apply -f deploy/k8s/namespace.yaml
-          kubectl apply -f deploy/k8s/app.yaml
-          kubectl rollout status deployment/festival-api -n "$APP_NAMESPACE" --timeout=180s
-
-  deploy-temporal-worker:
-    if: ${{ vars.TEMPORAL_ENABLED == 'true' && vars.OCI_REGISTRY != '' && vars.KUBERNETES_ENABLED == 'true' }}
-    needs: deploy-api
-    environment:
-      name: ${{ github.ref_name == 'main' && 'production' || 'qa' }}
-    runs-on: ubuntu-latest
-    env:
-      APP_NAMESPACE: ${{ github.ref_name == 'main' && 'festival' || 'festival-qa' }}
-      OCI_IMAGE: ${{ vars.OCI_REGISTRY }}/festival-temporal-worker:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - uses: oven-sh/setup-bun@v2
         with:
-          registry: ${{ vars.OCI_REGISTRY_HOST }}
-          username: ${{ secrets.OCIR_USERNAME }}
-          password: ${{ secrets.OCIR_AUTH_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: deploy/temporal-worker.Dockerfile
-          push: true
-          tags: ${{ env.OCI_IMAGE }}
-      - uses: azure/setup-kubectl@v4
-      - name: Configure cluster access
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+          bun-version: 1.4.4
+      - name: Validate application and deployment
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          if [ -n "$SSH_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
-          else
-            ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
-          fi
-          chmod 600 ~/.ssh/known_hosts
+          bun install --frozen-lockfile
+          bun run check
+          bun run build
+          bun test
+          python3 -m unittest discover -s deploy/tests -v
 
-      - name: Deploy latest main with Docker Compose
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/qa'
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'qa' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'qa' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy exact commit to the existing Compose project
         env:
-          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
-          EXPECTED_SHA: ${{ github.sha }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST || '129.154.220.233' }}
+          SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+          DEPLOY_SHA: ${{ github.sha }}
+          PUBLIC_GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
         run: |
-          test -n "$TEMPORAL_ADDRESS" || { echo "TEMPORAL_ADDRESS secret is required"; exit 1; }
-          test -n "$TEMPORAL_NAMESPACE" || { echo "TEMPORAL_NAMESPACE secret is required"; exit 1; }
-          test -n "$TEMPORAL_GATEWAY_TOKEN" || { echo "TEMPORAL_GATEWAY_TOKEN secret is required"; exit 1; }
-          sed -i "s|namespace: festival|namespace: $APP_NAMESPACE|g" deploy/k8s/temporal-worker.yaml
-          sed -i "s|name: festival$|name: $APP_NAMESPACE|" deploy/k8s/namespace.yaml
-          kubectl apply -f deploy/k8s/namespace.yaml
-          kubectl -n "$APP_NAMESPACE" create secret generic festival-temporal \
-            --from-literal=address="$TEMPORAL_ADDRESS" \
-            --from-literal=namespace="$TEMPORAL_NAMESPACE" \
-            --from-literal=api-key="$TEMPORAL_API_KEY" \
-            --from-literal=gateway-token="$TEMPORAL_GATEWAY_TOKEN" \
-            --dry-run=client -o yaml | kubectl apply -f -
-          sed -i "s|REPLACE_WITH_TEMPORAL_WORKER_IMAGE|$OCI_IMAGE|" deploy/k8s/temporal-worker.yaml
-          kubectl apply -f deploy/k8s/temporal-worker.yaml
-          kubectl rollout status deployment/temporal-worker -n "$APP_NAMESPACE" --timeout=180s
-          kubectl rollout restart deployment/festival-api -n "$APP_NAMESPACE"
-          kubectl rollout status deployment/festival-api -n "$APP_NAMESPACE" --timeout=180s
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'SSH_PRIVATE_KEY secret is required (OpenSSH key or base64 encoded key)'; exit 1; }
+          [[ "$DEPLOY_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
+          key="$RUNNER_TEMP/mindul_web_key"
+          trap 'rm -f "$key"' EXIT
+          if [[ "$SSH_PRIVATE_KEY" == *'BEGIN OPENSSH PRIVATE KEY'* || "$SSH_PRIVATE_KEY" == *'BEGIN RSA PRIVATE KEY'* ]]; then
+            printf '%s\n' "$SSH_PRIVATE_KEY" > "$key"
+          else
+            printf '%s' "$SSH_PRIVATE_KEY" | base64 --decode > "$key"
+          fi
+          chmod 600 "$key"
+          printf -v remote_command 'PUBLIC_GA_MEASUREMENT_ID=%q python3 - %q %q' "$PUBLIC_GA_MEASUREMENT_ID" "$DEPLOY_ENVIRONMENT" "$DEPLOY_SHA"
+          ssh -i "$key" -p "$SSH_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o HostKeyAlgorithms=ssh-ed25519 \
+            -o UserKnownHostsFile="$PWD/deploy/ssh_known_hosts" \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+            "$SSH_USER@$SSH_HOST" "$remote_command" < deploy/deploy-compose.py
