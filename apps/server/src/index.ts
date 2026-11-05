@@ -12,6 +12,7 @@ import {
 } from "@festival/shared";
 import { Store } from "./store";
 import { Game } from "./game";
+import { metrics, observeHTTP } from "./observability";
 import type { WSContext } from "hono/ws";
 const production = process.env.NODE_ENV === "production";
 if (production && !process.env.APP_ORIGIN)
@@ -21,8 +22,17 @@ export const store = new Store(
 );
 export const game = new Game(store);
 const app = new Hono<{ Variables: { guest: Guest } }>();
+app.use("*", observeHTTP);
 const { upgradeWebSocket, websocket } = createBunWebSocket();
 const sockets = new Map<WSContext, Guest>();
+app.get("/metrics", (c) => {
+  const token = process.env.METRICS_BEARER_TOKEN;
+  if (!token || c.req.header("authorization") !== `Bearer ${token}`)
+    return c.text("Not found", 404);
+  return c.text(metrics(sockets.size), 200, {
+    "Content-Type": "text/plain; version=0.0.4; charset=utf-8",
+  });
+});
 const broadcast = () => {
   for (const [ws, guest] of sockets) {
     try {
