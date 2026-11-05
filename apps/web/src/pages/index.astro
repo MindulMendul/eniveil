@@ -1,5 +1,5 @@
 ---
-import App from "../App.svelte";
+import App from "../app/App.svelte";
 ---
 <!doctype html>
 <html lang="ko">
@@ -12,7 +12,7 @@ import App from "../App.svelte";
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>이상한 축제 · 머더 미스터리</title>
   </head>
-  <body class="m-0 bg-festival-bg font-sans text-festival-text font-normal [font-synthesis:none]">
+  <body class="m-0 min-h-screen bg-festival-bg font-sans text-festival-text font-normal font-synthesis-none">
     <App client:only="svelte" />
   </body>
 </html>
