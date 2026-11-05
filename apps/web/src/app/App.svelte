@@ -272,7 +272,6 @@
 
 <StoryPickerDialog
   open={picker && snapshot !== null}
-  scenarios={snapshot?.scenarios ?? []}
   {busy}
   {connected}
   {t}
