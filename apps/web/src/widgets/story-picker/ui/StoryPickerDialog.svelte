@@ -10,6 +10,7 @@
     connected,
     t,
     onClose,
+    onWorkshop,
     onCreate,
   }: {
     open: boolean;
@@ -18,6 +19,7 @@
     connected: boolean;
     t: (key: string) => string;
     onClose: () => void;
+    onWorkshop: () => void;
     onCreate: (scenarioId: string) => void;
   } = $props();
 
@@ -42,9 +44,7 @@
       <h2 class="modal-title" id="picker-title">{t("chooseStory")}</h2>
       <div class="tabs">
         <span class="tab selected">오리지널 스토리</span>
-        <Button variant="tab" class="tab" disabled title="준비 중">
-          창작마당 <span class="tag tab-tag">준비 중</span>
-        </Button>
+        <Button variant="tab" class="tab" onclick={onWorkshop}>창작마당 ↗</Button>
       </div>
       <div class="scenario-list">
         {#each scenarios as scenario (scenario.id)}
