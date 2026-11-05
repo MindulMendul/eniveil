@@ -130,5 +130,5 @@ export function createLobbyRoutes(deps: {
   );
   setInterval(broadcast, 30000).unref();
 
-  return { app, websocket };
+  return { app, websocket, connectionCount: () => sockets.size };
 }

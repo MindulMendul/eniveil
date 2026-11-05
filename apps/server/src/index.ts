@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { observeHTTP, metrics } from "./observability";
 import { serveStatic } from "hono/bun";
 import { bodyLimit } from "hono/body-limit";
 import { resolve } from "node:path";
@@ -45,6 +46,7 @@ const notifyTemporal = (action: "start" | "event" | "end", payload: object) => {
 };
 
 const app = new Hono();
+app.use("*", observeHTTP);
 const allowed = (origin: string, url: string) =>
   origin === (process.env.APP_ORIGIN ?? new URL(url).origin) ||
   (!production &&
@@ -84,6 +86,10 @@ app.route("/api/game", createGameRoutes({
   sessions: storySessions,
 }));
 app.route("/api/lobby", lobby.app);
+
+app.get("/metrics", (c) => c.text(metrics(lobby.connectionCount()), 200, {
+  "Content-Type": "text/plain; version=0.0.4; charset=utf-8",
+}));
 
 // Health stays at a stable platform-independent path for container probes.
 app.get("/api/health", (c) => c.json({ ok: true }));
