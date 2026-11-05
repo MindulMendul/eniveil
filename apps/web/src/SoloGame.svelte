@@ -1,6 +1,10 @@
 <script>
-  /** @type {{ onExit?: () => void }} */
-  let { onExit = () => {} } = $props();
+  import { translate } from './i18n.js';
+
+  /** @type {{ locale?: 'ko' | 'en', onExit?: () => void }} */
+  let { locale = 'ko', onExit = () => {} } = $props();
+  /** @param {Parameters<typeof translate>[1]} key */
+  const t = (key) => translate(locale, key);
 
   const suspects = [
     { id: 'dae', name: '최대리', details: '박대리와 함께 진급시험을 봤다가 밀려난 동료. 야근 후 22:30 귀가했다고 진술했다.' },
@@ -172,79 +176,79 @@
     <p class="eyebrow">A CASE FOR ONE DETECTIVE</p>
     <div class="mb-7 border-y border-festival-line py-8">
       <span class="text-5xl text-festival-gold" aria-hidden="true">✳</span>
-      <p class="my-4 text-[11px] tracking-[3px] text-festival-muted">덕일상사 · 23:00</p>
-      <h1 class="m-0 font-serif text-[38px] font-medium leading-[1.5] tracking-[-1px] max-[520px]:text-[30px]">덕일상사 살인사건</h1>
-      <p class="mt-3 text-sm leading-[1.9] text-festival-muted">네 명의 용의자, 아홉 개의 증거.<br />혼자 수사하고 범인을 밝혀내.</p>
+      <p class="my-4 text-[11px] tracking-[3px] text-festival-muted">{locale === 'en' ? 'DEOKIL TRADING · 23:00' : '덕일상사 · 23:00'}</p>
+      <h1 class="m-0 font-serif text-[38px] font-medium leading-[1.5] tracking-[-1px] max-[520px]:text-[30px]">{t('caseTitle')}</h1>
+      <p class="mt-3 text-sm leading-[1.9] text-festival-muted">{t('caseSubtitle')}</p>
     </div>
     <div class="mx-auto grid max-w-[540px] grid-cols-3 gap-3 text-left max-[520px]:grid-cols-1">
       {#each [{ number: '01', label: '현장 조사' }, { number: '02', label: '진술 검증' }, { number: '03', label: '범인 지목' }] as step}
         <div class="border border-festival-line px-4 py-3"><span class="text-[10px] tracking-[1px] text-festival-gold">{step.number}</span><p class="mb-0 mt-2 text-sm">{step.label}</p></div>
       {/each}
     </div>
-    <button class="primary mx-auto max-w-[540px]" onclick={startOver}>사건 시작하기 <span>→</span></button>
-    <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>축제 홈으로 돌아가기</button>
+    <button class="primary mx-auto max-w-[540px]" onclick={startOver}>{t('caseStart')} <span>→</span></button>
+    <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>{t('backToFestival')}</button>
   </section>
 {:else if phase === 'intro'}
   <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-9 text-center max-[520px]:p-6">
-    <p class="eyebrow">THE CASE FILE · {String(introIndex + 1).padStart(2, '0')} / {intro.length}</p>
+    <p class="eyebrow">{t('caseIntro')} · {String(introIndex + 1).padStart(2, '0')} / {intro.length}</p>
     <div class="my-8 border-y border-festival-line py-10"><span class="text-4xl text-festival-gold" aria-hidden="true">✳</span><p class="mx-auto my-7 max-w-[520px] font-serif text-[20px] leading-[2] text-festival-copy">{intro[introIndex]}</p></div>
-    <button class="primary mx-auto max-w-[400px]" onclick={nextIntro}>{introIndex === intro.length - 1 ? '등장인물 확인하기' : '다음'} <span>→</span></button>
+    <button class="primary mx-auto max-w-[400px]" onclick={nextIntro}>{introIndex === intro.length - 1 ? t('suspectsTitle') : t('next')} <span>→</span></button>
   </section>
 {:else if phase === 'cast'}
   <section class="mx-auto max-w-[840px]">
-    <p class="eyebrow">THE SUSPECTS</p><h1 class="heading-one page-title">등장인물</h1><p class="muted mb-7">사건과 얽힌 네 사람. 진술과 증거를 하나씩 대조해 봐.</p>
+    <p class="eyebrow">THE SUSPECTS</p><h1 class="heading-one page-title">{t('suspectsTitle')}</h1><p class="muted mb-7">{t('suspectDescription')}</p>
     <div class="grid grid-cols-2 gap-4 max-[650px]:grid-cols-1">
-      <article class="panel"><span class="eyebrow">THE VICTIM</span><h2 class="heading-two mb-2">박대리</h2><p class="muted">인망 좋기로 소문난 덕일상사 직원. 진급을 앞두고 있었고, 23시에 사망했다.</p></article>
+      <article class="panel"><span class="eyebrow">{t('victim')}</span><h2 class="heading-two mb-2">박대리</h2><p class="muted">인망 좋기로 소문난 덕일상사 직원. 진급을 앞두고 있었고, 23시에 사망했다.</p></article>
       {#each suspects as suspect, i}
-        <article class="panel"><div class="section-heading"><span class="eyebrow section-eyebrow">SUSPECT 0{i + 1}</span><span class="tag">용의자</span></div><h2 class="heading-two mb-2 mt-4">{suspect.name}</h2><p class="muted">{suspect.details}</p></article>
+        <article class="panel"><div class="section-heading"><span class="eyebrow section-eyebrow">SUSPECT 0{i + 1}</span><span class="tag">{t('suspect')}</span></div><h2 class="heading-two mb-2 mt-4">{suspect.name}</h2><p class="muted">{suspect.details}</p></article>
       {/each}
     </div>
-    <button class="primary mt-6" onclick={() => { phase = 'explore'; }}>현장 조사 시작 <span>→</span></button>
+    <button class="primary mt-6" onclick={() => { phase = 'explore'; }}>{t('investigate')} <span>→</span></button>
   </section>
 {:else if phase === 'explore'}
   <section class="mx-auto max-w-[960px]">
-    <div class="page-heading"><div><p class="eyebrow">INVESTIGATION · 01</p><h1 class="heading-one page-title">현장 조사</h1><p class="muted">장소를 살펴보고 사건의 단서를 모아.</p></div><span class="tag gold">증거 {found.length} / 9</span></div>
+    <div class="page-heading"><div><p class="eyebrow">INVESTIGATION · 01</p><h1 class="heading-one page-title">{t('investigate')}</h1><p class="muted">{t('investigationDescription')}</p></div><span class="tag gold">{t('collectedEvidence')} {found.length} / 9</span></div>
     <div class="lobby-grid"><section class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">
       {#each rooms as room}
         <button class="cursor-pointer border bg-festival-panel p-5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-festival-gold {roomId === room.id ? 'border-festival-gold' : 'border-festival-line hover:border-festival-gold-border'}" onclick={() => enterRoom(room.id)}>
           <span class="text-[10px] tracking-[1.5px] text-festival-gold">{room.id === 'pantry' ? 'BREAK ROOM' : room.id === 'stairs' ? 'EMERGENCY STAIR' : room.id === 'guard' ? 'SECURITY ROOM' : 'OFFICE'}</span>
-          <h2 class="mb-1 mt-3 font-serif text-[19px] font-medium">{room.name}</h2><p class="muted">{room.mood}</p>
-          <span class="mt-4 block text-xs text-festival-muted">조사한 증거 {room.evidence.filter((id) => found.includes(id)).length} / {room.evidence.length}</span>
+          <h2 class="mb-1 mt-3 font-serif text-[19px] font-medium">{t(room.id === 'desk' ? 'locationDesk' : room.id === 'pantry' ? 'locationPantry' : room.id === 'stairs' ? 'locationStairs' : 'locationGuard')}</h2><p class="muted">{t(room.id === 'desk' ? 'roomDeskMood' : room.id === 'pantry' ? 'roomPantryMood' : room.id === 'stairs' ? 'roomStairsMood' : 'roomGuardMood')}</p>
+          <span class="mt-4 block text-xs text-festival-muted">{t('cluePlural')} {room.evidence.filter((id) => found.includes(id)).length} / {room.evidence.length}</span>
         </button>
       {/each}
     </section><aside class="panel min-h-[210px]">
       {#if selectedRoom}
-        <p class="eyebrow">SEARCH THE ROOM</p><h2 class="heading-two">{selectedRoom.name}</h2>
+        <p class="eyebrow">SEARCH THE ROOM</p><h2 class="heading-two">{t(selectedRoom.id === 'desk' ? 'locationDesk' : selectedRoom.id === 'pantry' ? 'locationPantry' : selectedRoom.id === 'stairs' ? 'locationStairs' : 'locationGuard')}</h2>
         <div class="grid gap-2">{#each selectedRoom.evidence as id}<button class="secondary mt-0" onclick={() => inspect(id)}><span>{found.includes(id) ? '✓ ' : ''}{evidence[id].name}</span><span>↗</span></button>{/each}</div>
         {#if currentEvidence}<div class="mt-5 border-t border-festival-line pt-4"><p class="mb-2 text-xs text-festival-gold">{evidence[currentEvidence].icon} {evidence[currentEvidence].name}</p><p class="m-0 text-sm leading-[1.9] text-festival-copy-soft">{evidence[currentEvidence].detail}</p></div>{/if}
-      {:else}<p class="eyebrow">CRIME SCENE</p><h2 class="heading-two">어디부터 살펴볼까?</h2><p class="muted">장소를 선택하면 조사할 물건을 확인할 수 있어.</p>{/if}
+      {:else}<p class="eyebrow">CRIME SCENE</p><h2 class="heading-two">{t('whereStart')}</h2><p class="muted">{t('searchRoom')}</p>{/if}
     </aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>힌트 보기</button><button class="primary mt-0 w-auto min-w-[230px]" onclick={() => { phase = 'alibi'; selectedSuspect = ''; }}>1차 검증으로 <span>→</span></button></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><button class="primary mt-0 w-auto min-w-[230px]" onclick={() => { phase = 'alibi'; selectedSuspect = ''; }}>{t('exploreNext')} <span>→</span></button></div>
   </section>
 {:else if phase === 'alibi' || phase === 'cross'}
   <section class="mx-auto max-w-[960px]">
-    <div class="page-heading"><div><p class="eyebrow">INTERROGATION · {phase === 'alibi' ? '02' : '03'}</p><h1 class="heading-one page-title">{phase === 'alibi' ? '알리바이 검증' : '증거 제시'}</h1><p class="muted">용의자를 선택해 질문하고 반응을 기록해.</p></div><span class="tag gold">수집한 증거 {found.length}개</span></div>
-    <nav class="steps" aria-label="수사 단계"><span class="step">01 현장 조사</span><span class:active={phase === 'alibi'} class="step">02 알리바이</span><span class:active={phase === 'cross'} class="step">03 증거 제시</span><span class="step">04 범인 지목</span></nav>
+    <div class="page-heading"><div><p class="eyebrow">INTERROGATION · {phase === 'alibi' ? '02' : '03'}</p><h1 class="heading-one page-title">{phase === 'alibi' ? t('interview') : t('presentEvidence')}</h1><p class="muted">{t('interrogationDescription')}</p></div><span class="tag gold">{t('evidenceCount')} {found.length}</span></div>
+    <nav class="steps" aria-label="수사 단계"><span class="step">{t('stageOne')}</span><span class:active={phase === 'alibi'} class="step">{t('stageTwo')}</span><span class:active={phase === 'cross'} class="step">{t('stageThree')}</span><span class="step">{t('stageFour')}</span></nav>
     <div class="lobby-grid"><section class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">{#each suspects as suspect}
       <button class="cursor-pointer border bg-festival-panel p-5 text-left focus-visible:outline-2 focus-visible:outline-festival-gold {selectedSuspect === suspect.id ? 'border-festival-gold' : 'border-festival-line hover:border-festival-gold-border'}" onclick={() => chooseSuspect(suspect.id)}><span class="text-[10px] tracking-[1px] text-festival-muted">SUSPECT</span><h2 class="mb-2 mt-3 font-serif text-[20px] font-medium">{suspect.name}</h2><p class="m-0 text-xs leading-[1.8] text-festival-muted">{suspect.details}</p></button>
     {/each}</section><aside class="panel min-h-[300px]">
       {#if selected}
-        <p class="eyebrow">QUESTION · {selected.name}</p><h2 class="heading-two">무엇을 물어볼까?</h2>
-        {#if phase === 'alibi'}<div class="grid gap-2"><button class="secondary mt-0" onclick={() => askAlibi(0)}>알리바이를 묻는다 <span>↗</span></button><button class="secondary mt-0" onclick={() => askAlibi(1)}>박대리와의 관계를 묻는다 <span>↗</span></button></div>
-        {:else}<p class="muted mb-3">가방에서 증거를 골라 제시해.</p>{#if found.length}<div class="grid max-h-[230px] gap-2 overflow-auto">{#each found as id}<button class="secondary mt-0" onclick={() => presentEvidence(id)}><span>{evidence[id].icon} {evidence[id].name}</span><span>↗</span></button>{/each}</div>{:else}<p class="muted">아직 확보한 증거가 없어.</p>{/if}{/if}
+        <p class="eyebrow">QUESTION · {selected.name}</p><h2 class="heading-two">{t('chooseQuestion')}</h2>
+        {#if phase === 'alibi'}<div class="grid gap-2"><button class="secondary mt-0" onclick={() => askAlibi(0)}>{t('askAlibi')} <span>↗</span></button><button class="secondary mt-0" onclick={() => askAlibi(1)}>{t('askRelationship')} <span>↗</span></button></div>
+        {:else}<p class="muted mb-3">{t('showEvidence')}</p>{#if found.length}<div class="grid max-h-[230px] gap-2 overflow-auto">{#each found as id}<button class="secondary mt-0" onclick={() => presentEvidence(id)}><span>{evidence[id].icon} {evidence[id].name}</span><span>↗</span></button>{/each}</div>{:else}<p class="muted">{t('noEvidence')}</p>{/if}{/if}
         <div class="mt-5 grid gap-3">{#each responses.slice().reverse() as response}<blockquote class="m-0 border-l-2 border-festival-gold-border bg-festival-panel-input px-4 py-3"><span class="text-[10px] tracking-[1px] text-festival-gold">{response.source}</span><p class="mb-0 mt-2 text-sm leading-[1.9] text-festival-copy">“{response.text}”</p></blockquote>{/each}</div>
-      {:else}<p class="eyebrow">INTERVIEW NOTES</p><h2 class="heading-two">용의자를 선택해</h2><p class="muted">한 사람씩 진술을 확인하고, 확보한 증거와 비교해 봐.</p>{/if}
+      {:else}<p class="eyebrow">INTERVIEW NOTES</p><h2 class="heading-two">{t('chooseSuspect')}</h2><p class="muted">{t('compareStatements')}</p>{/if}
     </aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>힌트 보기</button><div class="flex flex-wrap gap-3"><button class="secondary mt-0 w-auto" onclick={() => { phase = phase === 'alibi' ? 'explore' : 'alibi'; selectedSuspect = ''; }}>← 이전 단계</button>{#if phase === 'alibi'}<button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'cross'; selectedSuspect = ''; }}>증거 제시로 <span>→</span></button>{:else}<button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'accuse'; selectedSuspect = ''; accusation = []; }}>범인 지목하기 <span>→</span></button>{/if}</div></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><div class="flex flex-wrap gap-3"><button class="secondary mt-0 w-auto" onclick={() => { phase = phase === 'alibi' ? 'explore' : 'alibi'; selectedSuspect = ''; }}>← {t('previous')}</button>{#if phase === 'alibi'}<button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'cross'; selectedSuspect = ''; }}>{t('presentEvidence')} <span>→</span></button>{:else}<button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'accuse'; selectedSuspect = ''; accusation = []; }}>{t('accusationTitle')} <span>→</span></button>{/if}</div></div>
   </section>
 {:else if phase === 'accuse'}
   <section class="mx-auto max-w-[960px]">
-    <p class="eyebrow">FINAL · 04</p><h1 class="heading-one page-title">범인을 지목하라</h1><p class="muted mb-7">범인 한 명과 사건을 뒷받침할 증거 세 개를 선택해.</p>
-    <div class="lobby-grid"><section class="panel"><h2 class="heading-two">누가 박대리를 죽였을까?</h2><div class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">{#each suspects as suspect}<button class="cursor-pointer border p-4 text-left focus-visible:outline-2 focus-visible:outline-festival-gold {selectedSuspect === suspect.id ? 'border-festival-gold bg-festival-panel-hover' : 'border-festival-line bg-transparent hover:border-festival-gold-border'}" onclick={() => chooseSuspect(suspect.id)}><span class="text-xs text-festival-muted">{selectedSuspect === suspect.id ? '● 선택됨' : '○ 선택'}</span><h3 class="heading-three mb-0 mt-2">{suspect.name}</h3></button>{/each}</div></section><aside class="panel"><div class="section-heading"><h2 class="heading-two mb-0">결정적 증거</h2><span class="tag gold">{accusation.length} / 3</span></div><p class="muted my-4">범행을 증명할 단서를 세 개 골라.</p><div class="grid max-h-[390px] gap-2 overflow-auto">{#each found as id}<button class="secondary mt-0" onclick={() => toggleAccusation(id)}><span>{accusation.includes(id) ? '☑' : '☐'} {evidence[id].icon} {evidence[id].name}</span><span>{accusation.includes(id) ? '선택됨' : ''}</span></button>{/each}</div></aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>힌트 보기</button><div class="flex gap-3"><button class="secondary mt-0 w-auto" onclick={() => { phase = 'cross'; selectedSuspect = ''; }}>증거 다시 확인</button><button class="primary mt-0 w-auto min-w-[190px]" disabled={!selectedSuspect || accusation.length !== 3} onclick={arrest}>체포한다 <span>→</span></button></div></div>
+    <p class="eyebrow">FINAL · 04</p><h1 class="heading-one page-title">{t('accusationTitle')}</h1><p class="muted mb-7">{t('accusationDescription')}</p>
+    <div class="lobby-grid"><section class="panel"><h2 class="heading-two">{t('culpritQuestion')}</h2><div class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">{#each suspects as suspect}<button class="cursor-pointer border p-4 text-left focus-visible:outline-2 focus-visible:outline-festival-gold {selectedSuspect === suspect.id ? 'border-festival-gold bg-festival-panel-hover' : 'border-festival-line bg-transparent hover:border-festival-gold-border'}" onclick={() => chooseSuspect(suspect.id)}><span class="text-xs text-festival-muted">{selectedSuspect === suspect.id ? `● ${t('selectedLabel')}` : `○ ${t('selectLabel')}`}</span><h3 class="heading-three mb-0 mt-2">{suspect.name}</h3></button>{/each}</div></section><aside class="panel"><div class="section-heading"><h2 class="heading-two mb-0">{t('decisiveEvidence')}</h2><span class="tag gold">{accusation.length} / 3</span></div><p class="muted my-4">{t('chooseThreeEvidence')}</p><div class="grid max-h-[390px] gap-2 overflow-auto">{#each found as id}<button class="secondary mt-0" onclick={() => toggleAccusation(id)}><span>{accusation.includes(id) ? '☑' : '☐'} {evidence[id].icon} {evidence[id].name}</span><span>{accusation.includes(id) ? t('selectedLabel') : ''}</span></button>{/each}</div></aside></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><div class="flex gap-3"><button class="secondary mt-0 w-auto" onclick={() => { phase = 'cross'; selectedSuspect = ''; }}>{t('reviewEvidence')}</button><button class="primary mt-0 w-auto min-w-[190px]" disabled={!selectedSuspect || accusation.length !== 3} onclick={arrest}>{t('arrest')} <span>→</span></button></div></div>
   </section>
 {:else if phase === 'win'}
-  <section class="mx-auto max-w-[760px] border border-festival-gold-border bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">CASE CLOSED · SUCCESS</p><h1 class="heading-one page-title">사건 종결</h1><p class="muted">범인 최사원과 핵심 증거를 정확히 짚어냈어.</p><div class="mt-8 grid gap-3 text-left">{#each resolution as line, i}<article class="border border-festival-line p-5"><span class="text-[10px] tracking-[1px] text-festival-gold">결말 0{i + 1}</span><p class="mb-0 mt-3 font-serif text-[16px] leading-[2] text-festival-copy">{line}</p></article>{/each}</div><button class="primary mt-7" onclick={startOver}>다시 플레이하기 <span>↻</span></button><button class="mt-4 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>축제 홈으로 돌아가기</button></section>
+  <section class="mx-auto max-w-[760px] border border-festival-gold-border bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('allCaught')}</p><h1 class="heading-one page-title">{t('success')}</h1><p class="muted">{t('successDescription')}</p><div class="mt-8 grid gap-3 text-left">{#each resolution as line, i}<article class="border border-festival-line p-5"><span class="text-[10px] tracking-[1px] text-festival-gold">{t('conclusion')} 0{i + 1}</span><p class="mb-0 mt-3 font-serif text-[16px] leading-[2] text-festival-copy">{line}</p></article>{/each}</div><button class="primary mt-7" onclick={startOver}>{t('replay')} <span>↻</span></button><button class="mt-4 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>{t('backToFestival')}</button></section>
 {:else}
-  <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">CASE UNRESOLVED</p><span class="text-5xl text-festival-gold" aria-hidden="true">…</span><h1 class="heading-one page-title mt-5">사건이 미궁에 빠졌다</h1><p class="narrative">{resultMessage}</p><div class="mt-7 grid gap-3 sm:grid-cols-2"><button class="primary mt-0" onclick={startOver}>처음부터 다시하기 <span>↻</span></button><button class="secondary mt-0" onclick={onExit}>축제 홈으로 돌아가기 <span>↗</span></button></div></section>
+  <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('caseUnresolved')}</p><span class="text-5xl text-festival-gold" aria-hidden="true">…</span><h1 class="heading-one page-title mt-5">{t('unresolved')}</h1><p class="narrative">{resultMessage}</p><div class="mt-7 grid gap-3 sm:grid-cols-2"><button class="primary mt-0" onclick={startOver}>{t('restart')} <span>↻</span></button><button class="secondary mt-0" onclick={onExit}>{t('backToFestival')} <span>↗</span></button></div></section>
 {/if}
