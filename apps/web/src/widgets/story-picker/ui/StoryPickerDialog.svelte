@@ -11,6 +11,7 @@
     t,
     onClose,
     onWorkshop,
+    onSolo,
     onCreate,
   }: {
     open: boolean;
@@ -20,6 +21,7 @@
     t: (key: string) => string;
     onClose: () => void;
     onWorkshop: () => void;
+    onSolo: () => void;
     onCreate: (scenarioId: string) => void;
   } = $props();
 
@@ -45,6 +47,13 @@
       <div class="tabs">
         <span class="tab selected">오리지널 스토리</span>
         <Button variant="tab" class="tab" onclick={onWorkshop}>창작마당 ↗</Button>
+      </div>
+      <div class="mt-4 flex items-center justify-between gap-4 border-t border-festival-line pt-4">
+        <div>
+          <h3 class="heading-three">{t("soloLabel")}</h3>
+          <p class="muted">{t("soloDescription")}</p>
+        </div>
+        <Button variant="secondary" onclick={onSolo}>{t("soloPlay")} ↗</Button>
       </div>
       <div class="scenario-list">
         {#each scenarios as scenario (scenario.id)}
