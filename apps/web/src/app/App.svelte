@@ -7,6 +7,7 @@
   import { EntryPage } from "../pages/entry";
   import { GamePage } from "../pages/game";
   import { LobbyPage } from "../pages/lobby";
+  import { WorkshopPage } from "../pages/workshop";
   import { RoomPage } from "../pages/room";
   import { AppFooter } from "../widgets/app-footer";
   import { AppHeader } from "../widgets/app-header";
@@ -23,6 +24,8 @@
   let picker = $state(false);
   let copied = $state(false);
   let locale = $state<"ko" | "en">(getLocaleFromPath(location.pathname));
+  const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "") || "/";
+  let currentPath = $state(pagePath(location.pathname));
   let soloActive = $state(false);
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
@@ -136,6 +139,11 @@
     history.pushState({}, "", `${localePath(next, location.pathname)}${location.search}${location.hash}`);
   }
 
+  function openWorkshop() {
+    picker = false;
+    window.location.assign(localePath(locale, "/workshop"));
+  }
+
   async function login() {
     await action(async () => {
       await api("/guest", { nickname });
@@ -173,6 +181,7 @@
   onMount(() => {
     const syncLocale = () => {
       locale = getLocaleFromPath(location.pathname);
+      currentPath = pagePath(location.pathname);
       document.documentElement.lang = locale;
     };
     window.addEventListener("popstate", syncLocale);
@@ -201,7 +210,7 @@
 </script>
 
 <svelte:head>
-  <title>{room ? `${room.title} · ${t("brand")}` : t("homeTitle")}</title>
+  <title>{currentPath === "/workshop" ? t("workshopTitle") : room ? `${room.title} · ${t("brand")}` : t("homeTitle")}</title>
 </svelte:head>
 
 <div class="shell">
@@ -213,6 +222,8 @@
 
   {#if loading}
     <main class="main center"><p>축제의 문을 여는 중…</p></main>
+  {:else if currentPath === "/workshop"}
+    <WorkshopPage {locale} />
   {:else if soloActive}
     <main class="main"><SoloGame {locale} onExit={() => (soloActive = false)} /></main>
   {:else if !snapshot}
@@ -254,5 +265,6 @@
   {connected}
   {t}
   onClose={() => (picker = false)}
+  onWorkshop={openWorkshop}
   onCreate={create}
 />
