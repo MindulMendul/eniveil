@@ -10,8 +10,7 @@
   /** @param {Parameters<typeof translate>[1]} key */
   const t = (key) => translate(locale, key);
 
-  /** @type {import('@festival/shared').StoryPackage | null} */
-  let storyPackage = $state(null);
+  let storyPackage = $state(/** @type {import('@festival/shared').StoryPackage | null} */ (null));
   let storyLoadError = $state('');
   let mechanics = $derived(
     storyPackage?.content.mechanics.type === 'solo-investigation'
