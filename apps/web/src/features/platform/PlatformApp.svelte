@@ -2,7 +2,7 @@
  import { onMount } from 'svelte';
  import SoloGame from '../game/SoloGame.svelte';
  import MultiplayerGame from '../game/MultiplayerGame.svelte';
- import { getLocaleFromPath, localePath, translate } from '../../i18n.js';
+ import { getLocaleFromPath, localePath, translate } from '../../shared/lib/i18n.js';
  import { initializeAnalytics, trackEvent, trackPageView } from '../../analytics.js';
  import type { Snapshot, ServerEvent, Command } from '@festival/shared';
  let locale=$state<'ko'|'en'>(getLocaleFromPath(location.pathname)), snapshot=$state<Snapshot|null>(null), nickname=$state(''), code=$state(''), error=$state(''), busy=$state(false), connected=$state(false), loading=$state(true), picker=$state(false), copied=$state(false), soloActive=$state(false);
