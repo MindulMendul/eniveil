@@ -83,6 +83,63 @@ export class Game {
       room,
     };
   }
+  catalog(query: {
+    search?: string;
+    origin?: "original" | "demo";
+    difficulty?: "easy" | "normal" | "hard";
+    players?: number;
+    sort: "latest" | "rating" | "popular";
+    page: number;
+    limit: number;
+  }) {
+    const items = scenarios.map((scenario) => {
+      const completedSessions = Object.values(this.state.sessions).filter(
+        (session) => session.scenarioId === scenario.id && session.endedAt,
+      );
+      const uniquePlayers = new Set(
+        completedSessions.flatMap((session) => session.participants.map((player) => player.id)),
+      );
+      return {
+        ...scenario,
+        origin: scenario.kind,
+        difficulty: scenario.difficulty ?? null,
+        averageRating: null,
+        ratingCount: 0,
+        completedPlays: completedSessions.length,
+        uniquePlayers: uniquePlayers.size,
+      };
+    }).filter((story) => {
+      if (query.origin && story.origin !== query.origin) return false;
+      if (query.difficulty && story.difficulty !== query.difficulty) return false;
+      if (query.players && story.players !== query.players) return false;
+      const keyword = query.search?.trim().toLocaleLowerCase();
+      return !keyword ||
+        story.title.toLocaleLowerCase().includes(keyword) ||
+        story.subtitle.toLocaleLowerCase().includes(keyword);
+    });
+
+    items.sort((a, b) => {
+      if (query.sort === "rating") {
+        return (b.averageRating ?? -1) - (a.averageRating ?? -1) || b.version - a.version;
+      }
+      if (query.sort === "popular") {
+        return b.uniquePlayers - a.uniquePlayers ||
+          b.completedPlays - a.completedPlays ||
+          b.version - a.version;
+      }
+      return b.version - a.version;
+    });
+
+    const total = items.length;
+    const start = (query.page - 1) * query.limit;
+    return {
+      items: items.slice(start, start + query.limit),
+      page: query.page,
+      limit: query.limit,
+      total,
+      pages: Math.ceil(total / query.limit),
+    };
+  }
   create(me: Guest, scenarioId: string) {
     if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
     const scenario = scenarios.find((s) => s.id === scenarioId && s.available);
