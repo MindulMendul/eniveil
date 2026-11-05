@@ -1,0 +1,21 @@
+---
+import App from "../app/App.svelte";
+
+const { locale = "ko" } = Astro.props;
+const title = locale === "en" ? "The Strange Festival · Murder Mystery" : "이상한 축제 · 머더 미스터리";
+---
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#171c1a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <title>{title}</title>
+  </head>
+  <body class="m-0 min-h-screen bg-festival-bg font-sans text-festival-text font-normal font-synthesis-none">
+    <App client:only="svelte" />
+  </body>
+</html>

@@ -6,3 +6,8 @@ consistency, and deployment safety. Report only actionable findings with file an
 references. Treat generated suggestions as advisory; the existing CI checks remain the
 merge gate.
 """
+
+[github_app]
+pr_commands = ["/agentic_review"]
+handle_push_trigger = true
+push_commands = ["/agentic_review"]

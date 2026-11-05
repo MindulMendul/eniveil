@@ -1,4 +1,89 @@
 import { defineConfig, presetWind4 } from "unocss";
+import { readFileSync } from "node:fs";
+
+type DtcgNode = {
+  $type?: string;
+  $value?: unknown;
+  [key: string]: unknown;
+};
+
+type ThemeTokens = Record<string, string | ThemeTokens>;
+
+const tokens = JSON.parse(
+  readFileSync(new URL("./design-tokens.tokens.json", import.meta.url), "utf8"),
+) as DtcgNode;
+
+function dimensionToCss(value: unknown): string {
+  const dimension = value as { value: number; unit: string };
+  return `${dimension.value}${dimension.unit}`;
+}
+
+function colorToCss(value: unknown): string {
+  if (typeof value === "string") return value;
+  const color = value as { hex?: string; alpha?: number; components?: number[] };
+  if (!color.hex) throw new Error("Design token color is missing its hex fallback.");
+  if (color.alpha === undefined || color.alpha >= 1 || !color.components) return color.hex;
+  const channels = color.components.map((channel) => Math.round(channel * 255)).join(" ");
+  return `rgb(${channels} / ${color.alpha})`;
+}
+
+function tokenToCss(value: unknown, type: string): string {
+  if (type === "dimension") return dimensionToCss(value);
+  if (type === "number") return String(value);
+  if (type === "color") return colorToCss(value);
+  if (type === "fontFamily") {
+    const families = Array.isArray(value) ? value : [value];
+    return families
+      .map((family) => {
+        const name = String(family);
+        return name.includes(" ") ? `\"${name}\"` : name;
+      })
+      .join(", ");
+  }
+  if (type === "shadow") {
+    const shadows = Array.isArray(value) ? value : [value];
+    return shadows
+      .map((item) => {
+        const shadow = item as {
+          color: unknown;
+          offsetX: unknown;
+          offsetY: unknown;
+          blur: unknown;
+          spread: unknown;
+          inset?: boolean;
+        };
+        return [
+          shadow.inset ? "inset" : "",
+          dimensionToCss(shadow.offsetX),
+          dimensionToCss(shadow.offsetY),
+          dimensionToCss(shadow.blur),
+          dimensionToCss(shadow.spread),
+          colorToCss(shadow.color),
+        ]
+          .filter(Boolean)
+          .join(" ");
+      })
+      .join(", ");
+  }
+  throw new Error(`Unsupported design token type: ${type}`);
+}
+
+function toThemeTokens(node: DtcgNode, inheritedType = ""): ThemeTokens | string {
+  const type = typeof node.$type === "string" ? node.$type : inheritedType;
+  if ("$value" in node) return tokenToCss(node.$value, type);
+
+  return Object.fromEntries(
+    Object.entries(node)
+      .filter(([key]) => !key.startsWith("$"))
+      .map(([key, value]) => [key, toThemeTokens(value as DtcgNode, type)]),
+  );
+}
+
+const extensions = tokens.$extensions as DtcgNode;
+const unoExtensions = extensions["com.murderparker.unocss"] as DtcgNode;
+const viewportSizing = unoExtensions.viewportSizing as Record<string, string>;
+const typography = tokens.typography as DtcgNode;
+const typeScale = typography.size as DtcgNode;
 
 export default defineConfig({
   presets: [
@@ -10,145 +95,121 @@ export default defineConfig({
     filesystem: ["src/**/*.{astro,svelte,html}"],
   },
   theme: {
-    colors: {
-      festival: {
-        bg: "#171c1a",
-        text: "#e9e5da",
-        muted: "#a1aaa2",
-        line: "#384139",
-        gold: "#d8bb79",
-        "gold-border": "#6d6041",
-        "gold-hover": "#e4cb94",
-        panel: "#202722",
-        "panel-input": "#181e19",
-        "panel-hover": "#30392c",
-        "copy": "#d6dacd",
-        "copy-soft": "#d4d9cb",
-        "copy-strong": "#e2e6d7",
-        "muted-light": "#c2c8be",
-        "muted-dark": "#69766b",
-        "muted-green": "#829080",
-        "muted-olive": "#788674",
-        "muted-vacant": "#7e8c79",
-        "symbol": "#8b987b",
-        "live": "#b3ce92",
-        "avatar": "#303b2d",
-        "avatar-border": "#4d5a42",
-        "input-border": "#465143",
-        "empty-border": "#46513f",
-        "ticket-border": "#596250",
-        "button-border": "#626d57",
-        "button-text": "#dedcca",
-        "button-hover-border": "#69715e",
-        "member-vacant": "#423126",
-        "notice": "#423126",
-        "notice-border": "#86664f",
-        "notice-text": "#f1d3ad",
-        "avatar-live-shadow": "#b3ce9230",
-        "modal-backdrop": "#080e0bd9",
-        "modal-border": "#5a644d",
-        "dialog-text": "#e9e5da",
-        "scenario-bg": "#182019",
-        "scenario-text": "#e2e6d7",
-        "scenario-small": "#a6b094",
-      },
+    // DTCG tokens are the source of truth; viewport-relative sizes are UnoCSS extensions.
+    breakpoint: toThemeTokens(tokens.breakpoint as DtcgNode) as Record<string, string>,
+    spacing: {
+      ...(toThemeTokens(tokens.layout as DtcgNode) as Record<string, string>),
+      ...viewportSizing,
     },
-    font: {
-      sans: '"Noto Sans KR", sans-serif',
-      serif: '"Noto Serif KR", serif',
-    },
+    text: Object.fromEntries(
+      Object.entries(toThemeTokens(typeScale as DtcgNode) as Record<string, string>).map(
+        ([name, fontSize]) => [name, { fontSize }],
+      ),
+    ),
+    leading: toThemeTokens(typography["line-height"] as DtcgNode) as Record<string, string>,
+    tracking: toThemeTokens(typography["letter-spacing"] as DtcgNode) as Record<string, string>,
+    radius: toThemeTokens(tokens.radius as DtcgNode) as Record<string, string>,
+    shadow: toThemeTokens(tokens.shadow as DtcgNode) as Record<string, string>,
+    colors: toThemeTokens(tokens.color as DtcgNode) as Record<string, Record<string, string>>,
+    font: toThemeTokens(typography.family as DtcgNode) as Record<string, string>,
   },
+  rules: [
+    ["grid-entrance", { "grid-template-columns": "1.3fr 1fr" }],
+    ["grid-lobby", { "grid-template-columns": "minmax(0, 1fr) 19.375rem" }],
+  ],
   shortcuts: {
-    shell: "mx-auto w-full max-w-[1280px] px-[52px] min-h-[100dvh] flex flex-col max-[850px]:px-6 max-[520px]:px-[18px]",
-    header: "h-[108px] flex items-center justify-between border-b border-festival-line max-[850px]:h-[90px]",
-    brand: "flex items-center gap-[14px] font-serif text-[23px] font-semibold max-[850px]:text-[19px] text-inherit no-underline [-webkit-tap-highlight-color:transparent] focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-[5px]",
-    "brand-subtitle": "block mt-[7px] font-sans text-[9px] tracking-[2.3px] text-festival-muted max-[520px]:text-[8px]",
-    emblem: "text-[46px] text-festival-gold font-normal max-[850px]:text-[38px]",
-    identity: "flex items-center gap-[10px] text-[13px] max-[850px]:text-[11px]",
-    edition: "text-festival-muted text-xs max-[520px]:hidden",
-    "identity-tag": "max-[520px]:hidden",
-    tag: "inline-block whitespace-nowrap border border-festival-line px-2 py-1 text-[10px] tracking-[1px] text-festival-muted",
+    "tap-highlight-none": "[-webkit-tap-highlight-color:transparent]",
+    "font-synthesis-none": "[font-synthesis:none]",
+    shell: "mx-auto w-full max-w-7xl px-13 min-h-viewport flex flex-col max-tablet:px-6 max-mobile:px-4.5",
+    header: "h-27 flex items-center justify-between border-b border-festival-line max-tablet:h-22.5",
+    brand: "flex items-center gap-3.5 font-serif text-title-lg font-semibold max-tablet:text-brand-tablet text-inherit no-underline tap-highlight-none focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-5",
+    "brand-subtitle": "block mt-1.75 font-sans text-micro tracking-brand text-festival-muted max-mobile:text-mini",
+    emblem: "text-display-xl text-festival-gold font-normal max-tablet:text-display-lg",
+    identity: "flex items-center gap-2.5 text-body-sm max-tablet:text-caption",
+    edition: "text-festival-muted text-xs max-mobile:hidden",
+    "identity-tag": "max-mobile:hidden",
+    tag: "inline-block whitespace-nowrap border border-festival-line px-2 py-1 text-label tracking-label text-festival-muted",
     gold: "text-festival-gold border-festival-gold-border",
-    dot: "inline-block size-[7px] shrink-0 rounded-full bg-[#777]",
-    live: "bg-festival-live shadow-[0_0_10px_#b3ce9230]",
-    main: "flex-1 py-[54px] pb-[72px] max-[520px]:py-9 max-[520px]:pb-12",
-    entrance: "grid min-h-[680px] grid-cols-[1.3fr_1fr] items-center gap-[90px] max-[850px]:min-h-0 max-[850px]:grid-cols-1 max-[850px]:gap-9 max-[850px]:pt-[45px]",
-    "heading-one": "mt-0 mb-5 font-serif text-[42px] leading-[1.55] font-medium tracking-[-1.6px] max-[850px]:text-[33px]",
-    "entrance-title": "mb-5 text-[46px] max-[850px]:text-[38px] max-[520px]:text-[33px]",
-    "page-title": "mb-[10px]",
-    "heading-two": "mt-0 mb-[18px] font-serif text-[25px] leading-[1.6] font-medium",
-    "sidebar-title": "text-[23px]",
+    dot: "inline-block size-1.75 shrink-0 rounded-full bg-festival-status-offline",
+    live: "bg-festival-live shadow-live",
+    main: "flex-1 py-13.5 pb-18 max-mobile:py-9 max-mobile:pb-12",
+    entrance: "grid-entrance grid min-h-entrance items-center gap-22.5 max-tablet:min-h-0 max-tablet:grid-cols-1 max-tablet:gap-9 max-tablet:pt-11.25",
+    "heading-one": "mt-0 mb-5 font-serif text-display leading-display font-medium tracking-display max-tablet:text-display-sm",
+    "entrance-title": "mb-5 text-display-xl max-tablet:text-display-lg max-mobile:text-display-sm",
+    "page-title": "mb-2.5",
+    "heading-two": "mt-0 mb-4.5 font-serif text-title-xl leading-title font-medium",
+    "sidebar-title": "text-title-lg",
     "section-title": "m-0 font-sans text-base",
-    "heading-three": "mt-0 mb-3 text-[17px] leading-[1.7] font-medium",
-    "room-title": "my-5 mb-[10px] font-serif text-[22px]",
-    "eyebrow": "mb-5 text-[10px] leading-normal font-semibold tracking-[2.5px] text-festival-gold",
-    intro: "m-0 text-[15px] leading-[2.1] text-festival-muted",
-    ticket: "mt-[58px] flex justify-between border-y border-dashed border-festival-ticket-border py-5 text-[10px] tracking-[1px] text-festival-gold max-[850px]:mt-7 max-[520px]:text-[8px]",
-    panel: "border border-festival-line bg-festival-panel p-7 max-[520px]:p-[22px]",
-    login: "p-10 max-[850px]:p-7",
-    muted: "m-0 text-sm leading-[1.9] text-festival-muted",
-    fine: "mt-[22px] mb-0 text-xs leading-[1.9] text-festival-muted",
-    "input-label": "mt-6 mb-[10px] block text-xs text-festival-muted-light",
-    "join-label": "mt-[15px]",
-    "input-field": "w-full rounded-none border border-festival-input-border bg-festival-panel-input px-4 py-[14px] text-festival-text outline-none [-webkit-tap-highlight-color:transparent] placeholder:text-festival-muted-dark focus:border-festival-gold focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-[5px]",
-    primary: "mt-5 flex w-full cursor-pointer items-center justify-between rounded-none border border-festival-gold bg-festival-gold [-webkit-tap-highlight-color:transparent] px-[18px] py-[14px] text-[13px] font-semibold text-[#22291f] transition-[background,border-color] duration-150 focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-[5px] disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:bg-festival-gold-hover",
-    secondary: "mt-5 flex w-full cursor-pointer items-center justify-between rounded-none border border-festival-button-border bg-transparent [-webkit-tap-highlight-color:transparent] px-[18px] py-[14px] text-[13px] text-festival-button-text transition-[background,border-color] duration-150 focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-[5px] disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:border-festival-gold enabled:hover:bg-festival-panel-hover",
+    "heading-three": "mt-0 mb-3 text-body-lg leading-body-lg font-medium",
+    "room-title": "my-5 mb-2.5 font-serif text-title",
+    "eyebrow": "mb-5 text-label leading-normal font-semibold tracking-eyebrow text-festival-gold",
+    intro: "m-0 whitespace-pre-line text-body leading-intro text-festival-muted",
+    ticket: "mt-14.5 flex justify-between border-y border-dashed border-festival-ticket-border py-5 text-label tracking-label text-festival-gold max-tablet:mt-7 max-mobile:text-mini",
+    panel: "border border-festival-line bg-festival-panel p-7 max-mobile:p-5.5",
+    login: "p-10 max-tablet:p-7",
+    muted: "m-0 text-sm leading-body text-festival-muted",
+    fine: "mt-5.5 mb-0 text-xs leading-body text-festival-muted",
+    "input-label": "mt-6 mb-2.5 block text-xs text-festival-muted-light",
+    "join-label": "mt-3.75",
+    "input-field": "w-full rounded-control border border-festival-input-border bg-festival-panel-input px-4 py-3.5 text-festival-text outline-none tap-highlight-none placeholder:text-festival-muted-dark focus:border-festival-gold focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-5",
+    primary: "mt-5 flex min-h-11 w-full cursor-pointer items-center justify-between rounded-control border border-festival-gold bg-festival-gold tap-highlight-none px-4.5 py-3.5 text-body-sm font-semibold text-festival-button-foreground transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-5 disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:bg-festival-gold-hover",
+    secondary: "mt-5 flex min-h-11 w-full cursor-pointer items-center justify-between rounded-control border border-festival-button-border bg-transparent tap-highlight-none px-4.5 py-3.5 text-body-sm text-festival-button-text transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-5 disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:border-festival-gold enabled:hover:bg-festival-panel-hover",
     "secondary-compact": "w-auto min-w-40",
-    "page-heading": "mb-10 flex items-center justify-between gap-6 max-[850px]:items-start max-[520px]:gap-3",
-    count: "whitespace-nowrap text-[13px] text-festival-muted",
-    "lobby-grid": "grid grid-cols-[minmax(0,1fr)_310px] gap-7 max-[850px]:grid-cols-1",
-    sidebar: "flex flex-col gap-5 max-[850px]:grid max-[850px]:grid-cols-2 max-[850px]:items-start max-[520px]:flex",
-    "section-heading": "flex items-center justify-between gap-[15px]",
+    "page-heading": "mb-10 flex items-center justify-between gap-6 max-tablet:items-start max-mobile:gap-3",
+    count: "whitespace-nowrap text-body-sm text-festival-muted",
+    "lobby-grid": "grid-lobby grid gap-7 max-tablet:grid-cols-1",
+    sidebar: "flex flex-col gap-5 max-tablet:grid max-tablet:grid-cols-2 max-tablet:items-start max-mobile:flex",
+    "section-heading": "flex items-center justify-between gap-3.75",
     "section-eyebrow": "m-0",
-    empty: "mt-[22px] flex min-h-[360px] flex-col items-center justify-center border border-dashed border-festival-empty-border p-[30px] text-center",
-    "empty-symbol": "mb-5 text-[50px] text-festival-symbol",
-    "empty-copy": "mb-0 text-[13px] text-festival-muted",
-    rooms: "mt-[22px] grid gap-4",
+    empty: "mt-5.5 flex min-h-90 flex-col items-center justify-center border border-dashed border-festival-empty-border p-7.5 text-center",
+    "empty-symbol": "mb-5 text-symbol text-festival-symbol",
+    "empty-copy": "mb-0 text-body-sm text-festival-muted",
+    rooms: "mt-5.5 grid gap-4",
     "room-card": "border border-festival-line bg-festival-panel p-6",
-    "room-count": "m-0 text-sm leading-[1.9] text-festival-muted",
-    "footer": "flex justify-between gap-4 border-t border-festival-line py-6 pb-[30px] text-[10px] tracking-[1px] text-festival-muted-green",
-    "footer-tagline": "max-[850px]:hidden",
+    "room-count": "m-0 text-sm leading-body text-festival-muted",
+    "footer": "flex justify-between gap-4 border-t border-festival-line py-6 pb-7.5 text-label tracking-label text-festival-muted-green",
+    "footer-tagline": "max-tablet:hidden",
     offline: "text-festival-gold",
-    notice: "mt-6 flex items-center justify-between border border-festival-notice-border bg-festival-notice px-[18px] py-[14px] text-[13px] text-festival-notice-text",
-    dismiss: "cursor-pointer border-0 bg-transparent [-webkit-tap-highlight-color:transparent] px-[5px] py-0 text-[26px] text-festival-muted focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-[5px]",
-    "text-button": "cursor-pointer border-0 border-b border-festival-button-hover-border bg-transparent [-webkit-tap-highlight-color:transparent] px-0 py-2 text-[13px] text-festival-muted focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-[5px] disabled:cursor-not-allowed disabled:opacity-40",
+    notice: "mt-6 flex items-center justify-between border border-festival-notice-border bg-festival-notice px-4.5 py-3.5 text-body-sm text-festival-notice-text",
+    dismiss: "grid min-h-11 min-w-11 place-items-center cursor-pointer border-0 bg-transparent tap-highlight-none px-1.25 py-0 text-title-xl text-festival-muted focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-5",
+    "text-button": "min-h-11 cursor-pointer border-0 border-b border-festival-button-hover-border bg-transparent tap-highlight-none px-0 py-2 text-body-sm text-festival-muted focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-5 disabled:cursor-not-allowed disabled:opacity-40",
     members: "mt-7",
     member: "flex items-center gap-4 border-t border-festival-line py-5",
     "member-info": "min-w-0 flex-1",
     "member-status": "ml-auto",
-    "member-name": "text-[15px] font-medium",
-    "member-role": "mt-[7px] block text-[11px] text-festival-muted",
+    "member-name": "text-body font-medium",
+    "member-role": "mt-1.75 block text-caption text-festival-muted",
     avatar: "grid size-11 shrink-0 place-items-center border border-festival-avatar-border bg-festival-avatar font-serif text-festival-gold",
-    vacant: "text-[13px] text-festival-muted-vacant",
+    vacant: "text-body-sm text-festival-muted-vacant",
     "vacant-avatar": "border-dashed bg-transparent",
-    "invite-code": "my-6 font-mono text-[34px] tracking-[6px] text-festival-gold",
+    "invite-code": "my-6 font-mono text-code tracking-code text-festival-gold",
     steps: "mb-8 grid grid-cols-4 gap-3 border-t border-festival-line",
-    step: "pt-4 text-xs text-festival-muted-olive max-[520px]:text-[10px] max-[520px]:leading-[1.8]",
+    step: "pt-4 text-xs text-festival-muted-olive max-mobile:text-label max-mobile:leading-readable",
     active: "-mt-px border-t-2 border-festival-gold text-festival-gold",
-    narrative: "my-[26px] font-serif text-[18px] leading-[2.2] text-festival-copy",
-    story: "min-h-[360px] p-9 max-[520px]:p-[22px]",
-    clue: "border-b border-festival-line py-[22px]",
-    "clue-label": "text-[11px] tracking-[1px] text-festival-gold",
-    "clue-text": "mt-3 mb-0 text-[15px] leading-[2] text-festival-copy-soft",
-    summary: "cursor-pointer text-sm leading-[1.8] text-festival-gold",
-    "detail-copy": "mt-[18px]",
+    narrative: "my-6.5 font-serif text-title-sm leading-narrative text-festival-copy",
+    story: "min-h-90 p-9 max-mobile:p-5.5",
+    clue: "border-b border-festival-line py-5.5",
+    "clue-label": "text-caption tracking-label text-festival-gold",
+    "clue-text": "mt-3 mb-0 text-body leading-copy text-festival-copy-soft",
+    summary: "cursor-pointer text-sm leading-readable text-festival-gold",
+    "detail-copy": "mt-4.5",
     votes: "my-7",
     "vote-result": "my-0 border-t border-festival-line py-4 text-sm",
     "vote-target": "px-5 text-festival-gold",
     center: "grid place-items-center",
-    "modal-backdrop": "fixed inset-0 z-10 flex items-center justify-center bg-festival-modal-backdrop p-6 backdrop-blur-[7px] max-[520px]:p-3",
-    modal: "m-auto max-h-[90dvh] w-[700px] overflow-auto border border-festival-modal-border bg-festival-panel p-9 text-festival-dialog-text max-[520px]:p-[22px] backdrop:bg-festival-modal-backdrop backdrop:backdrop-blur-[7px]",
-    "modal-title": "my-[22px] font-serif text-[25px] leading-[1.6] font-medium",
-    tabs: "mb-5 flex items-center gap-7 border-b border-festival-line max-[520px]:gap-5",
-    tab: "py-[14px] text-[13px]",
+    "modal-backdrop": "fixed inset-0 z-10 flex items-center justify-center bg-festival-modal-backdrop p-6 max-mobile:p-3",
+    modal: "m-auto max-h-modal-height w-full max-w-modal overflow-auto border border-festival-modal-border bg-festival-panel p-9 text-festival-dialog-text max-mobile:p-5.5 backdrop:bg-festival-modal-backdrop",
+    "modal-title": "my-5.5 font-serif text-title-xl leading-title font-medium",
+    tabs: "mb-5 flex items-center gap-7 border-b border-festival-line max-mobile:gap-5",
+    tab: "min-h-11 py-3.5 text-body-sm",
     selected: "border-b-2 border-festival-gold text-festival-gold",
-    "tab-button": "cursor-pointer border-0 bg-transparent [-webkit-tap-highlight-color:transparent] text-festival-muted focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-[5px] disabled:cursor-not-allowed disabled:opacity-40",
-    "tab-tag": "ml-[5px] text-[9px]",
-    scenario: "mt-3 flex w-full cursor-pointer items-center justify-between gap-[15px] border border-festival-line bg-festival-scenario-bg [-webkit-tap-highlight-color:transparent] p-[22px] text-left text-festival-scenario-text focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-[5px] disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:border-festival-gold",
-    "scenario-label": "text-[9px]",
-    "scenario-title": "my-[10px] text-[18px]",
-    "scenario-description": "mb-[10px] text-xs leading-[1.8] text-festival-muted",
-    "scenario-meta": "text-[11px] text-festival-scenario-small",
+    "tab-button": "min-h-11 cursor-pointer border-0 bg-transparent tap-highlight-none text-festival-muted focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-5 disabled:cursor-not-allowed disabled:opacity-40",
+    "tab-tag": "ml-1.25 text-micro",
+    scenario: "mt-3 flex min-h-11 w-full cursor-pointer items-center justify-between gap-3.75 border border-festival-line bg-festival-scenario-bg tap-highlight-none p-5.5 text-left text-festival-scenario-text focus-visible:outline-2 focus-visible:outline-festival-gold focus-visible:outline-offset-5 disabled:cursor-not-allowed disabled:opacity-40 enabled:hover:border-festival-gold",
+    "scenario-label": "text-micro",
+    "scenario-title": "my-2.5 text-title-sm",
+    "scenario-description": "mb-2.5 text-xs leading-readable text-festival-muted",
+    "scenario-meta": "text-caption text-festival-scenario-small",
     "scenario-status": "whitespace-nowrap text-xs text-festival-gold",
   },
 });
