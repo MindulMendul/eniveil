@@ -56,12 +56,7 @@ jobs:
           [[ "$SSH_PORT" =~ ^[0-9]+$ ]]
           key="$RUNNER_TEMP/mindul_web_key"
           trap 'rm -f "$key"' EXIT
-          if [[ "$SSH_PRIVATE_KEY" == *'BEGIN OPENSSH PRIVATE KEY'* || "$SSH_PRIVATE_KEY" == *'BEGIN RSA PRIVATE KEY'* ]]; then
-            printf '%s\n' "$SSH_PRIVATE_KEY" > "$key"
-          else
-            printf '%s' "$SSH_PRIVATE_KEY" | base64 --decode > "$key"
-          fi
-          chmod 600 "$key"
+          python3 deploy/prepare-ssh-key.py "$key"
           printf -v remote_command 'PUBLIC_GA_MEASUREMENT_ID=%q python3 - %q %q' "$PUBLIC_GA_MEASUREMENT_ID" "$DEPLOY_ENVIRONMENT" "$DEPLOY_SHA"
           ssh -i "$key" -p "$SSH_PORT" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
