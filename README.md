@@ -68,17 +68,19 @@ WS: `/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `ad
 
 ## OCI 배포
 
-기존 OCI의 아키텍처·메모리·포트·도메인 정보는 아직 연결하지 않았습니다. 실제 원격 배포는 수행하지 않았습니다.
+main 브랜치에 변경이 push되면 GitHub Actions가 SSH로 OCI 인스턴스(ubuntu@129.154.220.233)에 접속해 저장소의 main을 fast-forward하고 Docker Compose로 앱을 빌드·재시작합니다. 공개 주소는 https://mindul-murder-mystery.duckdns.org 입니다.
 
-```sh
-APP_ORIGIN=https://your-domain.example docker compose -f deploy/compose.yaml up -d --build
-```
+- GitHub Actions repository secret SSH_PRIVATE_KEY에 서버 접속용 OpenSSH 개인키를 등록합니다.
+- 배포 경로 기본값은 /home/ubuntu/murder-parker입니다. 서버의 저장소 경로가 다르면 Actions repository variable OCI_DEPLOY_PATH에 절대 경로를 설정합니다.
+- SSH 호스트 키 검증에는 Actions secret SSH_KNOWN_HOSTS를 설정할 수 있습니다. 비어 있으면 workflow가 배포 시점에 ssh-keyscan으로 호스트 키를 수집합니다.
+- 서버에 Docker Compose v2, Git, curl이 설치되어 있어야 하며, Ubuntu 사용자가 Docker를 실행할 수 있어야 합니다.
+- 기존 Caddy/Nginx가 HTTPS 도메인을 호스트의 127.0.0.1:3000으로 프록시해야 합니다. 앱 health check는 /api/health를 확인합니다.
+- 데이터는 Compose named volume festival-data에 남습니다. 배포 때 해당 볼륨을 삭제하지 않습니다.
+- 서버 checkout에 추적 파일 변경이 있으면 자동 배포는 덮어쓰지 않고 실패합니다. 서버에서 변경을 커밋하거나 폐기한 뒤 다시 배포해야 합니다.
 
-- 컨테이너는 호스트의 `127.0.0.1:3000`에만 바인딩됩니다.
-- Nginx HTTPS 서버에서 `/`와 `/ws`를 프록시합니다. `deploy/nginx.conf`는 기존 TLS 설정에 합칠 예시이며 그대로 활성화하는 전체 설정이 아닙니다.
-- production에서는 정확한 `APP_ORIGIN`이 필수이며 쿠키에 Secure가 적용되므로 HTTPS가 필요합니다.
-- 볼륨 `festival-data`를 유지해야 합니다. 삭제하면 데이터가 사라집니다.
-- SQLite 파일은 실행 중 단순 복사하지 말고 SQLite online backup 또는 정지 후 백업을 사용하세요.
+수동 기동/갱신 명령은 다음과 같습니다.
+
+    APP_ORIGIN=https://mindul-murder-mystery.duckdns.org docker compose -f deploy/compose.yaml up -d --build
 
 ## UI 스타일
 
@@ -86,16 +88,16 @@ APP_ORIGIN=https://your-domain.example docker compose -f deploy/compose.yaml up 
 
 ## CI/CD와 새 인프라 골격
 
-- GitHub Actions의 `.github/workflows/ci.yml`은 `dev`·`qa`·`main` 대상 PR과 해당 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드와 Trivy 취약점 검사를 실행합니다. 수정 가능한 High/Critical 취약점이 있으면 CI를 실패 처리합니다. 기존 자동 테스트 suite는 이 CI에서 실행하지 않습니다.
-- `.github/workflows/deploy-oci.yml`은 저장소 변수 `OCI_REGISTRY`, `OCI_REGISTRY_HOST`, `KUBERNETES_ENABLED=true`, `APP_ORIGIN`이 준비된 경우 OCIR에 이미지를 올리고 k3s에 배포합니다. 필요한 Actions secrets는 `OCIR_USERNAME`, `OCIR_AUTH_TOKEN`, `KUBECONFIG_B64`입니다.
-- API의 k3s replicas는 1로 고정했습니다. 현재 SQLite 데이터 파일과 WebSocket 접속 상태가 프로세스 로컬이기 때문입니다. Supabase/Postgres 저장소와 분산 presence·브로커 없이 API replica를 늘리면 데이터 정합성이 깨질 수 있습니다.
-- Temporal은 Cloud 또는 별도 운영 중인 Temporal Service에 연결하는 Worker로 구성했습니다. `TEMPORAL_ENABLED=true`일 때 별도 배포하며 `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `TEMPORAL_GATEWAY_TOKEN` secrets가 필요합니다. API가 게임 세션 시작·단계 변경·종료 이벤트를 전달하고 Worker가 세션별 workflow를 유지합니다.
-- 방마다 Pod를 띄우지 않습니다. 세션마다 Temporal Workflow Execution을 만들고, 공용 Worker Deployment가 task queue에서 여러 세션을 처리합니다. Worker는 부하에 따라 별도로 scale할 수 있습니다.
-- 앱 이미지에는 HTTPS 도메인과 Ingress TLS secret을 반영해야 합니다. `festival.example.com`과 `festival-tls`는 배포 전에 교체·프로비저닝해야 합니다.
-- `.pr_agent.toml`은 Qodo GitHub App이 PR 생성과 새 커밋 푸시 때 `/agentic_review`를 실행하도록 설정합니다. 저장소에 Qodo GitHub App을 설치해야 동작하며, AI 리뷰는 merge gate가 아니라 보조 의견으로 둡니다.
-- `.github/workflows/supabase-keepalive.yml`은 매월 1·6·11·16·21·26·31일 UTC 03:17에 Supabase REST API를 요청합니다. `SUPABASE_URL`과 `SUPABASE_ANON_KEY`를 Actions secrets에 등록해야 합니다. GitHub 예약 실행은 정확한 분 단위 실행을 보장하지 않습니다.
+- GitHub Actions의 .github/workflows/ci.yml은 PR 및 개발 브랜치 푸시에서 잠금 파일 설치, 타입·Astro 검사, production build, API·Temporal Worker 이미지 빌드를 실행합니다.
+- .github/workflows/deploy-oci.yml은 main 푸시에서만 실행되어 OCI의 기존 Docker Compose 앱을 갱신합니다. 배포에는 SSH_PRIVATE_KEY secret이 필요합니다. 서버 경로가 기본값과 다르면 OCI_DEPLOY_PATH repository variable을 설정합니다.
+- workflow는 원격 checkout의 변경 사항을 보존하기 위해 추적 파일이 dirty하면 배포를 중단합니다. 업데이트는 git merge --ff-only로만 적용하고 배포 후 /api/health를 확인합니다.
+- 앱은 SQLite와 WebSocket 연결 상태가 프로세스 로컬이어서 단일 Bun 컨테이너로 실행합니다. 현재 Docker Compose 배포는 k3s에 의존하지 않습니다.
+- Temporal 연동과 Kubernetes manifest는 별도 인프라 골격으로 남아 있습니다. 앱의 Docker Compose 배포만으로 Temporal Worker가 실행되지는 않습니다. Temporal Service와 Worker 배포를 실제 사용할 때 별도로 구성해야 합니다.
+- 방마다 Pod를 띄우지 않습니다. Temporal을 사용할 경우 세션마다 Workflow Execution을 만들고 공용 Worker가 처리하도록 설계합니다.
+- .pr_agent.toml은 Qodo PR reviewer가 멀티플레이 권한, 역할 비밀 노출, WebSocket, 데이터 일관성과 배포 안전을 우선 검토하도록 설정합니다. GitHub App을 설치하면 적용되며, AI 리뷰는 보조 의견으로 둡니다.
+- .github/workflows/supabase-keepalive.yml은 매월 1·6·11·16·21·26·31일 UTC 03:17에 Supabase REST API를 요청합니다. SUPABASE_URL과 SUPABASE_ANON_KEY Actions secrets가 필요합니다.
 
-현재 단계에서 Supabase는 앱의 저장소로 연결하지 않았습니다. Keepalive는 프로젝트의 REST API를 호출할 뿐 SQLite 데이터를 Supabase로 옮기지 않습니다. 또한 Temporal Service 자체는 k3s 안에 설치하지 않습니다. Temporal Cloud 또는 별도 Temporal Service 주소가 있어야 Worker가 준비 상태가 됩니다.
+현재 단계에서 Supabase는 앱의 저장소로 연결하지 않았습니다. Keepalive는 프로젝트의 REST API를 호출할 뿐 SQLite 데이터를 Supabase로 옮기지 않습니다. Temporal Service 자체도 현재 Docker Compose 앱과 함께 설치·실행되지 않습니다.
 
 ## 범위와 다음 구현 지점
 
