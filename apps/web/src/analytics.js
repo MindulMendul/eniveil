@@ -1,4 +1,7 @@
-const measurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID?.trim();
+const configuredMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID?.trim();
+const measurementId = configuredMeasurementId && /^G-[A-Z0-9]+$/i.test(configuredMeasurementId)
+  ? configuredMeasurementId
+  : undefined;
 
 /** @type {boolean} */
 let initialized = false;
@@ -60,15 +63,16 @@ export function trackPageView(locale) {
   savePageDwell({ finish: true });
   activePage = {
     locale,
-    path: `${window.location.pathname}${window.location.search}`,
+    // Room invite codes are carried in the query string; keep them out of analytics.
+    path: window.location.pathname,
     startedAt: document.hidden ? 0 : Date.now(),
     elapsedMs: 0,
   };
   const browserWindow = /** @type {Window & { gtag?: (...args: unknown[]) => void }} */ (window);
   browserWindow.gtag?.('event', 'page_view', {
     page_title: document.title,
-    page_location: window.location.href,
-    page_path: `${window.location.pathname}${window.location.search}`,
+    page_location: `${window.location.origin}${window.location.pathname}`,
+    page_path: window.location.pathname,
     language: locale,
   });
 }
