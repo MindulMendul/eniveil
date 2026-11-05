@@ -28,6 +28,8 @@ Returns a filterable, sorted, paginated catalog for the story picker.
 
 #### Response
 
+Example response for `?origin=demo`:
+
 ```json
 {
   "items": [
