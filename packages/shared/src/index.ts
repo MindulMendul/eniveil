@@ -77,9 +77,11 @@ export type ServerEvent =
 export {
   storyCueSchema,
   storyPackageSchema,
+  storyCatalogItemSchema,
+  storyCatalogResponseSchema,
   startStorySessionSchema,
   inspectStoryEvidenceSchema,
   accuseStorySchema,
   rumVitalSchema,
 } from "./story";
-export type { StoryCue, StoryPackage } from "./story";
+export type { StoryCue, StoryPackage, StoryCatalogItem, StoryCatalogResponse } from "./story";
