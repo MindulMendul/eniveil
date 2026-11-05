@@ -141,7 +141,8 @@
 
   function openWorkshop() {
     picker = false;
-    window.location.assign(localePath(locale, "/workshop"));
+    currentPath = "/workshop";
+    history.pushState({}, "", localePath(locale, "/workshop"));
   }
 
   async function login() {
