@@ -88,7 +88,7 @@ app.use("*", async (c, next) => {
 app.get("/api/health", (c) => c.json({ ok: true }));
 app.get("/api/stories", (c) =>
   c.json({
-    items: fileStoryCatalog.list().map(({ story }) => ({
+    items: fileStoryCatalog.list().map((story) => ({
       id: story.id,
       version: story.version,
       mode: story.mode,
