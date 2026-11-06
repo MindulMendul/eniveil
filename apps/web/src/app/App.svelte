@@ -1,4 +1,7 @@
 <script lang="ts">
+  import MyPage from "../pages/account/_MyPage.svelte";
+  import NicknameField from "../features/account/NicknameField.svelte";
+  import type { Guest } from "@festival/shared";
   import { onMount, tick } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
@@ -17,6 +20,8 @@
   import { StoryPickerDialog } from "../widgets/story-picker";
 
   let snapshot = $state<Snapshot | null>(null);
+  let account = $state<{ me: Guest | null; accountType: string | null; needsNickname: boolean }>({ me: null, accountType: null, needsNickname: false });
+  let authConfig = $state({ google: false, demo: false });
   let nickname = $state("");
   let code = $state("");
   let error = $state("");
@@ -184,13 +189,45 @@
     if (modeId === "host") picker = true;
   }
 
+  async function loadAccount() {
+    account = await api("/platform/account");
+    if (account.me && !account.needsNickname) {
+      snapshot = await api("/lobby/state");
+      if (!socket || socket.readyState > 1) connect();
+    }
+  }
+  function openAccount() {
+    if (!snapshot) { requestWorkshopLogin(openAccount); return; }
+    currentPath = "/mypage";
+    history.pushState({}, "", localePath(locale, currentPath));
+  }
+  async function googleLogin() {
+    if (authConfig.google) { location.assign(`/api/platform/auth/google?locale=${locale}`); return; }
+    await action(async () => {
+      if (!authConfig.demo) throw Error(locale === "en" ? "Google sign-in is not configured. Please use guest sign-in." : "구글 로그인 설정이 필요해요. 게스트 로그인을 이용해 주세요.");
+      account = await api("/platform/auth/google/demo", {});
+      nickname = "";
+      loginDialog?.close();
+      await loadAccount();
+    });
+  }
+  async function rename(next: string) {
+    await action(async () => { account = await api("/platform/account/nickname", { nickname: next }); await loadAccount(); });
+  }
+  async function logout() {
+    await action(async () => {
+      await api("/platform/account/logout", {});
+      if (socket) { socket.onclose = null; socket.close(); }
+      clearTimeout(reconnectTimer);
+      location.assign(localePath(locale));
+    });
+  }
   async function login() {
     const resume = loginDialog?.open ? pendingWorkshopAction : undefined;
     pendingWorkshopAction = undefined;
     await action(async () => {
       await api("/platform/guest", { nickname });
-      snapshot = await api("/lobby/state");
-      connect();
+      await loadAccount();
       if (loginDialog?.open) {
         loginDialog.close();
         await tick();
@@ -236,8 +273,10 @@
     window.addEventListener("popstate", syncLocale);
     void (async () => {
       try {
-        snapshot = await api("/lobby/state");
-        connect();
+        authConfig = await api("/platform/auth/config");
+        await loadAccount();
+        const authError = new URLSearchParams(location.search).get("auth");
+        if (authError) error = locale === "en" ? "Google sign-in was cancelled or failed. Please try again." : "구글 로그인이 취소되었거나 실패했어요. 다시 시도해 주세요.";
       } catch (cause) {
         if ((cause as { status?: number }).status !== 401) {
           error = "서버에 연결할 수 없어. 잠시 후 새로고침해 줘.";
@@ -259,12 +298,12 @@
 </script>
 
 <svelte:head>
-  <title>{currentPath.startsWith("/workshop") ? t("workshopTitle") : room ? `${room.title} · ${t("brand")}` : t("homeTitle")}</title>
+  <title>{currentPath === "/mypage" ? `${locale === "en" ? "My page" : "마이페이지"} · ${t("brand")}` : currentPath.startsWith("/workshop") ? t("workshopTitle") : room ? `${room.title} · ${t("brand")}` : t("homeTitle")}</title>
 </svelte:head>
 
 <div class="shell">
   {#if !entryHome}
-    <AppHeader {snapshot} {connected} {locale} {t} onLocaleChange={changeLocale} />
+    <AppHeader {snapshot} {connected} {locale} {t} accountType={account.accountType} onAccount={openAccount} onLocaleChange={changeLocale} />
   {/if}
 
   {#if error}
@@ -273,12 +312,16 @@
 
   {#if loading}
     <main class="main center"><p>{t("workshopLoading")}</p></main>
+  {:else if account.needsNickname}
+    <main class="main"><section class="panel"><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><button class="primary" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</button></form><button class="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</button></section></main>
+  {:else if currentPath === "/mypage" && snapshot}
+    <MyPage me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={logout} onEdit={openEditor} onWorkshop={openWorkshop} />
   {:else if currentPath === "/workshop"}
     <WorkshopPage {locale} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
   {:else if editorPath && snapshot}
     {#key editorId}<WorkshopEditor {locale} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
   {:else if !snapshot}
-    <EntryPage bind:nickname {busy} {t} onLogin={login} />
+    <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
   {:else if soloActive}
     <main class="main"><SoloGame {locale} onExit={() => (soloActive = false)} /></main>
   {:else if !room}
@@ -327,11 +370,11 @@
 <dialog bind:this={loginDialog} class="workshop-login" onclose={() => pendingWorkshopAction = undefined} aria-labelledby="workshop-login-title">
   <h2 id="workshop-login-title">{locale === "en" ? "Sign in to the workshop" : "창작마당 로그인"}</h2>
   <p>{locale === "en" ? "Sign in with a guest nickname to create stories and save favorites." : "닉네임으로 게스트 로그인하면 창작과 즐겨찾기를 이용할 수 있어요."}</p>
+  <button type="button" class="secondary" disabled={busy} onclick={() => void googleLogin()}>{locale === "en" ? "Continue with Google" : "구글로 로그인"}{authConfig.demo ? (locale === "en" ? " (test)" : " (테스트)") : ""}</button>
   <form onsubmit={(event) => { event.preventDefault(); void login(); }}>
-    <label for="workshop-nickname">{locale === "en" ? "Nickname" : "닉네임"}</label>
-    <input id="workshop-nickname" class="input-field" bind:value={nickname} minlength="1" maxlength="20" required />
+    <NicknameField id="workshop-nickname" bind:value={nickname} {locale} {busy} />
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="login-actions"><button type="submit" class="primary" disabled={busy}>{locale === "en" ? "Sign in" : "로그인"}</button><button type="button" class="secondary" onclick={() => loginDialog.close()}>{locale === "en" ? "Cancel" : "취소"}</button></div>
   </form>
 </dialog>
-<style>.workshop-login{width:min(440px,calc(100% - 2rem));padding:2rem;background:#202820;color:#eee9dd;border:1px solid #59634f}.workshop-login::backdrop{background:#000b}.workshop-login h2{font-size:1.5rem}.workshop-login p{margin:1rem 0;line-height:1.7}.workshop-login label{display:block;margin-bottom:.5rem}.workshop-login .primary,.workshop-login .secondary{width:auto;margin-top:0}.login-actions{display:flex;gap:1rem;margin-top:1rem}</style>
+<style>.workshop-login{width:min(440px,calc(100% - 2rem));padding:2rem;background:#202820;color:#eee9dd;border:1px solid #59634f}.workshop-login::backdrop{background:#000b}.workshop-login h2{font-size:1.5rem}.workshop-login p{margin:1rem 0;line-height:1.7}.workshop-login .primary,.workshop-login .secondary{width:auto;margin-top:0}.login-actions{display:flex;gap:1rem;margin-top:1rem}</style>
