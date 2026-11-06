@@ -17,21 +17,16 @@
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
   let stories = $state<StoryCatalogItem[]>([]);
+  let total = $state(0);
+  let offset = $state(0);
+  let loadRequestVersion = 0;
+  const pageSize = 100;
   let loading = $state(true);
   let error = $state("");
   let query = $state("");
   let mode = $state<"all" | "solo" | "multiplayer">("all");
 
-  let filteredStories = $derived(
-    stories.filter((story) => {
-      const keyword = query.trim().toLocaleLowerCase(locale);
-      const matchesQuery =
-        !keyword ||
-        story.title.toLocaleLowerCase(locale).includes(keyword) ||
-        story.subtitle.toLocaleLowerCase(locale).includes(keyword);
-      return matchesQuery && (mode === "all" || story.mode === mode);
-    }),
-  );
+  let filteredStories = $derived(stories);
 
   function isStory(value: unknown): value is StoryCatalogItem {
     if (!value || typeof value !== "object") return false;
@@ -51,31 +46,47 @@
     );
   }
 
-  async function loadStories() {
+  async function loadStories(nextOffset = 0) {
+    const requestVersion = ++loadRequestVersion;
     loading = true;
     error = "";
     try {
-      const response = await fetch("/api/workshop/stories?limit=100&offset=0");
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String(nextOffset),
+      });
+      const keyword = query.trim().slice(0, 100);
+      if (keyword) params.set("q", keyword);
+      if (mode !== "all") params.set("mode", mode);
+      const response = await fetch(`/api/workshop/stories?${params}`);
       if (!response.ok) throw new Error(t("workshopLoadFailed"));
       const payload: unknown = await response.json();
       if (
         !payload ||
         typeof payload !== "object" ||
         !Array.isArray((payload as { items?: unknown }).items) ||
-        !(payload as { items: unknown[] }).items.every(isStory)
+        !(payload as { items: unknown[] }).items.every(isStory) ||
+        typeof (payload as { total?: unknown }).total !== "number"
       ) {
         throw new Error(t("workshopLoadFailed"));
       }
+      if (requestVersion !== loadRequestVersion) return;
       stories = (payload as { items: StoryCatalogItem[] }).items;
+      total = (payload as { total: number }).total;
+      offset = nextOffset;
     } catch {
-      error = t("workshopLoadFailed");
+      if (requestVersion === loadRequestVersion) {
+        error = t("workshopLoadFailed");
+      }
     } finally {
-      loading = false;
+      if (requestVersion === loadRequestVersion) {
+        loading = false;
+      }
     }
   }
 
   onMount(() => {
-    void loadStories();
+    void loadStories(0);
   });
 </script>
 
@@ -93,11 +104,11 @@
 
   <section class="panel mb-6">
     <label class="input-label" for="story-search">{t("workshopSearchPlaceholder")}</label>
-    <input class="input-field" id="story-search" bind:value={query} type="search" placeholder={t("workshopSearchPlaceholder")} />
+    <input class="input-field" id="story-search" value={query} maxlength="100" oninput={(event) => { query = event.currentTarget.value; void loadStories(0); }} type="search" placeholder={t("workshopSearchPlaceholder")} />
     <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label={t("workshopDescription")}>
-      <button class:active={mode === "all"} class="tab" onclick={() => (mode = "all")}>{t("workshopFilterAll")}</button>
-      <button class:active={mode === "solo"} class="tab" onclick={() => (mode = "solo")}>{t("workshopFilterSolo")}</button>
-      <button class:active={mode === "multiplayer"} class="tab" onclick={() => (mode = "multiplayer")}>{t("workshopFilterMultiplayer")}</button>
+      <button class:active={mode === "all"} class="tab" onclick={() => { mode = "all"; void loadStories(0); }}>{t("workshopFilterAll")}</button>
+      <button class:active={mode === "solo"} class="tab" onclick={() => { mode = "solo"; void loadStories(0); }}>{t("workshopFilterSolo")}</button>
+      <button class:active={mode === "multiplayer"} class="tab" onclick={() => { mode = "multiplayer"; void loadStories(0); }}>{t("workshopFilterMultiplayer")}</button>
     </div>
   </section>
 
@@ -106,7 +117,7 @@
   {:else if error}
     <div class="empty" role="alert"><p>{error}</p><button class="secondary" onclick={() => void loadStories()}>{t("workshopRetry")} ↻</button></div>
   {:else if !filteredStories.length}
-    <div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{stories.length ? t("workshopNoMatches") : t("workshopEmpty")}</h2></div>
+    <div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{query.trim() || mode !== "all" ? t("workshopNoMatches") : t("workshopEmpty")}</h2></div>
   {:else}
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each filteredStories as story (story.id + ":" + story.version)}
@@ -124,5 +135,16 @@
         </article>
       {/each}
     </div>
+    {#if total > pageSize}
+      <nav class="mt-6 flex items-center justify-between" aria-label={locale === "en" ? "Story pages" : "작품 페이지"}>
+        <button class="secondary" disabled={offset === 0} onclick={() => void loadStories(Math.max(0, offset - pageSize))}>
+          ← {locale === "en" ? "Previous" : "이전"}
+        </button>
+        <span class="muted text-sm">{offset + 1}–{Math.min(offset + pageSize, total)} / {total}</span>
+        <button class="secondary" disabled={offset + pageSize >= total} onclick={() => void loadStories(offset + pageSize)}>
+          {locale === "en" ? "Next" : "다음"} →
+        </button>
+      </nav>
+    {/if}
   {/if}
 </main>

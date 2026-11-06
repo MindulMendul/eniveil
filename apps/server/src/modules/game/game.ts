@@ -103,25 +103,38 @@ export class Game {
     limit: number;
     offset: number;
   }) {
+    const playsByStoryVersion = new Map<
+      string,
+      { started: number; completed: number; players: Set<string> }
+    >();
+    for (const session of Object.values(this.state.sessions)) {
+      const key = JSON.stringify([session.scenarioId, session.scenarioVersion]);
+      const plays = playsByStoryVersion.get(key) ?? {
+        started: 0,
+        completed: 0,
+        players: new Set<string>(),
+      };
+      plays.started++;
+      if (session.endedAt) {
+        plays.completed++;
+        for (const participant of session.participants) {
+          plays.players.add(participant.id);
+        }
+      }
+      playsByStoryVersion.set(key, plays);
+    }
+
     const items = this.storyCatalog.list().map((story) => {
-      const sessions = Object.values(this.state.sessions).filter(
-        (session) => session.scenarioId === story.id,
-      );
-      const completedSessions = sessions.filter((session) => session.endedAt);
-      const uniquePlayers = new Set(
-        completedSessions.flatMap((session) =>
-          session.participants.map((participant) => participant.id),
-        ),
-      );
+      const plays = playsByStoryVersion.get(JSON.stringify([story.id, story.version]));
       return {
         ...story,
         origin: story.kind,
         difficulty: story.difficulty ?? null,
         averageRating: null,
         ratingCount: 0,
-        startedPlays: sessions.length,
-        completedPlays: completedSessions.length,
-        uniquePlayers: uniquePlayers.size,
+        startedPlays: plays?.started ?? 0,
+        completedPlays: plays?.completed ?? 0,
+        uniquePlayers: plays?.players.size ?? 0,
       };
     }).filter((story) => {
       if (query.origin && story.origin !== query.origin) return false;

@@ -13,6 +13,7 @@ const routes = new Set([
   "/api/lobby/ws",
   "/api/game/sessions",
   "/api/game/stories",
+  "/api/lobby/stories",
   "/api/workshop/stories",
 ]);
 const spans: object[] = [];
