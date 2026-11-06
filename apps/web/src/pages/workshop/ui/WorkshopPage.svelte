@@ -90,6 +90,9 @@
 
   function handleSearchInput(event: Event) {
     query = (event.currentTarget as HTMLInputElement).value;
+    loadRequestVersion += 1;
+    loading = true;
+    error = "";
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       searchTimer = undefined;
