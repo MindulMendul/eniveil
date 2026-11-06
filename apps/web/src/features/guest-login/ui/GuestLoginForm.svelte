@@ -20,6 +20,6 @@
     autocomplete="nickname"
   />
   <Button type="submit" disabled={busy || !nickname.trim()}>
-    {busy ? "입장 중…" : t("guestStart")} <span>↗</span>
+    {busy ? t("guestLoggingIn") : t("guestStart")} <span aria-hidden="true">↗</span>
   </Button>
 </form>

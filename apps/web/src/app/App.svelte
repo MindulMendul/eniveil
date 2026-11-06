@@ -12,6 +12,7 @@
   import WorkshopEditor from "../pages/workshop/ui/WorkshopEditor.svelte";
   import { RoomPage } from "../pages/room";
   import { AppFooter } from "../widgets/app-footer";
+  import LegalLinks from "../widgets/app-footer/ui/LegalLinks.svelte";
   import { AppHeader } from "../widgets/app-header";
   import { ErrorNotice } from "../widgets/error-notice";
   import { StoryPickerDialog } from "../widgets/story-picker";
@@ -32,6 +33,7 @@
   let loginDialog: HTMLDialogElement;
   let pendingWorkshopAction: (() => void) | undefined;
   let editorPath = $derived(currentPath === "/workshop/editor");
+  let entryHome = $derived(currentPath === "/" && snapshot === null);
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
@@ -262,7 +264,9 @@
 </svelte:head>
 
 <div class="shell">
-  <AppHeader {snapshot} {connected} {locale} {t} onLocaleChange={changeLocale} />
+  {#if !entryHome}
+    <AppHeader {snapshot} {connected} {locale} {t} onLocaleChange={changeLocale} />
+  {/if}
 
   {#if error}
     <ErrorNotice message={error} onDismiss={() => (error = "")} />
@@ -305,7 +309,11 @@
     <GamePage {room} {session} {host} {busy} {connected} onCommand={command} />
   {/if}
 
-  <AppFooter {snapshot} {connected} {t} {locale} />
+  {#if entryHome}
+    <footer class="flex justify-center py-4 text-festival-muted"><LegalLinks {locale} /></footer>
+  {:else}
+    <AppFooter {snapshot} {connected} {t} {locale} />
+  {/if}
 </div>
 
 <StoryPickerDialog
