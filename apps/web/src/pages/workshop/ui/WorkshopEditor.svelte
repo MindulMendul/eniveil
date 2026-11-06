@@ -30,7 +30,7 @@
     source = storyPackage; difficulty = item.difficulty ?? ''; thumbnailUrl = item.thumbnailUrl ?? ''; published = item.published; baseline = snapshot();
   }
   onMount(() => {
-    if (!storyId) { source = createStoryDraft(locale); return; }
+    if (!storyId) { source = createStoryDraft(locale); baseline = snapshot(); return; }
     loading = true;
     void workshopRequest(`/drafts/${encodeURIComponent(storyId)}`).then(({item, package: storyPackage}) => { if (!disposed) apply(item, storyPackage); }).catch(cause => { if (!disposed) error = cause.message; }).finally(() => { if (!disposed) loading = false; });
   });
@@ -47,6 +47,7 @@
   async function importFile(event: Event) {
     const file = (event.currentTarget as HTMLInputElement).files?.[0];
     if (!file) return;
+    if (dirty && !window.confirm(label('현재 변경을 버리고 파일을 불러올까요?', 'Discard current changes and import this file?'))) { fileInput.value = ''; return; }
     const version = ++fileRequest;
     error = ''; message = ''; validating = true;
     try {
@@ -57,7 +58,7 @@
       const result = await workshopRequest('/stories/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(candidate) });
       if (disposed || version !== fileRequest) return;
       if (!result.valid) throw new Error(label('스토리 형식을 확인해 주세요.', 'Check the story format.'));
-      source = storyPackageSchema.parse(candidate);
+      storyPackageSchema.parse(candidate); source = candidate;
       message = label('스토리 파일을 불러왔어요. 저장하면 내 창작 목록에 추가돼요.', 'Story imported. Save it to add it to your stories.');
     } catch (cause) { if (!disposed && version === fileRequest) error = (cause as {status?: number})?.status === 422 ? label('스토리 형식을 확인해 주세요. 유효한 .mstory 패키지가 필요해요.', 'Invalid story format. Choose a valid .mstory package.') : cause instanceof Error ? cause.message : label('파일을 읽을 수 없어요.', 'Could not read this file.'); }
     finally { if (!disposed && version === fileRequest) { validating = false; fileInput.value = ''; } }

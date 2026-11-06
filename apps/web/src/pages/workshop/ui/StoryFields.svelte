@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { renameScene, hasPreservedSceneReference } from '../model/_editor';
   import type { StoryPackage } from '@festival/shared';
   import { Button, TextInput, Select } from '../../../shared/ui';
   let { source = $bindable(), locale, disabled }: { source: StoryPackage; locale: 'ko' | 'en'; disabled: boolean } = $props();
@@ -16,7 +17,7 @@
   {#each source.content.scenes as scene, sceneIndex}
     <section class="scene" aria-label={`${label('장면', 'Scene')} ${sceneIndex + 1}`}>
       <h3>{label('장면', 'Scene')} {sceneIndex + 1}</h3>
-      <label>{label('장면 ID', 'Scene ID')}<TextInput bind:value={scene.id} /></label>
+      <label>{label('장면 ID', 'Scene ID')}<TextInput value={scene.id} oninput={(event) => renameScene(source, sceneIndex, event.currentTarget.value)} /></label>
       <label>{label('다음 장면 ID (선택)', 'Next scene ID (optional)')}<TextInput value={scene.nextSceneId ?? ''} oninput={(event) => { const value = event.currentTarget.value; if (value) scene.nextSceneId = value; else delete scene.nextSceneId; }} /></label>
       {#each scene.cues as cue, cueIndex}
         <div class="cue">
@@ -28,8 +29,9 @@
         </div>
       {/each}
       <div class="actions"><Button variant="secondary" onclick={() => scene.cues.push({ type: 'dialogue.show', text: label('새 대사', 'New dialogue') })}>{label('대사 추가', 'Add dialogue')}</Button>
-      <Button variant="text" onclick={() => source.content.scenes.splice(sceneIndex, 1)}>{label('장면 삭제', 'Delete scene')}</Button></div>
-      {#if scene.choices.length}<p class="muted">{label('선택지 유지', 'Preserved choices')}: {scene.choices.map(choice => `${choice.label} → ${choice.targetSceneId}`).join(', ')}</p>{/if}
+      <Button variant="text" disabled={hasPreservedSceneReference(source, scene.id)} onclick={() => source.content.scenes.splice(sceneIndex, 1)}>{label('장면 삭제', 'Delete scene')}</Button></div>
+      {#if hasPreservedSceneReference(source, scene.id)}<p class="muted">{label('선택지 또는 정보 공개 조건에서 사용하는 장면은 삭제할 수 없어요.', 'Scenes used by choices or information release conditions cannot be deleted.')}</p>{/if}
+      {#if scene.choices?.length}<p class="muted">{label('선택지 유지', 'Preserved choices')}: {scene.choices.map(choice => `${choice.label} → ${choice.targetSceneId}`).join(', ')}</p>{/if}
     </section>
   {/each}
   <Button variant="secondary" onclick={addScene}>{label('장면 추가', 'Add scene')}</Button>

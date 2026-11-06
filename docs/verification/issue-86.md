@@ -2,9 +2,13 @@
 
 The editor starts with a private, valid fictional solo-investigation template. It edits title, description, scene IDs/connections and dialogue. Advanced package fields remain intact; graph editing and mechanics editing are outside this issue.
 
-- `bash scripts/codex/verify.sh`: passed, 41 tests / 442 assertions, including server owner authorization and new template/roundtrip/reference tests.
+- `bash scripts/codex/verify.sh`: passed, 42 tests / 449 assertions, including server owner authorization and new template/roundtrip/reference tests.
 - `bash scripts/codex/verify.sh --browser`: its standard checks passed; the wrapper then reported the existing missing `test:e2e` script. Browser evidence below supplies the separate UI check.
 - Chromium (Playwright, built static app, mocked account/workshop API): English and Korean; 320px layout without horizontal overflow; keyboard Tab from title to description; scene/dialogue add/delete; broken next-scene reference blocks save; rejected save preserves title; save/reload preserves dialogue; download/import restores edited package; back button discard cancellation preserves input. Screenshots captured locally at `/tmp/issue86-en-320.png` and `/tmp/issue86-ko-320.png`.
 - Model tests export/import the full package including assets, choices, wait cues and investigation mechanics without loss. Missing references, duplicate scene IDs and blank dialogue are rejected.
 
-UI requests were mocked for deterministic failure and reload scenarios. Actual source ownership and persistence remain covered by the existing server integration tests. QA/main promotion and deployment were not performed.
+An additional Chromium run used the real Bun HTTP/WebSocket server and in-memory SQLite on port 3027, without API mocks: guest creation, private save/reload/edit, import cancel/confirm, and two-account source/write isolation all passed. Mocked UI requests were retained for deterministic failure scenarios. Actual source ownership and persistence remain covered by the existing server integration tests. QA/main promotion and deployment were not performed.
+
+Review fixes: import requires discard confirmation; untouched template starts clean; scene renames update start/next/choice/information references; scenes referenced by preserved choices/information cannot be deleted; raw validated imports retain whitespace and omitted defaults; compact JSON gives import/save/export the same 900 KB package policy.
+
+PR: https://github.com/MindulMendul/murder-parker/pull/90. The initial head passed verify, branch-flow, GitGuardian and SonarCloud. Qodo findings were addressed in the following review commit; final head checks and re-review are recorded in the PR before merge.

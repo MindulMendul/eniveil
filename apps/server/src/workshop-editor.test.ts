@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { createStoryDraft, editorErrors, serializeDraft } from '../../web/src/pages/workshop/model/_editor';
+import { createStoryDraft, editorErrors, serializeDraft, renameScene, hasPreservedSceneReference } from '../../web/src/pages/workshop/model/_editor';
 import { storyPackageSchema } from '@festival/shared';
 
 test('localized starter is valid and preserves non-editor content across export/import', () => {
@@ -31,4 +31,22 @@ test('broken references, duplicate IDs and blank dialogue cannot export', () => 
   const cue = source.content.scenes[0]!.cues[0]!;
   if (cue.type === 'dialogue.show') cue.text = ' ';
   expect(editorErrors(source, 'en').some(error => error.includes('cues.0.text'))).toBe(true);
+});
+
+
+test('scene rename updates preserved choice/information references and deletion guards them', () => {
+  const source = createStoryDraft('en');
+  source.content.scenes[0]!.choices.push({ id: 'go', label: 'Go', targetSceneId: 'investigation', visibleWhen: { type: 'always' } });
+  source.content.information.push({ id: 'news', title: ' News ', body: ' Details ', audience: { type: 'all' }, releasedWhen: { type: 'scene_entered', sceneId: 'investigation' }, sharing: 'never', shareableWithRoleIds: [] });
+  expect(hasPreservedSceneReference(source, 'investigation')).toBe(true);
+  renameScene(source, 1, 'new-scene');
+  expect(editorErrors(source, 'en')).toEqual([]);
+  expect(source.content.scenes[0]!.nextSceneId).toBe('new-scene');
+  expect(source.content.scenes[0]!.choices[0]!.targetSceneId).toBe('new-scene');
+  expect(source.content.information[0]!.releasedWhen).toEqual({ type: 'scene_entered', sceneId: 'new-scene' });
+  const raw = JSON.parse(JSON.stringify(source));
+  delete raw.content.scenes[1].choices;
+  const roundtrip = JSON.parse(serializeDraft(raw));
+  expect(roundtrip.content.information[0].title).toBe(' News ');
+  expect(roundtrip.content.scenes[1].choices).toBeUndefined();
 });

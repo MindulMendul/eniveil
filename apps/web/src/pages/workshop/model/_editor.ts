@@ -36,7 +36,27 @@ export function editorErrors(source: unknown, locale: 'ko' | 'en'): string[] {
 export function serializeDraft(source: StoryPackage): string {
   // Validate without replacing the imported document: untouched fields retain their values.
   storyPackageSchema.parse(source);
-  const serialized = JSON.stringify(source, null, 2);
+  const serialized = JSON.stringify(source);
   if (new TextEncoder().encode(serialized).length > 900 * 1024) throw new Error('900 KB');
   return serialized;
+}
+
+export function renameScene(source: StoryPackage, index: number, id: string): void {
+  const scene = source.content.scenes[index];
+  if (!scene) return;
+  const previous = scene.id;
+  scene.id = id;
+  if (source.story.startSceneId === previous) source.story.startSceneId = id;
+  for (const entry of source.content.scenes) {
+    if (entry.nextSceneId === previous) entry.nextSceneId = id;
+    for (const choice of entry.choices ?? []) if (choice.targetSceneId === previous) choice.targetSceneId = id;
+  }
+  for (const information of source.content.information) {
+    if (information.releasedWhen.type === 'scene_entered' && information.releasedWhen.sceneId === previous) information.releasedWhen.sceneId = id;
+  }
+}
+
+export function hasPreservedSceneReference(source: StoryPackage, id: string): boolean {
+  return source.content.scenes.some(scene => (scene.choices ?? []).some(choice => choice.targetSceneId === id)) ||
+    source.content.information.some(info => info.releasedWhen.type === 'scene_entered' && info.releasedWhen.sceneId === id);
 }
