@@ -1,0 +1,73 @@
+{
+  "browser": "Chromium via Playwright",
+  "viewports": [
+    1280,
+    320
+  ],
+  "locales": [
+    {
+      "locale": "ko",
+      "notFound": {
+        "status": 404,
+        "robots": "noindex,nofollow",
+        "localizedHome": true
+      },
+      "staticPages": true,
+      "authFailure": {
+        "localizedApp": true,
+        "noSession": true,
+        "stateCookieCleared": true
+      },
+      "privacy": {
+        "googleSubject": true,
+        "persistentAssociation": true,
+        "actualRetention": true
+      },
+      "nicknames": {
+        "available": true,
+        "selfExcluded": true
+      },
+      "jpeg": {
+        "inputBytes": 328476,
+        "outputBytes": 562,
+        "decodedOnce": true,
+        "pixelLimitBeforeDecode": true,
+        "fileLimitBeforeDecode": true
+      },
+      "mobileOverflow": false
+    },
+    {
+      "locale": "en",
+      "notFound": {
+        "status": 404,
+        "robots": "noindex,nofollow",
+        "localizedHome": true
+      },
+      "staticPages": true,
+      "authFailure": {
+        "localizedApp": true,
+        "noSession": true,
+        "stateCookieCleared": true
+      },
+      "privacy": {
+        "googleSubject": true,
+        "persistentAssociation": true,
+        "actualRetention": true
+      },
+      "nicknames": {
+        "available": true,
+        "selfExcluded": true
+      },
+      "jpeg": {
+        "inputBytes": 328476,
+        "outputBytes": 562,
+        "decodedOnce": true,
+        "pixelLimitBeforeDecode": true,
+        "fileLimitBeforeDecode": true
+      },
+      "mobileOverflow": false
+    }
+  ],
+  "pageErrors": [],
+  "missingCookieSafeDefault": true
+}

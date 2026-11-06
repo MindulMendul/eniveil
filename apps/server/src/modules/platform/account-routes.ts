@@ -21,10 +21,18 @@ export function createAccountRoutes(deps: {
 
   const request = deps.fetch ?? fetch;
   let demoAttempts = 0, demoUntil = 0;
+  let nicknameAttempts = 0, nicknameUntil = 0;
   app.use("*", async (c, next) => { c.header("Cache-Control", "no-store"); await next(); });
   app.get("/account", (c) => c.json(profile(session(c))));
   app.get("/auth/config", (c) => c.json({ google: !!deps.google, demo }));
   app.get("/nicknames/availability", (c) => {
+    // No trusted proxy is configured: client-supplied IP headers must not bypass this bound.
+    const now = Date.now();
+    if (now >= nicknameUntil) { nicknameAttempts = 0; nicknameUntil = now + 60000; }
+    if (++nicknameAttempts > 60) {
+      c.header("Retry-After", String(Math.max(1, Math.ceil((nicknameUntil - now) / 1000))));
+      return c.json({ error: "잠시 후 다시 시도해 줘." }, 429);
+    }
     const parsed = nicknameSchema.safeParse(c.req.query("nickname"));
     if (!parsed.success) return c.json({ error: parsed.error.issues[0]!.message }, 400);
     return c.json({ available: deps.store.nicknameAvailable(parsed.data, session(c)?.id) });
@@ -77,10 +85,10 @@ export function createAccountRoutes(deps: {
       const signed = await getSignedCookie(c, `oauth-state:${config.clientSecret}`, "festival_oauth_state");
       if (signed) { try { attempt = JSON.parse(signed); } catch { /* invalid cookie */ } }
     }
-    if (!config || !state || !attempt || state !== attempt.state || typeof attempt.verifier !== "string" || !Number.isFinite(attempt.expires) || attempt.expires <= Date.now() || !deps.store.consumeOAuthState(state, attempt.expires))
-      return c.json({ error: "로그인 요청이 만료됐어. 다시 시도해 줘." }, 400);
+    const home = attempt?.locale === "en" ? "/en/" : "/";
     deleteCookie(c, "festival_oauth_state", cookieOptions);
-    const home = attempt.locale === "en" ? "/en/" : "/";
+    if (!config || !state || !attempt || state !== attempt.state || typeof attempt.verifier !== "string" || !Number.isFinite(attempt.expires) || attempt.expires <= Date.now() || !deps.store.consumeOAuthState(state, attempt.expires))
+      return c.redirect(`${home}?auth=failed`);
     if (c.req.query("error")) return c.redirect(`${home}?auth=cancelled`);
     const code = c.req.query("code");
     if (!code || session(c)) return c.redirect(`${home}?auth=failed`);

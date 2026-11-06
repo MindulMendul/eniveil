@@ -23,7 +23,7 @@ function fixture(options: Partial<Parameters<typeof createAccountRoutes>[0]> = {
   app.route("/api/platform", createPlatformRoutes({ store, runs, production: false, stories: new FileStoryCatalog(join(import.meta.dir, "../../../stories")) }));
   app.onError((_error, c) => c.json({ error: "Invalid input" }, 400));
   cleanups.push(() => store.close());
-  const req = (path: string, cookie = "", body?: unknown) => app.request(`http://localhost/api/platform${path}`, { method: body === undefined ? "GET" : "POST", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const req = (path: string, cookie = "", body?: unknown, headers: Record<string, string> = {}) => app.request(`http://localhost/api/platform${path}`, { method: body === undefined ? "GET" : "POST", headers: { Cookie: cookie, "Content-Type": "application/json", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
   const guest = async (nickname: string) => {
     const response = await req("/guest", "", { nickname });
     expect(response.status).toBe(201);
@@ -151,14 +151,15 @@ test("OAuth uses PKCE and browser-bound, expiring, single-use state; identity co
   }
   const a = await start();
   const callback = `/auth/google/callback?state=${a.state}&code=code`;
-  expect((await f.req(callback)).status).toBe(400);
+  expect((await f.req(callback)).headers.get("location")).toBe("/?auth=failed");
   expect(calls).toHaveLength(0);
   const response = await f.req(callback, a.cookie);
   expect(response.headers.get("location")).toBe("/en/");
   const tokenBody = calls[0]!.options!.body as URLSearchParams;
   expect(tokenBody.get("client_secret")).toBe("secret");
   expect(tokenBody.get("code_verifier")).toBeTruthy();
-  expect((await f.req(callback, a.cookie)).status).toBe(400);
+  expect((await f.req(callback, a.cookie)).headers.get("location")).toBe("/en/?auth=failed");
+  expect(calls).toHaveLength(2);
   const cookie = sessionCookie(response);
   const profile = await read((await f.req("/account", cookie)));
   expect(profile.accountType).toBe("google");
@@ -188,7 +189,7 @@ test("OAuth cancellation, expired state and upstream failure never issue a sessi
   expect(failure.headers.getSetCookie().some((cookie) => cookie.startsWith("festival_guest="))).toBe(false);
   const expired = await start();
   setSystemTime(Date.now() + 601000);
-  expect((await f.req(`/auth/google/callback?state=${expired.state}&code=old`, expired.cookie)).status).toBe(400);
+  expect((await f.req(`/auth/google/callback?state=${expired.state}&code=old`, expired.cookie)).headers.get("location")).toBe("/?auth=failed");
   expect(Object.values(f.store.state.guests)).toHaveLength(0);
 });
 
@@ -204,8 +205,11 @@ test("failed persistence rolls back account memory, credentials and workshop mut
     expect(f.workshop.get(draft.id)).toBeDefined();
     expect(() => f.store.rename(f.store.state.guests[a.me.id]!, "Changed")).toThrow("disk failure");
     expect(f.store.state.guests[a.me.id]?.nickname).toBe("Rollback");
+    expect(f.store.nicknameAvailable("ROLLBACK")).toBe(false);
+    expect(f.store.nicknameAvailable("Changed")).toBe(true);
     expect(f.workshop.get(draft.id)?.author.name).toBe("Rollback");
     expect(() => f.store.createGuest("Rejected")).toThrow("disk failure");
+    expect(f.store.nicknameAvailable("Rejected")).toBe(true);
     expect(() => f.store.googleAccount("google:rejected")).toThrow("disk failure");
     expect(Object.values(f.store.state.guests)).toHaveLength(1);
     expect(f.store.db.query("SELECT * FROM google_accounts").all()).toHaveLength(0);
@@ -220,6 +224,92 @@ test("OAuth initiation has no shared pending capacity; cookie tampering cannot c
   expect(response!.status).toBe(302);
   const state = new URL(response!.headers.get("location")!).searchParams.get("state")!;
   const cookie = sessionCookie(response!, "festival_oauth_state");
-  expect((await f.req(`/auth/google/callback?state=${state}&code=bad`, cookie + "tampered")).status).toBe(400);
+  expect((await f.req(`/auth/google/callback?state=${state}&code=bad`, cookie + "tampered")).headers.get("location")).toBe("/?auth=failed");
   expect(f.store.db.query("SELECT * FROM oauth_consumed").all()).toHaveLength(0);
+});
+
+test("OAuth invalid state returns to a fixed localized app URL without contacting Google or issuing credentials", async () => {
+  let calls = 0;
+  const f = fixture({ google: { clientId: "client", clientSecret: "secret", origin: "http://localhost" }, fetch: async () => { calls++; throw Error("must not fetch"); } });
+  const start = await f.req("/auth/google?locale=en");
+  const cookie = sessionCookie(start, "festival_oauth_state");
+  const state = new URL(start.headers.get("location")!).searchParams.get("state")!;
+  for (const [query, boundCookie, expected] of [
+    [`state=${state}&code=x&locale=en&returnTo=https://evil.invalid`, "", "/?auth=failed"],
+    [`state=wrong&code=x`, cookie, "/en/?auth=failed"],
+    ["code=x", cookie, "/en/?auth=failed"],
+    [`state=${state}&code=x`, `${cookie}tampered`, "/?auth=failed"],
+  ]) {
+    const response = await f.req(`/auth/google/callback?${query}`, boundCookie);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(expected);
+    expect(response.headers.getSetCookie().some(value => value.startsWith("festival_oauth_state=;") && value.includes("Max-Age=0"))).toBe(true);
+    expect(response.headers.getSetCookie().some(value => value.startsWith("festival_guest="))).toBe(false);
+  }
+  setSystemTime(Date.now() + 600001);
+  const expired = await f.req(`/auth/google/callback?state=${state}&code=x`, cookie);
+  expect(expired.headers.get("location")).toBe("/en/?auth=failed");
+  expect(calls).toBe(0);
+  expect(f.store.db.query("SELECT * FROM credentials").all()).toHaveLength(0);
+  expect(f.store.db.query("SELECT * FROM oauth_consumed").all()).toHaveLength(0);
+});
+
+test("nickname availability is throttled globally, ignores forged IP headers and recovers after the window", async () => {
+  const f = fixture();
+  const owner = await f.guest("ThrottleOwner");
+  for (let i = 0; i < 60; i++) expect((await f.req("/nicknames/availability?nickname=Available")).status).toBe(200);
+  const limited = await f.req("/nicknames/availability?nickname=Available", owner.cookie, undefined, { "X-Forwarded-For": "203.0.113.9", "X-Real-IP": "203.0.113.10" });
+  expect(limited.status).toBe(429);
+  expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+  expect(f.store.authenticate(owner.cookie.split("=")[1])?.id).toBe(owner.me.id);
+  setSystemTime(Date.now() + 60000);
+  expect((await f.req("/nicknames/availability?nickname=Available")).status).toBe(200);
+});
+
+test("nickname index restores Unicode names on restart and updates only after successful account mutations", () => {
+  const directory = mkdtempSync(join(tmpdir(), "festival-names-"));
+  cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, "db.sqlite");
+  const f = fixture({}, path);
+  const guest = f.store.createGuest("Ｆｏｏｏ");
+  const second = new Store(path);
+  try {
+    expect(second.nicknameAvailable("fooo")).toBe(false);
+    expect(second.nicknameAvailable("FOOO", guest.id)).toBe(true);
+    const restored = second.state.guests[guest.id]!;
+    second.rename(restored, "Updated");
+    expect(second.nicknameAvailable("fooo")).toBe(true);
+    expect(second.nicknameAvailable("updated")).toBe(false);
+    second.logout(restored);
+    expect(second.nicknameAvailable("UPDATED")).toBe(true);
+    const google = second.googleAccount("google:indexed");
+    expect(second.nicknameAvailable("GoogleName")).toBe(true);
+    second.rename(google, "GoogleName");
+    second.logout(google);
+    expect(second.nicknameAvailable("googlename")).toBe(false);
+    expect(second.googleAccount("google:indexed").id).toBe(google.id);
+  } finally { second.close(); }
+});
+
+test("legacy duplicate normalized nicknames remain reserved until every owner releases them", () => {
+  const directory = mkdtempSync(join(tmpdir(), "festival-legacy-names-"));
+  cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, "db.sqlite");
+  const f = fixture({}, path);
+  // Old state files can predate case-insensitive nickname uniqueness.
+  f.store.state.guests.first = { id: "first", nickname: "Legacy" };
+  f.store.state.guests.second = { id: "second", nickname: "Ｌｅｇａｃｙ" };
+  f.store.save();
+  const restored = new Store(path);
+  try {
+    expect(restored.nicknameAvailable("legacy")).toBe(false);
+    expect(restored.nicknameAvailable("legacy", "first")).toBe(false);
+    expect(() => restored.createGuest("LEGACY")).toThrow();
+    restored.rename(restored.state.guests.first!, "Renamed");
+    expect(restored.nicknameAvailable("legacy")).toBe(false);
+    expect(restored.nicknameAvailable("legacy", "second")).toBe(true);
+    restored.logout(restored.state.guests.second!);
+    expect(restored.nicknameAvailable("legacy")).toBe(true);
+    expect(restored.nicknameAvailable("renamed")).toBe(false);
+  } finally { restored.close(); }
 });

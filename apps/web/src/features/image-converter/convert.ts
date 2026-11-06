@@ -5,7 +5,10 @@ import { checkDimensions, imageDimensions } from './headers';
 export async function convertToWebp(file: File): Promise<Blob> {
   if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) throw Error('format');
   if (!file.size || file.size > MAX_IMAGE_BYTES) throw Error('size');
-  const dimensions = imageDimensions(new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer()), file.type);
+  // JPEG metadata may span many APP segments before SOF. The file-size check bounds this
+  // scan to 10 MiB while still rejecting oversized dimensions before bitmap decoding.
+  const headerBytes = file.type === 'image/jpeg' ? file.size : 256 * 1024;
+  const dimensions = imageDimensions(new Uint8Array(await file.slice(0, headerBytes).arrayBuffer()), file.type);
   checkDimensions(dimensions.width, dimensions.height);
   const bitmap = await createImageBitmap(file);
   try {
