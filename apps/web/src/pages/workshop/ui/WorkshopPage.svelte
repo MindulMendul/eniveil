@@ -156,11 +156,11 @@
     </div>
     {#if total > pageSize}
       <nav class="mt-6 flex items-center justify-between" aria-label={locale === "en" ? "Story pages" : "작품 페이지"}>
-        <button class="secondary" disabled={offset === 0} onclick={() => void loadStories(Math.max(0, offset - pageSize))}>
+        <button class="secondary" disabled={offset === 0 || loading} onclick={() => void loadStories(Math.max(0, offset - pageSize))}>
           ← {locale === "en" ? "Previous" : "이전"}
         </button>
         <span class="muted text-sm">{offset + 1}–{Math.min(offset + pageSize, total)} / {total}</span>
-        <button class="secondary" disabled={offset + pageSize >= total} onclick={() => void loadStories(offset + pageSize)}>
+        <button class="secondary" disabled={offset + pageSize >= total || loading} onclick={() => void loadStories(offset + pageSize)}>
           {locale === "en" ? "Next" : "다음"} →
         </button>
       </nav>
