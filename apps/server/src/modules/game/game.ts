@@ -90,7 +90,9 @@ export class Game {
     return {
       me,
       scenarios: this.storyCatalog.list(),
-      rooms: Object.values(this.state.rooms).map((r) => this.summary(r)),
+      rooms: Object.values(this.state.rooms)
+        .map((r) => this.summary(r))
+        .filter((room) => room.status === "waiting" && room.count < room.capacity),
       room,
     };
   }

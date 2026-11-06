@@ -23,6 +23,22 @@ const cmd = (type: "start" | "advance" | "return" | "leave") => ({
   type,
   requestId: crypto.randomUUID(),
 });
+test("room discovery follows vacancy and waiting status without hiding the member's room", () => {
+  const { game, a, b, c } = setup();
+  const room = game.create(a, "rehearsal");
+  expect(game.snapshot(c).rooms.map((item) => item.id)).toEqual([room.id]);
+  game.join(b, room.code);
+  expect(game.snapshot(c).rooms).toEqual([]);
+  expect(game.snapshot(a).room?.id).toBe(room.id);
+  game.command(b, cmd("leave"));
+  expect(game.snapshot(c).rooms.map((item) => item.id)).toEqual([room.id]);
+  game.join(b, room.code);
+  game.command(a, cmd("start"));
+  // Even a persisted playing room with a vacant seat must not be advertised.
+  room.memberIds.pop();
+  expect(game.snapshot(c).rooms).toEqual([]);
+  expect(game.snapshot(a).room?.session).not.toBeNull();
+});
 test("only a full connected room can start; host authorization and duplicate start", () => {
   const { game, a, b } = setup();
   game.create(a, "rehearsal");

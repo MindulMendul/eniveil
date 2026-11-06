@@ -83,11 +83,17 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
       (await req("/api/lobby/rooms", a.cookie, { scenarioId: "rehearsal" })).status,
     ).toBe(201);
     await wait(() => !!aa.latest.room);
+    const roomId = aa.latest.room!.id;
+    await wait(() => bb.latest.rooms.some((room) => room.id === roomId));
+    const listed = await req("/api/lobby/state", b.cookie);
+    expect(((await listed.json()) as Snapshot).rooms.map((room) => room.id)).toContain(roomId);
     expect(
       (await req("/api/lobby/rooms/join", b.cookie, { code: aa.latest.room!.code }))
         .status,
     ).toBe(200);
     await wait(() => aa.latest.room?.count === 2);
+    await wait(() => !bb.latest.rooms.some((room) => room.id === roomId));
+    expect(((await (await req("/api/lobby/state", b.cookie)).json()) as Snapshot).rooms).toEqual([]);
     const send = async (client: typeof aa, type: string, targetId?: string) => {
       const requestId = crypto.randomUUID();
       client.ws.send(JSON.stringify({ type, requestId, targetId }));
@@ -122,6 +128,8 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     expect(aa.latest.room!.count).toBe(2);
     expect((await req("/api/platform/account/logout", a.cookie, {})).status).toBe(409);
     await send(aa, "leave");
+    await wait(() => reconnected.latest.rooms.some((room) => room.id === roomId));
+    expect(((await (await req("/api/lobby/state", b.cookie)).json()) as Snapshot).rooms.map((room) => room.id)).toContain(roomId);
     let closed = false;
     aa.ws.addEventListener("close", () => { closed = true; });
     expect((await req("/api/platform/account/logout", a.cookie, {})).status).toBe(200);
