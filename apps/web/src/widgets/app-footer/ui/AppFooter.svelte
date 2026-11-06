@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snapshot } from "@festival/shared";
+  import type { LegalLocale } from "../../../shared/lib/legal";
   import LegalLinks from "./LegalLinks.svelte";
 
   let {
@@ -7,7 +8,7 @@
     connected,
     t,
     locale,
-  }: { snapshot: Snapshot | null; connected: boolean; t: (key: string) => string; locale: "ko" | "en" } = $props();
+  }: { snapshot: Snapshot | null; connected: boolean; t: (key: string) => string; locale: LegalLocale } = $props();
 </script>
 
 <footer class="footer">

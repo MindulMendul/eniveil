@@ -24,12 +24,12 @@ const otherLocale = locale === "ko" ? "en" : "ko";
       <header>
         <a href={localePath(locale)}>{translate(locale, "brand")}</a>
         <nav aria-label={translate(locale, "language")}>
-          <a href={localePath(otherLocale, `/${policy}`)} lang={otherLocale} hreflang={otherLocale}>{otherLocale === "en" ? "English" : "한국어"}</a>
+          <a href={localePath(otherLocale, `/${policy}`)} lang={otherLocale} hreflang={otherLocale}>{translate(otherLocale, "languageName")}</a>
         </nav>
       </header>
       <main>
         <h1>{title}</h1>
-        <p class="updated">{locale === "ko" ? "시행일 · 최종 수정일" : "Effective · Last updated"}: <time datetime={legalUpdatedAt}>{legalUpdatedAt}</time></p>
+        <p class="updated">{translate(locale, "legalUpdatedLabel")}: <time datetime={legalUpdatedAt}>{legalUpdatedAt}</time></p>
         <p>{document.introduction}</p>
         {document.sections.map((section) => (
           <section>
@@ -38,17 +38,17 @@ const otherLocale = locale === "ko" ? "en" : "ko";
           </section>
         ))}
         <section>
-          <h2>{locale === "ko" ? "문의 및 관련 안내" : "Contact and related information"}</h2>
-          <p><a href={legalContact}>{locale === "ko" ? "운영자에게 문의하기 (GitHub 공개 이슈)" : "Contact the operator (public GitHub issue)"}</a></p>
+          <h2>{translate(locale, "legalContactHeading")}</h2>
+          <p><a href={legalContact}>{translate(locale, "legalContactOperator")}</a></p>
           {policy === "privacy" && (
             <ul>
-              <li><a href={`https://policies.google.com/privacy?hl=${locale}`}>{locale === "ko" ? "Google 개인정보처리방침" : "Google Privacy Policy"}</a></li>
-              <li><a href={`https://tools.google.com/dlpage/gaoptout?hl=${locale}`}>{locale === "ko" ? "Google Analytics 차단 도구" : "Google Analytics opt-out tool"}</a></li>
+              <li><a href={`https://policies.google.com/privacy?hl=${locale}`}>{translate(locale, "googlePrivacy")}</a></li>
+              <li><a href={`https://tools.google.com/dlpage/gaoptout?hl=${locale}`}>{translate(locale, "analyticsOptOut")}</a></li>
             </ul>
           )}
         </section>
       </main>
-      <footer><LegalLinks {locale} /><a href={localePath(locale)}>{locale === "ko" ? "홈으로 돌아가기" : "Back to home"}</a></footer>
+      <footer><LegalLinks {locale} /><a href={localePath(locale)}>{translate(locale, "legalBackToHome")}</a></footer>
     </div>
   </body>
 </html>

@@ -1,7 +1,8 @@
 <script lang="ts">
   import { localePath, translate } from "../../../shared/lib";
+  import type { LegalLocale } from "../../../shared/lib/legal";
 
-  let { locale }: { locale: "ko" | "en" } = $props();
+  let { locale }: { locale: LegalLocale } = $props();
 </script>
 
 <nav class="legal-links" aria-label={translate(locale, "legalNavigation")}>
