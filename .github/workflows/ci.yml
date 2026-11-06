@@ -60,7 +60,7 @@ jobs:
         with:
           bun-version: 1.4.4
       - name: Install locked dependencies
-        run: bun install --frozen-lockfile
+        run: bash scripts/codex/setup.sh
       - name: Check Codex workflow entry points
         run: |
           bash -n scripts/codex/setup.sh scripts/codex/verify.sh
@@ -69,7 +69,7 @@ jobs:
         run: bash scripts/codex/verify.sh
       - name: Preserve verification diagnostics
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verification-logs
           path: .codex-results/
