@@ -1,0 +1,32 @@
+---
+import { pageMetadata, siteOrigin } from './metadata';
+const meta = pageMetadata(Astro.url.pathname);
+const origin = siteOrigin(import.meta.env.PUBLIC_SITE_URL);
+const canonical = new URL(meta.localized(meta.en ? 'en' : 'ko'), origin).href;
+const schema = meta.indexable ? {
+  '@context': 'https://schema.org',
+  '@type': meta.path === '/' ? 'WebSite' : meta.path === '/workshop' ? 'CollectionPage' : 'WebPage',
+  name: meta.title, description: meta.description, url: canonical,
+  inLanguage: meta.en ? 'en' : 'ko',
+} : null;
+---
+<title>{meta.title}</title>
+<meta data-site-meta name="description" content={meta.description} />
+<meta data-site-meta name="robots" content={meta.indexable ? 'index,follow' : 'noindex,nofollow'} />
+{meta.indexable && <>
+  <link data-site-meta rel="canonical" href={canonical} />
+  <link data-site-meta rel="alternate" hreflang="ko" href={new URL(meta.localized('ko'), origin).href} />
+  <link data-site-meta rel="alternate" hreflang="en" href={new URL(meta.localized('en'), origin).href} />
+  <link data-site-meta rel="alternate" hreflang="x-default" href={new URL(meta.localized('ko'), origin).href} />
+  <meta data-site-meta property="og:type" content="website" />
+  <meta data-site-meta property="og:site_name" content={meta.brand} />
+  <meta data-site-meta property="og:title" content={meta.title} />
+  <meta data-site-meta property="og:description" content={meta.description} />
+  <meta data-site-meta property="og:url" content={canonical} />
+  <meta data-site-meta property="og:locale" content={meta.en ? 'en_US' : 'ko_KR'} />
+  <meta data-site-meta property="og:locale:alternate" content={meta.en ? 'ko_KR' : 'en_US'} />
+  <meta data-site-meta name="twitter:card" content="summary" />
+  <meta data-site-meta name="twitter:title" content={meta.title} />
+  <meta data-site-meta name="twitter:description" content={meta.description} />
+</>}
+{schema && <script data-site-meta type="application/ld+json" set:html={JSON.stringify(schema).replace(/</g, '\\u003c')} />}
