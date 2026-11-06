@@ -3,7 +3,7 @@ import { getCookie } from "hono/cookie";
 import { storyPackageSchema, type Guest } from "@festival/shared";
 import type { Store } from "../../store";
 import type { SQLiteStoryRunStore } from "../../infrastructure/sqlite/story-run-store";
-import type { SQLiteWorkshopStore } from "../../infrastructure/sqlite/workshop-store";
+import { WorkshopQuotaError, type SQLiteWorkshopStore } from "../../infrastructure/sqlite/workshop-store";
 import type { FileStoryCatalog } from "../platform/stories/file-catalog";
 import type { WorkshopDraftInput, WorkshopItem, WorkshopStory } from "./model";
 
@@ -110,6 +110,15 @@ function compareStories(sort: string, a: WorkshopItem, b: WorkshopItem) {
   if (difference) return difference;
   const date = (item: WorkshopItem) => item.publishedAt ?? (item.published ? "" : item.updatedAt);
   return date(b).localeCompare(date(a)) || b.version - a.version || a.id.localeCompare(b.id);
+}
+
+function persistDraft(save: () => WorkshopStory | undefined) {
+  try {
+    return { story: save(), error: null };
+  } catch (error) {
+    if (error instanceof WorkshopQuotaError) return { story: undefined, error };
+    throw error;
+  }
 }
 
 /** Public metadata catalog with authenticated favorites and owner-only source packages. */
@@ -257,8 +266,9 @@ export function createWorkshopRoutes(deps: {
     if (!guest) return c.json({ error: loginRequired }, 401);
     const result = parseDraft(await c.req.json());
     if (!result.success) return c.json({ error: result.error, issues: result.issues }, result.status);
-    const saved = deps.workshop.create(guest, result.draft);
-    return c.json({ item: enrich([saved], guest)[0] }, 201);
+    const saved = persistDraft(() => deps.workshop.create(guest, result.draft));
+    if (saved.error) return c.json({ error: saved.error.message }, saved.error.status);
+    return c.json({ item: enrich([saved.story!], guest)[0] }, 201);
   });
 
   app.put("/drafts/:id", async (c) => {
@@ -268,9 +278,10 @@ export function createWorkshopRoutes(deps: {
     if (deps.workshop.get(id)?.author.id !== guest.id) return c.json({ error: notFound }, 404);
     const result = parseDraft(await c.req.json());
     if (!result.success) return c.json({ error: result.error, issues: result.issues }, result.status);
-    const saved = deps.workshop.update(id, guest, result.draft);
-    if (!saved) return c.json({ error: notFound }, 404);
-    return c.json({ item: enrich([saved], guest)[0] });
+    const saved = persistDraft(() => deps.workshop.update(id, guest, result.draft));
+    if (saved.error) return c.json({ error: saved.error.message }, saved.error.status);
+    if (!saved.story) return c.json({ error: notFound }, 404);
+    return c.json({ item: enrich([saved.story], guest)[0] });
   });
 
   app.post("/stories/validate", async (c) => {
