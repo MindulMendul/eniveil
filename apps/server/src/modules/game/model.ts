@@ -7,6 +7,8 @@ export type Room = {
   scenarioId: string;
   memberIds: string[];
   sessionId: string | null;
+  mode?: "solo" | "multiplayer";
+  soloStarted?: boolean;
 };
 
 export type Session = {

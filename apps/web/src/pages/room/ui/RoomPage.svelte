@@ -12,6 +12,8 @@
     connected,
     copied,
     onCopy,
+    locale,
+    onMode,
     onCommand,
   }: {
     snapshot: Snapshot;
@@ -21,6 +23,8 @@
     busy: boolean;
     connected: boolean;
     copied: boolean;
+    locale: "ko" | "en";
+    onMode: (mode: "solo" | "multiplayer") => void;
     onCopy: () => void;
     onCommand: (type: Command["type"], targetId?: string) => void;
   } = $props();
@@ -32,12 +36,26 @@
     <div>
       <h1 class="heading-one page-title">{room.title}</h1>
       <p class="muted">
-        {room.scenario.kind === "demo" ? "기능 검증용 테스트 시나리오" : "오리지널 스토리"}
-        · {room.capacity}인 · 약 {room.scenario.minutes}분
+        {#if room.mode === "solo"}
+          {locale === "en" ? "A solo investigation: collect clues and question suspects." : "단서와 진술을 모아 범인을 밝혀내는 1인 추리극"}
+        {:else}
+          {room.scenario.kind === "demo" ? "기능 검증용 테스트 시나리오" : "오리지널 스토리"}
+          · {room.capacity}인 · 약 {room.scenario.minutes}분
+        {/if}
       </p>
     </div>
     <Button variant="text" disabled={busy || !connected} onclick={() => onCommand("leave")}>방 나가기 ↗</Button>
   </div>
+
+  <Panel class="mb-6">
+    <h2 class="heading-two">{locale === "en" ? "Room mode" : "방 모드"}</h2>
+    <p class="muted">{locale === "en" ? "Choose solo to play alone, or multiplayer to invite others." : "혼자 플레이하려면 1인 모드로, 함께 플레이하려면 다인 모드로 방을 열어 줘."}</p>
+    <div class="flex flex-wrap gap-3">
+      <Button variant={room.mode === "solo" ? "primary" : "secondary"} disabled={!host || busy || !connected || room.count !== 1} onclick={() => onMode("solo")} aria-pressed={room.mode === "solo"}>{locale === "en" ? "Solo mode" : "1인 모드"}</Button>
+      <Button variant={room.mode === "multiplayer" ? "primary" : "secondary"} disabled={!host || busy || !connected} onclick={() => onMode("multiplayer")} aria-pressed={room.mode === "multiplayer"}>{locale === "en" ? "Multiplayer mode" : "다인 모드"}</Button>
+    </div>
+    {#if room.count > 1}<p class="fine">{locale === "en" ? "Solo mode is available when only the host remains." : "방장 혼자 남았을 때 1인 모드로 바꿀 수 있어."}</p>{/if}
+  </Panel>
 
   <div class="lobby-grid">
     <Panel>
@@ -58,15 +76,17 @@
     </Panel>
 
     <aside class="sidebar">
+      {#if room.mode === "multiplayer"}
       <Panel>
         <p class="eyebrow">INVITE YOUR FRIENDS</p>
         <h2 class="heading-two sidebar-title">초대 코드</h2>
         <p class="invite-code">{room.code}</p>
         <Button variant="secondary" onclick={onCopy}>{copied ? "초대 링크 복사 완료" : "초대 링크 복사 ↗"}</Button>
       </Panel>
+      {/if}
       <Panel>
         <p class="muted">
-          {canStart ? "모든 참가자가 모였어. 이야기를 시작해도 좋아." : "필요한 인원이 모두 접속하면 시작할 수 있어."}
+          {room.mode === "solo" ? (locale === "en" ? "Your solo room is ready. Start whenever you like." : "1인 방이 준비됐어. 다른 참가자를 기다리지 않고 시작할 수 있어.") : canStart ? "모든 참가자가 모였어. 이야기를 시작해도 좋아." : "필요한 인원이 모두 접속하면 시작할 수 있어."}
         </p>
         {#if host}
           <Button disabled={!canStart || !connected || busy} onclick={() => onCommand("start")}>

@@ -17,6 +17,8 @@ export const joinRoomSchema = z.object({
     .regex(/^[A-Z0-9]{6}$/, "6자리 초대 코드를 확인해 줘."),
 });
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("mode"), mode: z.enum(["solo", "multiplayer"]), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("solo-return"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("start"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("advance"), requestId: z.string().max(80) }),
   z.object({
@@ -60,6 +62,8 @@ export type SessionView = {
   result: null | { answer: string; votes: { voter: string; target: string }[] };
 };
 export type RoomView = RoomSummary & {
+  mode: "solo" | "multiplayer";
+  soloStarted: boolean;
   hostId: string;
   members: Member[];
   scenario: Scenario;

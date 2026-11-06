@@ -37,7 +37,6 @@
   let locale = $state<"ko" | "en">(getLocaleFromPath(location.pathname));
   const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "").replace(/\/+$/, "") || "/";
   let currentPath = $state(pagePath(location.pathname));
-  let soloActive = $state(false);
   let loginDialog = $state<HTMLDialogElement>(undefined!);
   let pendingWorkshopAction: (() => void) | undefined;
   type AuthDestination = { page: "workshop" | "editor" | "account"; id?: string };
@@ -138,7 +137,7 @@
     };
   }
 
-  function command(type: Command["type"], targetId?: string) {
+  function command(type: Command["type"], targetId?: string, mode?: "solo" | "multiplayer") {
     if (!connected || busy || !socket) return;
     error = "";
     busy = true;
@@ -151,7 +150,7 @@
         error = "응답이 지연됐어. 현재 상태를 확인하고 다시 시도해 줘.";
       }, 8000),
     );
-    socket.send(JSON.stringify({ type, requestId, ...(targetId ? { targetId } : {}) }));
+    socket.send(JSON.stringify({ type, requestId, ...(targetId ? { targetId } : {}), ...(mode ? { mode } : {}) }));
   }
 
   function changeLocale(next: "ko" | "en") {
@@ -189,13 +188,7 @@
     history.replaceState({}, "", `${localePath(locale, "/workshop/editor")}?id=${encodeURIComponent(id)}`);
   }
 
-  function startSolo() {
-    if (!snapshot) return;
-    soloActive = true;
-  }
-
   function selectGameMode(modeId: string) {
-    if (modeId === "solo") startSolo();
     if (modeId === "host") picker = true;
   }
 
@@ -359,8 +352,8 @@
     {#key editorId}<WorkshopEditor {locale} onDirtyChange={(dirty) => { editorHasChanges = dirty; }} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
-  {:else if soloActive}
-    <main class="main"><SoloGame {locale} onExit={() => (soloActive = false)} /></main>
+  {:else if room?.soloStarted}
+    <main class="main"><SoloGame {locale} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>
   {:else if !room}
     <LobbyPage
       bind:code
@@ -381,6 +374,8 @@
       {busy}
       {connected}
       {copied}
+      {locale}
+      onMode={(mode) => command("mode", undefined, mode)}
       onCopy={copyInviteLink}
       onCommand={command}
     />

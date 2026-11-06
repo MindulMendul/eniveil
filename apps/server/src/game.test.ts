@@ -107,3 +107,40 @@ test("database survives process restart with role assignments and guest identity
   expect(restored.authenticate(token)).toEqual(a);
   expect(new Game(restored, storyCatalog).snapshot(a).room!.session!.id).toBe(id);
 });
+
+test("host can open a one-person room, start alone and return to multiplayer", () => {
+  const { game, a, b } = setup();
+  const room = game.create(a, "rehearsal");
+  game.command(a, { type: "mode", mode: "solo", requestId: "solo" });
+  expect(game.snapshot(a).room!.capacity).toBe(1);
+  expect(game.snapshot(a).room!.mode).toBe("solo");
+  expect(() => game.join(b, room.code)).toThrow("가득");
+  game.command(a, cmd("start"));
+  expect(game.snapshot(a).room!.soloStarted).toBe(true);
+  expect(game.snapshot(a).room!.status).toBe("playing");
+  expect(game.snapshot(a).room!.session).toBeNull();
+  expect(() => game.command(a, cmd("start"))).toThrow("이미");
+  expect(() => game.command(a, { type: "mode", mode: "multiplayer", requestId: "playing" })).toThrow("시작 전");
+  expect(() => game.command(a, cmd("leave"))).toThrow("게임 중");
+  game.command(a, { type: "solo-return", requestId: "return" });
+  expect(game.snapshot(a).room!.status).toBe("waiting");
+  game.command(a, { type: "mode", mode: "multiplayer", requestId: "multi" });
+  expect(game.snapshot(a).room!.capacity).toBe(2);
+  game.join(b, room.code);
+  game.command(a, cmd("start"));
+  expect(game.snapshot(a).room!.session).not.toBeNull();
+});
+
+test("solo mode changes enforce host, single occupancy, presence and lifecycle", () => {
+  const { game, a, b } = setup();
+  const room = game.create(a, "rehearsal");
+  game.join(b, room.code);
+  expect(() => game.command(b, { type: "mode", mode: "solo", requestId: "guest" })).toThrow("방장");
+  expect(() => game.command(a, { type: "mode", mode: "solo", requestId: "full" })).toThrow("혼자");
+  expect(() => game.command(a, { type: "solo-return", requestId: "invalid" })).toThrow("진행 중");
+  game.command(b, cmd("leave"));
+  game.command(a, { type: "mode", mode: "solo", requestId: "solo" });
+  game.online.set(a.id, 0);
+  expect(() => game.command(a, cmd("start"))).toThrow("접속");
+  expect(game.snapshot(a).room!.soloStarted).toBe(false);
+});
