@@ -12,8 +12,18 @@ import "../shared/styles/base.css";
   <body class="m-0 min-h-screen bg-festival-bg font-sans text-festival-text">
     <div class="shell">
       <PageState kind="error" message="404 · 페이지를 찾을 수 없습니다 / Page not found">
-        <CallToAction href="/">홈으로 / Home →</CallToAction>
+        <CallToAction id="error-home" href="/">홈으로 / Home →</CallToAction>
       </PageState>
     </div>
   </body>
 </html>
+<script>
+  import { getLocaleFromPath, localePath } from "../shared/lib";
+  const locale = getLocaleFromPath(location.pathname);
+  document.documentElement.lang = locale;
+  const home = document.querySelector<HTMLAnchorElement>("#error-home");
+  if (home) {
+    home.href = localePath(locale);
+    home.textContent = locale === "en" ? "Home →" : "홈으로 →";
+  }
+</script>

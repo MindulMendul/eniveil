@@ -60,3 +60,8 @@ Modal은 `open`과 `onClose`로 제어하거나 기존 로그인·상세 화면�
 - 게스트 로그인 → 로비 → 작품 선택: 280/360/717/1280px에서 검색, Tab 포커스 제한, Escape, 실행 버튼 포커스 복귀 확인. 솔로 플레이 진입과 런타임 오류 없음 확인.
 - 임시 Chromium 픽스처: 280px Offcanvas 열기·닫기, TextArea/Select 양방향 바인딩, reduced-motion에서 spinner/shimmer 애니메이션 중지 확인. 픽스처는 검증 후 제거.
 - CSS 변수 참조 전수 대조: 데이터 기반 `--cue-duration` 외 미정의 토큰 없음.
+
+### Qodo 리뷰 후 회귀 검증
+
+- imperative Modal의 Escape는 네이티브 close 이벤트 한 곳에서만 onClose를 호출한다. controlled Modal은 기본 닫기를 막고 부모 상태 변경을 요청한다. 실제 Chromium에서 imperative Escape·버튼 close 및 controlled Escape의 콜백이 각각 정확히 한 번 실행됨을 확인했다.
+- 정적 404는 빌드 시 URL 대신 브라우저 pathname에서 언어를 판별한다. 빌드 산출물을 누락 URL로 제공하는 HTTP 서버에서 `/missing` → `/`, `/en/missing` → `/en/`, `/english/missing` → `/`와 문서 언어를 확인했다.
