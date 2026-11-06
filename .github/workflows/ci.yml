@@ -47,7 +47,7 @@ jobs:
           esac
   verify:
     needs: branch-flow
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Require branch-flow to pass
