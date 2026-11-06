@@ -8,7 +8,8 @@
   import { EntryPage } from "../pages/entry";
   import { GamePage } from "../pages/game";
   import { LobbyPage } from "../pages/lobby";
-  import { WorkshopPage } from "../pages/workshop";
+  import { WorkshopPage } from "../pages/workshop/_index";
+  import WorkshopEditor from "../pages/workshop/ui/WorkshopEditor.svelte";
   import { RoomPage } from "../pages/room";
   import { AppFooter } from "../widgets/app-footer";
   import { AppHeader } from "../widgets/app-header";
@@ -25,9 +26,14 @@
   let picker = $state(false);
   let copied = $state(false);
   let locale = $state<"ko" | "en">(getLocaleFromPath(location.pathname));
-  const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "") || "/";
+  const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "").replace(/\/+$/, "") || "/";
   let currentPath = $state(pagePath(location.pathname));
   let soloActive = $state(false);
+  let loginDialog: HTMLDialogElement;
+  let pendingEditor = $state(false);
+  let pendingStoryId = $state<string | undefined>();
+  let editorPath = $derived(currentPath === "/workshop/editor");
+  let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
   let socket: WebSocket | undefined;
@@ -146,6 +152,29 @@
     history.pushState({}, "", localePath(locale, "/workshop"));
   }
 
+  function openEditor(id?: string) {
+    if (!snapshot) { requestWorkshopLogin(id); return; }
+    editorId = id;
+    currentPath = "/workshop/editor";
+    history.pushState({}, "", `${localePath(locale, currentPath)}${id ? `?id=${encodeURIComponent(id)}` : ""}`);
+  }
+
+  function requestWorkshopLogin(id?: string) {
+    pendingEditor = id !== undefined;
+    pendingStoryId = id;
+    loginDialog.showModal();
+  }
+
+  function createWorkshopStory() {
+    if (snapshot) openEditor();
+    else { pendingEditor = true; pendingStoryId = undefined; loginDialog.showModal(); }
+  }
+
+  function savedWorkshopStory(id: string) {
+    editorId = id;
+    history.replaceState({}, "", `${localePath(locale, "/workshop/editor")}?id=${encodeURIComponent(id)}`);
+  }
+
   function startSolo() {
     if (!snapshot) return;
     soloActive = true;
@@ -161,6 +190,11 @@
       await api("/platform/guest", { nickname });
       snapshot = await api("/lobby/state");
       connect();
+      if (loginDialog?.open) {
+        loginDialog.close();
+        if (pendingEditor) openEditor(pendingStoryId);
+        pendingEditor = false; pendingStoryId = undefined;
+      }
     });
   }
 
@@ -194,6 +228,7 @@
     const syncLocale = () => {
       locale = getLocaleFromPath(location.pathname);
       currentPath = pagePath(location.pathname);
+      editorId = new URLSearchParams(location.search).get("id") ?? undefined;
       document.documentElement.lang = locale;
     };
     window.addEventListener("popstate", syncLocale);
@@ -222,7 +257,7 @@
 </script>
 
 <svelte:head>
-  <title>{currentPath === "/workshop" ? t("workshopTitle") : room ? `${room.title} · ${t("brand")}` : t("homeTitle")}</title>
+  <title>{currentPath.startsWith("/workshop") ? t("workshopTitle") : room ? `${room.title} · ${t("brand")}` : t("homeTitle")}</title>
 </svelte:head>
 
 <div class="shell">
@@ -234,10 +269,12 @@
 
   {#if loading}
     <main class="main center"><p>{t("workshopLoading")}</p></main>
+  {:else if currentPath === "/workshop"}
+    <WorkshopPage {locale} loggedIn={snapshot !== null} onLogin={() => requestWorkshopLogin()} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
+  {:else if editorPath && snapshot}
+    {#key editorId}<WorkshopEditor {locale} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} onLogin={login} />
-  {:else if currentPath === "/workshop"}
-    <WorkshopPage {locale} />
   {:else if soloActive}
     <main class="main"><SoloGame {locale} onExit={() => (soloActive = false)} /></main>
   {:else if !room}
@@ -279,3 +316,16 @@
   onWorkshop={openWorkshop}
   onCreate={create}
 />
+
+
+<dialog bind:this={loginDialog} class="workshop-login" aria-labelledby="workshop-login-title">
+  <h2 id="workshop-login-title">{locale === "en" ? "Sign in to the workshop" : "창작마당 로그인"}</h2>
+  <p>{locale === "en" ? "Sign in with a guest nickname to create stories and save favorites." : "닉네임으로 게스트 로그인하면 창작과 즐겨찾기를 이용할 수 있어요."}</p>
+  <form onsubmit={(event) => { event.preventDefault(); void login(); }}>
+    <label for="workshop-nickname">{locale === "en" ? "Nickname" : "닉네임"}</label>
+    <input id="workshop-nickname" class="input-field" bind:value={nickname} minlength="1" maxlength="20" required />
+    {#if error}<p role="alert">{error}</p>{/if}
+    <div class="login-actions"><button type="submit" class="primary" disabled={busy}>{locale === "en" ? "Sign in" : "로그인"}</button><button type="button" class="secondary" onclick={() => loginDialog.close()}>{locale === "en" ? "Cancel" : "취소"}</button></div>
+  </form>
+</dialog>
+<style>.workshop-login{width:min(440px,calc(100% - 2rem));padding:2rem;background:#202820;color:#eee9dd;border:1px solid #59634f}.workshop-login::backdrop{background:#000b}.workshop-login h2{font-size:1.5rem}.workshop-login p{margin:1rem 0;line-height:1.7}.workshop-login label{display:block;margin-bottom:.5rem}.workshop-login .primary,.workshop-login .secondary{width:auto;margin-top:0}.login-actions{display:flex;gap:1rem;margin-top:1rem}</style>

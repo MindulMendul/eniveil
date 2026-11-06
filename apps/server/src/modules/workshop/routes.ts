@@ -1,68 +1,276 @@
 import { Hono } from "hono";
-import { storyPackageSchema } from "@festival/shared";
+import { getCookie } from "hono/cookie";
+import { storyPackageSchema, type Guest } from "@festival/shared";
+import type { Store } from "../../store";
+import type { SQLiteStoryRunStore } from "../../infrastructure/sqlite/story-run-store";
+import type { SQLiteWorkshopStore } from "../../infrastructure/sqlite/workshop-store";
 import type { FileStoryCatalog } from "../platform/stories/file-catalog";
+import type { WorkshopDraftInput, WorkshopItem, WorkshopStory } from "./model";
 
-type CatalogStory = ReturnType<FileStoryCatalog["list"]>[number];
+const notFound = "작품을 찾을 수 없어.";
+const loginRequired = "게스트 로그인이 필요해.";
+const difficulties = ["easy", "normal", "hard", "unset"];
+const sorts = ["latest", "rating", "plays", "favorites", "title"];
 
-function toCatalogItem(story: CatalogStory) {
+function integer(query: Record<string, string>, key: string, fallback: number, min: number, max: number) {
+  const raw = query[key];
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value < min || value > max)
+    throw new Error(`${key} 값은 ${min}부터 ${max} 사이의 정수여야 해.`);
+  return value;
+}
+
+function parseQuery(query: Record<string, string>) {
+  for (const key of ["q", "author"])
+    if ((query[key]?.length ?? 0) > 100) throw new Error(`${key}는 100자까지 입력할 수 있어.`);
+  const view = query.view ?? "all";
+  const sort = query.sort ?? "latest";
+  if (!["all", "favorites", "mine"].includes(view)) throw new Error("목록 종류를 확인해 줘.");
+  if (!sorts.includes(sort)) throw new Error("정렬 방식을 확인해 줘.");
+  if (query.difficulty && !difficulties.includes(query.difficulty)) throw new Error("난이도를 확인해 줘.");
+  if (query.mode && !["solo", "multiplayer"].includes(query.mode)) throw new Error("게임 모드를 확인해 줘.");
+  if (query.locale && !/^[a-z]{2}(?:-[A-Z]{2})?$/.test(query.locale)) throw new Error("언어 형식을 확인해 줘.");
+  if (query.publishedAfter && (
+    !/^\d{4}-\d{2}-\d{2}$/.test(query.publishedAfter) ||
+    !Number.isFinite(Date.parse(query.publishedAfter)) ||
+    new Date(query.publishedAfter).toISOString().slice(0, 10) !== query.publishedAfter
+  )) throw new Error("공개일은 YYYY-MM-DD 형식으로 입력해 줘.");
   return {
-    id: story.id,
-    version: story.version,
-    mode: story.mode,
-    locale: story.locale,
-    title: story.title,
-    subtitle: story.subtitle,
-    playerCount: story.playerCount,
-    estimatedMinutes: story.estimatedMinutes,
+    view,
+    sort,
+    mode: query.mode,
+    locale: query.locale,
+    difficulty: query.difficulty,
+    publishedAfter: query.publishedAfter,
+    q: query.q?.trim().toLocaleLowerCase(),
+    author: query.author?.trim().toLocaleLowerCase(),
+    ratingMin: integer(query, "ratingMin", 0, 1, 5),
+    playsMin: integer(query, "playsMin", 0, 0, Number.MAX_SAFE_INTEGER),
+    favoritesMin: integer(query, "favoritesMin", 0, 0, Number.MAX_SAFE_INTEGER),
+    limit: integer(query, "limit", 24, 1, 100),
+    offset: integer(query, "offset", 0, 0, 1000000),
   };
 }
 
-/** Public catalog and draft-validation endpoints for the workshop. */
-export function createWorkshopRoutes(deps: { stories: FileStoryCatalog }) {
+function safeThumbnail(value: unknown): value is string | null | undefined {
+  if (value === null || value === undefined) return true;
+  if (typeof value !== "string" || value.length > 2048 || /[\\\u0000-\u001f\u007f]/.test(value)) return false;
+  if (/^\/(?!\/)/.test(value)) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+function parseDraft(value: unknown):
+  | { success: true; draft: WorkshopDraftInput }
+  | { success: false; status: 400 | 422; error: string; issues?: { path: string; message: string }[] } {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return { success: false, status: 400, error: "저장할 작품을 확인해 줘." };
+  const input = value as Record<string, unknown>;
+  if (Object.keys(input).some((key) => !["package", "thumbnailUrl", "difficulty", "published"].includes(key)))
+    return { success: false, status: 400, error: "허용되지 않은 작품 정보야." };
+  if (!safeThumbnail(input.thumbnailUrl))
+    return { success: false, status: 400, error: "썸네일은 HTTPS 주소나 사이트 안의 경로로 입력해 줘." };
+  if (input.difficulty !== undefined && input.difficulty !== null && (
+    typeof input.difficulty !== "string" || !["easy", "normal", "hard"].includes(input.difficulty)
+  ))
+    return { success: false, status: 400, error: "난이도를 확인해 줘." };
+  if (input.published !== undefined && typeof input.published !== "boolean")
+    return { success: false, status: 400, error: "공개 여부를 확인해 줘." };
+  const result = storyPackageSchema.safeParse(input.package);
+  if (!result.success) {
+    return {
+      success: false,
+      status: 422,
+      error: ".mstory 파일 내용을 확인해 줘.",
+      issues: result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+    };
+  }
+  return {
+    success: true,
+    draft: {
+      package: result.data,
+      thumbnailUrl: input.thumbnailUrl ?? null,
+      difficulty: (input.difficulty ?? null) as WorkshopDraftInput["difficulty"],
+      published: input.published === true,
+    },
+  };
+}
+
+function compareStories(sort: string, a: WorkshopItem, b: WorkshopItem) {
+  let difference = 0;
+  if (sort === "rating") difference = (b.averageRating ?? -1) - (a.averageRating ?? -1);
+  if (sort === "plays") difference = b.playCount - a.playCount;
+  if (sort === "favorites") difference = b.favoriteCount - a.favoriteCount;
+  if (sort === "title") difference = a.title.localeCompare(b.title);
+  if (difference) return difference;
+  const date = (item: WorkshopItem) => item.publishedAt ?? (item.published ? "" : item.updatedAt);
+  return date(b).localeCompare(date(a)) || b.version - a.version || a.id.localeCompare(b.id);
+}
+
+/** Public metadata catalog with authenticated favorites and owner-only source packages. */
+export function createWorkshopRoutes(deps: {
+  stories: FileStoryCatalog;
+  store: Store;
+  workshop: SQLiteWorkshopStore;
+  runs: SQLiteStoryRunStore;
+}) {
   const app = new Hono();
+  const authenticate = (c: Parameters<typeof getCookie>[0]) =>
+    deps.store.authenticate(getCookie(c, "festival_guest"));
+
+  app.use("*", async (c, next) => {
+    // The same URL contains user-specific edit/favorite flags when a cookie is present.
+    c.header("Cache-Control", "no-store");
+    await next();
+  });
+
+  function fileMetadata(story: WorkshopStory["story"]): WorkshopStory {
+    return {
+      id: story.id,
+      story,
+      author: { id: null, name: "Murder Parker" },
+      thumbnailUrl: null,
+      difficulty: null,
+      published: true,
+      publishedAt: null,
+      updatedAt: new Date(0).toISOString(),
+    };
+  }
+
+  function findStory(id: string, guest: Guest | null): WorkshopStory | undefined {
+    const draft = deps.workshop.get(id);
+    if (draft) return draft.published || draft.author.id === guest?.id ? draft : undefined;
+    const file = deps.stories.get(id);
+    return file ? fileMetadata(file.story) : undefined;
+  }
+
+  function catalogMetadata(ownerId?: string): WorkshopStory[] {
+    if (ownerId) return deps.workshop.list(ownerId);
+    const latest = new Map<string, ReturnType<FileStoryCatalog["list"]>[number]>();
+    for (const story of deps.stories.list()) {
+      if ((latest.get(story.id)?.version ?? 0) < story.version) latest.set(story.id, story);
+    }
+    return [...latest.values()].map(fileMetadata).concat(deps.workshop.list());
+  }
+
+  function enrich(entries: WorkshopStory[], guest: Guest | null): WorkshopItem[] {
+    const ids = entries.map((entry) => entry.id);
+    const favorites = deps.workshop.favorites(ids, guest?.id);
+    const metrics = deps.runs.catalogMetrics(ids);
+    return entries.map((entry) => {
+      const story = entry.story;
+      const favorite = favorites.get(entry.id);
+      return {
+        id: entry.id,
+        version: story.version,
+        mode: story.mode,
+        locale: story.locale,
+        title: story.title,
+        subtitle: story.subtitle,
+        playerCount: story.playerCount,
+        estimatedMinutes: story.estimatedMinutes,
+        author: entry.author,
+        thumbnailUrl: entry.thumbnailUrl,
+        difficulty: entry.difficulty,
+        published: entry.published,
+        publishedAt: entry.publishedAt,
+        updatedAt: entry.updatedAt,
+        ...(metrics.get(entry.id) ?? { averageRating: null, ratingCount: 0, playCount: 0 }),
+        favoriteCount: favorite?.count ?? 0,
+        isFavorite: favorite?.selected ?? false,
+        canEdit: !!guest && entry.author.id === guest.id,
+      };
+    });
+  }
 
   app.get("/stories", (c) => {
-    const query = c.req.query();
-    const search = query.q?.trim().toLocaleLowerCase();
-    const mode = query.mode;
-    const locale = query.locale;
-    const limit = query.limit === undefined ? 24 : Number(query.limit);
-    const offset = query.offset === undefined ? 0 : Number(query.offset);
-
-    if (search && search.length > 100)
-      return c.json({ error: "검색어는 100자까지 입력할 수 있어." }, 400);
-    if (mode && mode !== "solo" && mode !== "multiplayer")
-      return c.json({ error: "mode 값은 solo 또는 multiplayer여야 해." }, 400);
-    if (locale && !/^[a-z]{2}(?:-[A-Z]{2})?$/.test(locale))
-      return c.json({ error: "locale 형식을 확인해 줘." }, 400);
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100)
-      return c.json({ error: "limit은 1부터 100 사이여야 해." }, 400);
-    if (!Number.isInteger(offset) || offset < 0 || offset > 1000000)
-      return c.json({ error: "offset 값이 올바르지 않아." }, 400);
-
-    const filtered = deps.stories.list()
-      .map(toCatalogItem)
-      .filter((story) => !mode || story.mode === mode)
-      .filter((story) => !locale || story.locale === locale)
-      .filter((story) =>
-        !search ||
-        story.title.toLocaleLowerCase().includes(search) ||
-        story.subtitle.toLocaleLowerCase().includes(search),
-      )
-      .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
-
+    let query: ReturnType<typeof parseQuery>;
+    try {
+      query = parseQuery(c.req.query());
+    } catch (error) {
+      return c.json({ error: (error as Error).message }, 400);
+    }
+    const guest = authenticate(c);
+    if (query.view !== "all" && !guest) return c.json({ error: loginRequired }, 401);
+    const favorites = query.view === "favorites" ? deps.workshop.favoriteIds(guest!.id) : undefined;
+    const candidates = catalogMetadata(query.view === "mine" ? guest!.id : undefined)
+      .filter((entry) => !favorites || favorites.has(entry.id))
+      .filter(({ story }) => !query.mode || story.mode === query.mode)
+      .filter(({ story }) => !query.locale || story.locale === query.locale)
+      .filter((entry) => !query.publishedAfter || (!!entry.publishedAt && entry.publishedAt >= query.publishedAfter))
+      .filter((entry) => !query.difficulty || (entry.difficulty ?? "unset") === query.difficulty)
+      .filter(({ story }) => !query.q || `${story.title}\n${story.subtitle}`.toLocaleLowerCase().includes(query.q))
+      .filter((entry) => !query.author || entry.author.name.toLocaleLowerCase().includes(query.author));
+    // Aggregate all matching candidates before statistical filters, sorting and pagination.
+    const filtered = enrich(candidates, guest)
+      .filter((story) => !query.ratingMin || (story.averageRating ?? 0) >= query.ratingMin)
+      .filter((story) => story.playCount >= query.playsMin && story.favoriteCount >= query.favoritesMin)
+      .sort((a, b) => compareStories(query.sort, a, b));
     return c.json({
-      items: filtered.slice(offset, offset + limit),
+      items: filtered.slice(query.offset, query.offset + query.limit),
       total: filtered.length,
-      limit,
-      offset,
+      limit: query.limit,
+      offset: query.offset,
     });
   });
 
   app.get("/stories/:id", (c) => {
-    const story = deps.stories.get(c.req.param("id"));
-    if (!story) return c.json({ error: "작품을 찾을 수 없어." }, 404);
-    return c.json({ item: toCatalogItem(story.story) });
+    const guest = authenticate(c);
+    const entry = findStory(c.req.param("id"), guest);
+    return entry ? c.json({ item: enrich([entry], guest)[0] }) : c.json({ error: notFound }, 404);
+  });
+
+  app.put("/stories/:id/favorite", (c) => {
+    const guest = authenticate(c);
+    if (!guest) return c.json({ error: loginRequired }, 401);
+    const entry = findStory(c.req.param("id"), guest);
+    if (!entry?.published) return c.json({ error: notFound }, 404);
+    deps.workshop.favorite(entry.id, guest.id, true);
+    return c.json({ item: enrich([entry], guest)[0] });
+  });
+
+  app.delete("/stories/:id/favorite", (c) => {
+    const guest = authenticate(c);
+    if (!guest) return c.json({ error: loginRequired }, 401);
+    const entry = findStory(c.req.param("id"), guest);
+    if (!entry) return c.json({ error: notFound }, 404);
+    deps.workshop.favorite(entry.id, guest.id, false);
+    return c.json({ item: enrich([entry], guest)[0] });
+  });
+
+  app.get("/drafts/:id", (c) => {
+    const guest = authenticate(c);
+    if (!guest) return c.json({ error: loginRequired }, 401);
+    const source = deps.workshop.source(c.req.param("id"), guest.id);
+    if (!source) return c.json({ error: notFound }, 404);
+    const entry = deps.workshop.get(c.req.param("id"))!;
+    return c.json({ item: enrich([entry], guest)[0], package: source });
+  });
+
+  app.post("/drafts", async (c) => {
+    const guest = authenticate(c);
+    if (!guest) return c.json({ error: loginRequired }, 401);
+    const result = parseDraft(await c.req.json());
+    if (!result.success) return c.json({ error: result.error, issues: result.issues }, result.status);
+    const saved = deps.workshop.create(guest, result.draft);
+    return c.json({ item: enrich([saved], guest)[0] }, 201);
+  });
+
+  app.put("/drafts/:id", async (c) => {
+    const guest = authenticate(c);
+    if (!guest) return c.json({ error: loginRequired }, 401);
+    const id = c.req.param("id");
+    if (deps.workshop.get(id)?.author.id !== guest.id) return c.json({ error: notFound }, 404);
+    const result = parseDraft(await c.req.json());
+    if (!result.success) return c.json({ error: result.error, issues: result.issues }, result.status);
+    const saved = deps.workshop.update(id, guest, result.draft);
+    if (!saved) return c.json({ error: notFound }, 404);
+    return c.json({ item: enrich([saved], guest)[0] });
   });
 
   app.post("/stories/validate", async (c) => {
