@@ -45,6 +45,16 @@ export function createAccountRoutes(deps: {
     deleteCookie(c, "festival_guest", cookieOptions);
     return c.json({ ok: true });
   });
+  app.post("/account/delete", (c) => {
+    const me = session(c);
+    if (!me) return c.json({ error: "로그인이 필요해." }, 401);
+    if (deps.store.inRoom(me.id)) return c.json({ error: "방에서 나온 뒤 회원탈퇴해 줘." }, 409);
+    deps.store.deleteAccount(me);
+    deps.onLogout?.(me.id);
+    deleteCookie(c, "festival_guest", cookieOptions);
+    deleteCookie(c, "festival_google_demo", cookieOptions);
+    return c.json({ ok: true });
+  });
   app.post("/auth/google/demo", (c) => {
     if (!demo) return c.json({ error: "임시 로그인은 개발 환경에서만 사용할 수 있어." }, 503);
     if (Date.now() >= demoUntil) { demoAttempts = 0; demoUntil = Date.now() + 60000; }
