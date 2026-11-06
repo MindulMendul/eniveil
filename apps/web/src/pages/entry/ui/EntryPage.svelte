@@ -3,11 +3,13 @@
   import { Button } from "../../../shared/ui";
 
   let {
+    locale, demo = false, onGoogle,
     nickname = $bindable(""),
     busy,
     t,
     onLogin,
   }: {
+    locale: "ko" | "en"; demo?: boolean; onGoogle: () => void;
     nickname?: string;
     busy: boolean;
     t: (key: string) => string;
@@ -24,11 +26,12 @@
       <p class="muted">{t("entryWelcome")}</p>
     </div>
     <div class="border-t border-festival-line pt-2">
-      <GuestLoginForm bind:nickname {busy} {t} onSubmit={onLogin} />
+      <GuestLoginForm bind:nickname {busy} {t} {locale} onSubmit={onLogin} />
+      <p class="fine">{t("entryHint")}</p>
     </div>
     <div class="mt-6 border-t border-festival-line pt-1">
-      <Button variant="secondary" disabled={busy} onclick={() => window.alert(t("googleLoginPending"))}>
-        {t("googleLogin")}
+      <Button variant="secondary" disabled={busy} onclick={onGoogle}>
+        {t("googleLogin")}{demo ? (locale === "en" ? " (test)" : " (테스트)") : ""}
       </Button>
       <Button variant="secondary" disabled={busy} onclick={() => window.alert(t("emailLoginPending"))}>
         {t("emailLogin")}
