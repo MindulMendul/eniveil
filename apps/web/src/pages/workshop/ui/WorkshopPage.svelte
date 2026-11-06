@@ -19,6 +19,7 @@
   let stories = $state<StoryCatalogItem[]>([]);
   let total = $state(0);
   let offset = $state(0);
+  let loadRequestVersion = 0;
   const pageSize = 100;
   let loading = $state(true);
   let error = $state("");
@@ -46,6 +47,7 @@
   }
 
   async function loadStories(nextOffset = 0) {
+    const requestVersion = ++loadRequestVersion;
     loading = true;
     error = "";
     try {
@@ -53,7 +55,7 @@
         limit: String(pageSize),
         offset: String(nextOffset),
       });
-      const keyword = query.trim();
+      const keyword = query.trim().slice(0, 100);
       if (keyword) params.set("q", keyword);
       if (mode !== "all") params.set("mode", mode);
       const response = await fetch(`/api/workshop/stories?${params}`);
@@ -68,13 +70,18 @@
       ) {
         throw new Error(t("workshopLoadFailed"));
       }
+      if (requestVersion !== loadRequestVersion) return;
       stories = (payload as { items: StoryCatalogItem[] }).items;
       total = (payload as { total: number }).total;
       offset = nextOffset;
     } catch {
-      error = t("workshopLoadFailed");
+      if (requestVersion === loadRequestVersion) {
+        error = t("workshopLoadFailed");
+      }
     } finally {
-      loading = false;
+      if (requestVersion === loadRequestVersion) {
+        loading = false;
+      }
     }
   }
 
@@ -97,7 +104,7 @@
 
   <section class="panel mb-6">
     <label class="input-label" for="story-search">{t("workshopSearchPlaceholder")}</label>
-    <input class="input-field" id="story-search" bind:value={query} oninput={() => void loadStories(0)} type="search" placeholder={t("workshopSearchPlaceholder")} />
+    <input class="input-field" id="story-search" value={query} maxlength="100" oninput={(event) => { query = event.currentTarget.value; void loadStories(0); }} type="search" placeholder={t("workshopSearchPlaceholder")} />
     <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label={t("workshopDescription")}>
       <button class:active={mode === "all"} class="tab" onclick={() => { mode = "all"; void loadStories(0); }}>{t("workshopFilterAll")}</button>
       <button class:active={mode === "solo"} class="tab" onclick={() => { mode = "solo"; void loadStories(0); }}>{t("workshopFilterSolo")}</button>
@@ -110,7 +117,7 @@
   {:else if error}
     <div class="empty" role="alert"><p>{error}</p><button class="secondary" onclick={() => void loadStories()}>{t("workshopRetry")} ↻</button></div>
   {:else if !filteredStories.length}
-    <div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{stories.length ? t("workshopNoMatches") : t("workshopEmpty")}</h2></div>
+    <div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{query.trim() || mode !== "all" ? t("workshopNoMatches") : t("workshopEmpty")}</h2></div>
   {:else}
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each filteredStories as story (story.id + ":" + story.version)}
