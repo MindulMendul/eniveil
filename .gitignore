@@ -7,3 +7,5 @@ data/
 apps/web/.astro/
 
 __pycache__/
+
+.codex-results/

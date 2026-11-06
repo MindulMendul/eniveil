@@ -1,34 +1,26 @@
 # API reference
 
-All API requests use the same origin as the web app. Except for `POST /api/guest` and `GET /api/health`, endpoints require the `festival_guest` HttpOnly cookie. The browser sends it automatically for same-origin `fetch` requests.
+API endpoints live under product modules. Lobby APIs require the `festival_guest` HttpOnly cookie. Workshop story browsing is public. Same-origin browser requests include the cookie automatically.
 
-## Story catalog
+## Lobby story catalog
 
-### `GET /api/stories`
+### `GET /api/lobby/stories`
 
-Returns a filterable, sorted, paginated catalog for the story picker.
+Authenticated paginated catalog for the room story picker.
 
 #### Query parameters
 
 | Parameter | Type | Allowed values / range | Default | Description |
 | --- | --- | --- | --- | --- |
-| `search` | string | Up to 100 characters | — | Case-insensitive substring match against title and subtitle. |
-| `origin` | string | `original`, `demo` | — | Filter by original story or demo. |
-| `difficulty` | string | `easy`, `normal`, `hard`, `unset` | — | Filter by difficulty. Use `unset` for stories whose difficulty is `null`. |
-| `players` | integer | 1–20 | — | Exact supported player count. |
-| `sort` | string | `latest`, `rating`, `popular` | `latest` | Sort order described below. |
-| `page` | integer | 1–100000 | 1 | 1-based page number. |
-| `limit` | integer | 1–50 | 12 | Items per page. |
-
-#### Sort behavior
-
-- `latest`: descending story version. The catalog does not store a publish timestamp yet, so version is the current recency signal.
-- `rating`: average rating descending, unrated stories last. Ratings are not collected yet, so current entries have no average and ties fall back to version.
-- `popular`: distinct players from completed sessions descending, then completed play count, then version.
+| `q` | string | Up to 100 characters | — | Case-insensitive title and subtitle search. |
+| `origin` | string | `original`, `demo` | — | Filter by the story's configured origin. |
+| `difficulty` | string | `easy`, `normal`, `hard`, `unset` | — | Filter by difficulty. `unset` selects stories whose difficulty is `null`. |
+| `players` | integer | 1–20 | — | Exact player count supported by the story. |
+| `sort` | string | `latest`, `rating`, `popular` | `latest` | Sort by version, average rating, or distinct completed players. |
+| `limit` | integer | 1–100 | 12 | Maximum items to return. |
+| `offset` | integer | 0–1,000,000 | 0 | Number of filtered items to skip. |
 
 #### Response
-
-Example response for `?origin=demo`:
 
 ```json
 {
@@ -46,36 +38,66 @@ Example response for `?origin=demo`:
       "difficulty": null,
       "averageRating": null,
       "ratingCount": 0,
+      "startedPlays": 0,
       "completedPlays": 0,
       "uniquePlayers": 0
     }
   ],
-  "page": 1,
-  "limit": 12,
   "total": 1,
-  "pages": 1
+  "limit": 12,
+  "offset": 0
 }
 ```
 
-- `uniquePlayers` counts distinct participant IDs across completed sessions for that story. It does not count in-progress or abandoned sessions.
-- `completedPlays` counts sessions returned from the reveal phase to the room.
-- `averageRating` is `null` and `ratingCount` is zero until rating collection is implemented. The UI displays this as “Not rated”/“평가 없음”; it never invents a score.
-- `difficulty` is `null` until a story author sets it.
-- `kind` is retained for existing clients; `origin` is the catalog filter field.
+- `uniquePlayers` counts distinct participant IDs in completed lobby sessions. `startedPlays` and `completedPlays` are session counts.
+- `averageRating` is `null` and `ratingCount` is zero: lobby stories do not currently collect ratings. Rating sort places unrated items last, then uses story version.
+- `difficulty` is `null` until configured. Use `difficulty=unset` to query items that have no difficulty.
+- `latest` uses descending story version because lobby stories do not store a publication timestamp.
+- `origin` is derived from the existing `kind` metadata (`original` or `demo`).
 
 #### Errors
 
 | Status | Meaning |
 | --- | --- |
-| 200 | Catalog returned. An empty `items` array means no results match. |
-| 400 | Invalid query parameter. The body contains an `error` message. |
+| 200 | Catalog returned; no matches produce an empty `items` array. |
+| 400 | Invalid query parameter. |
 | 401 | Missing or expired guest login. |
 
-#### Examples
+#### Example
 
 ```sh
-curl -b cookies.txt 'https://example.com/api/stories?origin=original&players=4&sort=latest&page=1&limit=12'
-curl -b cookies.txt 'https://example.com/api/stories?search=%EC%B6%95%EC%A0%9C&sort=popular'
+curl -b cookies.txt 'https://example.com/api/lobby/stories?q=축제&origin=original&players=4&sort=popular&limit=6&offset=0'
 ```
 
-The same endpoint is used by the authenticated room story picker. Filter controls update query parameters and page navigation requests the next result page.
+## Workshop story catalog
+
+### `GET /api/workshop/stories`
+
+Public metadata catalog for versioned `.mstory` packages. This catalog is separate from lobby scenarios.
+
+| Parameter | Type | Allowed values / range | Default | Description |
+| --- | --- | --- | --- | --- |
+| `q` | string | Up to 100 characters | — | Search title and subtitle. |
+| `mode` | string | `solo`, `multiplayer` | — | Filter by game mode. |
+| `locale` | string | BCP 47 short locale, e.g. `ko`, `en-US` | — | Filter by story locale. |
+| `limit` | integer | 1–100 | 24 | Maximum items to return. |
+| `offset` | integer | 0–1,000,000 | 0 | Number of filtered items to skip. |
+
+Returns `items`, `total`, `limit`, and `offset`. Each item has `id`, `version`, `mode`, `locale`, `title`, `subtitle`, `playerCount` (`min`/`max`), and `estimatedMinutes`.
+
+### Other story and play endpoints
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /api/workshop/stories/:id` | Read one public story package's metadata. |
+| `POST /api/workshop/stories/validate` | Validate a draft package; does not save or publish it. |
+| `GET /api/game/stories/:id` | Load playable solo story content with private solution content removed. |
+| `POST /api/game/sessions` | Start a solo session. JSON body: `{"storyId":"..."}`. |
+| `POST /api/game/sessions/:id/advance` | Advance the current solo story scene. |
+| `POST /api/game/sessions/:id/evidence` | Inspect evidence. JSON body: `{"evidenceId":"..."}`. |
+| `POST /api/game/sessions/:id/accuse` | Submit a suspect and evidence IDs. |
+| `POST /api/game/sessions/:id/abandon` | Mark a solo session abandoned. |
+| `POST /api/game/sessions/:id/rating` | Submit an integer rating from 1 to 5 after a completed solo session. JSON body: `{"rating":5}`. |
+| `GET /api/platform/admin/stories/:id/metrics` | Read story analytics with `Authorization: Bearer <STORY_ADMIN_TOKEN>`. |
+
+The frontend's room picker uses `/api/lobby/stories`; the Workshop page uses `/api/workshop/stories`. Do not substitute one endpoint for the other: they serve different story catalogs and return different item shapes.

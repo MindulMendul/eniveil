@@ -1,88 +1,111 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { translate } from "../../../shared/lib";
 
   type StoryCatalogItem = {
     id: string;
     version: number;
-    origin: "original" | "demo";
+    mode: "solo" | "multiplayer";
+    locale: string;
     title: string;
     subtitle: string;
-    players: number;
-    minutes: number;
-    available: boolean;
-    difficulty: "easy" | "normal" | "hard" | null;
-    averageRating: number | null;
-    ratingCount: number;
-    completedPlays: number;
-    uniquePlayers: number;
+    playerCount: { min: number; max: number };
+    estimatedMinutes: number;
   };
 
   let { locale }: { locale: "ko" | "en" } = $props();
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
   let stories = $state<StoryCatalogItem[]>([]);
+  let total = $state(0);
+  let offset = $state(0);
+  let loadRequestVersion = 0;
+  let pendingOffset = 0;
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  const pageSize = 100;
   let loading = $state(true);
   let error = $state("");
   let query = $state("");
-  let origin = $state<"all" | "original" | "demo">("all");
+  let mode = $state<"all" | "solo" | "multiplayer">("all");
 
-  let filteredStories = $derived(
-    stories.filter((story) => {
-      const keyword = query.trim().toLocaleLowerCase(locale);
-      const matchesQuery =
-        !keyword ||
-        story.title.toLocaleLowerCase(locale).includes(keyword) ||
-        story.subtitle.toLocaleLowerCase(locale).includes(keyword);
-      return matchesQuery && (origin === "all" || story.origin === origin);
-    }),
-  );
+  let filteredStories = $derived(stories);
 
   function isStory(value: unknown): value is StoryCatalogItem {
     if (!value || typeof value !== "object") return false;
     const item = value as Record<string, unknown>;
+    const players = item.playerCount as Record<string, unknown> | undefined;
     return (
       typeof item.id === "string" &&
       typeof item.version === "number" &&
-      (item.origin === "original" || item.origin === "demo") &&
+      (item.mode === "solo" || item.mode === "multiplayer") &&
+      typeof item.locale === "string" &&
       typeof item.title === "string" &&
       typeof item.subtitle === "string" &&
-      typeof item.players === "number" &&
-      typeof item.minutes === "number" &&
-      typeof item.available === "boolean" &&
-      (item.difficulty === null || ["easy", "normal", "hard"].includes(String(item.difficulty))) &&
-      (item.averageRating === null || typeof item.averageRating === "number") &&
-      typeof item.ratingCount === "number" &&
-      typeof item.completedPlays === "number" &&
-      typeof item.uniquePlayers === "number"
+      !!players &&
+      typeof players.min === "number" &&
+      typeof players.max === "number" &&
+      typeof item.estimatedMinutes === "number"
     );
   }
 
-  async function loadStories() {
+  async function loadStories(nextOffset = 0) {
+    pendingOffset = nextOffset;
+    const requestVersion = ++loadRequestVersion;
     loading = true;
     error = "";
     try {
-      const response = await fetch("/api/stories?limit=50");
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String(nextOffset),
+      });
+      const keyword = query.trim().slice(0, 100);
+      if (keyword) params.set("q", keyword);
+      if (mode !== "all") params.set("mode", mode);
+      const response = await fetch(`/api/workshop/stories?${params}`);
       if (!response.ok) throw new Error(t("workshopLoadFailed"));
       const payload: unknown = await response.json();
       if (
         !payload ||
         typeof payload !== "object" ||
         !Array.isArray((payload as { items?: unknown }).items) ||
-        !(payload as { items: unknown[] }).items.every(isStory)
+        !(payload as { items: unknown[] }).items.every(isStory) ||
+        typeof (payload as { total?: unknown }).total !== "number"
       ) {
         throw new Error(t("workshopLoadFailed"));
       }
+      if (requestVersion !== loadRequestVersion) return;
       stories = (payload as { items: StoryCatalogItem[] }).items;
+      total = (payload as { total: number }).total;
+      offset = nextOffset;
     } catch {
-      error = t("workshopLoadFailed");
+      if (requestVersion === loadRequestVersion) {
+        error = t("workshopLoadFailed");
+      }
     } finally {
-      loading = false;
+      if (requestVersion === loadRequestVersion) {
+        loading = false;
+      }
     }
   }
 
+  function handleSearchInput(event: Event) {
+    query = (event.currentTarget as HTMLInputElement).value;
+    loadRequestVersion += 1;
+    loading = true;
+    error = "";
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchTimer = undefined;
+      void loadStories(0);
+    }, 250);
+  }
+
   onMount(() => {
-    void loadStories();
+    void loadStories(0);
+  });
+
+  onDestroy(() => {
+    clearTimeout(searchTimer);
   });
 </script>
 
@@ -100,40 +123,47 @@
 
   <section class="panel mb-6">
     <label class="input-label" for="story-search">{t("workshopSearchPlaceholder")}</label>
-    <input class="input-field" id="story-search" bind:value={query} type="search" placeholder={t("workshopSearchPlaceholder")} />
-    <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label={t("storyOrigin")}>
-      <button class:active={origin === "all"} class="tab" onclick={() => (origin = "all")}>{t("workshopFilterAll")}</button>
-      <button class:active={origin === "original"} class="tab" onclick={() => (origin = "original")}>{t("storyOriginal")}</button>
-      <button class:active={origin === "demo"} class="tab" onclick={() => (origin = "demo")}>{t("storyDemo")}</button>
+    <input class="input-field" id="story-search" value={query} maxlength="100" oninput={handleSearchInput} type="search" placeholder={t("workshopSearchPlaceholder")} />
+    <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label={t("workshopDescription")}>
+      <button class:active={mode === "all"} class="tab" onclick={() => { clearTimeout(searchTimer); mode = "all"; void loadStories(0); }}>{t("workshopFilterAll")}</button>
+      <button class:active={mode === "solo"} class="tab" onclick={() => { clearTimeout(searchTimer); mode = "solo"; void loadStories(0); }}>{t("workshopFilterSolo")}</button>
+      <button class:active={mode === "multiplayer"} class="tab" onclick={() => { clearTimeout(searchTimer); mode = "multiplayer"; void loadStories(0); }}>{t("workshopFilterMultiplayer")}</button>
     </div>
   </section>
 
   {#if loading}
     <div class="empty" role="status"><p>{t("workshopLoading")}</p></div>
   {:else if error}
-    <div class="empty" role="alert"><p>{error}</p><button class="secondary" onclick={() => void loadStories()}>{t("workshopRetry")} ↻</button></div>
+    <div class="empty" role="alert"><p>{error}</p><button class="secondary" onclick={() => void loadStories(pendingOffset)}>{t("workshopRetry")} ↻</button></div>
   {:else if !filteredStories.length}
-    <div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{stories.length ? t("workshopNoMatches") : t("workshopEmpty")}</h2></div>
+    <div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{query.trim() || mode !== "all" ? t("workshopNoMatches") : t("workshopEmpty")}</h2></div>
   {:else}
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {#each filteredStories as story (story.id + ":" + story.version)}
         <article class="panel flex flex-col">
           <div class="section-heading">
-            <span class="eyebrow section-eyebrow">{story.origin === "original" ? t("storyOriginal") : t("storyDemo")}</span>
-            <span class="tag">{story.available ? t("storyAvailable") : t("storyComingSoon")}</span>
+            <span class="eyebrow section-eyebrow">{story.mode === "solo" ? t("workshopSolo") : t("workshopMultiplayer")}</span>
+            <span class="tag">{story.locale.toUpperCase()}</span>
           </div>
           <h2 class="heading-two mt-4">{story.title}</h2>
           <p class="muted grow">{story.subtitle}</p>
-          <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-festival-line pt-4 text-xs text-festival-muted">
-            <div><dt>{t("workshopPlayers")}</dt><dd>{story.players}{t("playerUnit")}</dd></div>
-            <div><dt>{t("storyDifficulty")}</dt><dd>{story.difficulty ? t(`difficulty${story.difficulty[0].toUpperCase()}${story.difficulty.slice(1)}`) : t("difficultyUndetermined")}</dd></div>
-            <div><dt>{t("storyRating")}</dt><dd>{story.averageRating === null ? t("noRatingYet") : `${story.averageRating.toFixed(1)} / 5 (${story.ratingCount})`}</dd></div>
-            <div><dt>{t("storyUniquePlayers")}</dt><dd>{story.uniquePlayers}</dd></div>
-            <div><dt>{t("storyCompletedPlays")}</dt><dd>{story.completedPlays}</dd></div>
-            <div><dt>{t("workshopMinutes")}</dt><dd>{story.minutes} min</dd></div>
-          </dl>
+          <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-festival-line pt-4 text-xs text-festival-muted">
+            <span>{t("workshopPlayers")}: {story.playerCount.min}{story.playerCount.max !== story.playerCount.min ? "–" + story.playerCount.max : ""}</span>
+            <span>{t("workshopMinutes")}: {story.estimatedMinutes} min</span>
+          </div>
         </article>
       {/each}
     </div>
+    {#if total > pageSize}
+      <nav class="mt-6 flex items-center justify-between" aria-label={locale === "en" ? "Story pages" : "작품 페이지"}>
+        <button class="secondary" disabled={offset === 0} onclick={() => void loadStories(Math.max(0, offset - pageSize))}>
+          ← {locale === "en" ? "Previous" : "이전"}
+        </button>
+        <span class="muted text-sm">{offset + 1}–{Math.min(offset + pageSize, total)} / {total}</span>
+        <button class="secondary" disabled={offset + pageSize >= total} onclick={() => void loadStories(offset + pageSize)}>
+          {locale === "en" ? "Next" : "다음"} →
+        </button>
+      </nav>
+    {/if}
   {/if}
 </main>

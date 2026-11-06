@@ -62,7 +62,7 @@ bun run start  # http://localhost:3000
 
 ## 통신과 권한
 
-HTTP: `POST /api/platform/guest`, `GET /api/lobby/state`, `POST /api/lobby/rooms`, `POST /api/lobby/rooms/join`, `GET /api/health`. Story catalog filters, sorting and pagination are documented in [docs/api.md](docs/api.md).
+HTTP: `POST /api/platform/guest`, `GET /api/lobby/state`, `GET /api/lobby/stories`, `GET /api/workshop/stories`, `POST /api/lobby/rooms`, `POST /api/lobby/rooms/join`, `GET /api/health`. Story catalog filters, sorting and pagination are documented in [docs/api.md](docs/api.md).
 
 WS: `/api/lobby/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `advance`, `vote`, `return`, `leave`이며 requestId를 포함합니다. 서버는 개인화된 `snapshot`, `ack`, `error`를 전달합니다. 서버가 방장 권한·정원·단계·중복 투표를 검증합니다. 시작을 재요청하면 이미 진행 중인 세션을 유지합니다. 클라이언트는 끊긴 연결을 2초 뒤 재연결하고 서버 snapshot으로 화면을 복원합니다. 서버는 30초마다 snapshot을 전송합니다.
 
@@ -126,3 +126,11 @@ Wind4가 의존하는 최신 CSS 기능 기준은 [UnoCSS Wind4 호환성 안내
 도메인 테스트: 방장 권한, 정원·접속 조건, 중복 시작·투표, 비밀 정보 분리, 결말 공개, 대기방 복귀·재시작, 방장 위임, 인증 만료, DB 재개방 복원.
 
 통합 테스트: 실제 Hono/Bun HTTP·WebSocket 서버에 두 게스트 연결, Origin 거부, 방 생성·참여, 세션 진행, WebSocket 재접속, 투표·결말·대기방 복귀.
+
+## Codex Cloud 자율 개발
+
+[환경 준비와 Goal 실행 방법](docs/codex-cloud.md)을 참고합니다. 클라우드 준비는
+`bash scripts/codex/setup.sh`, 기본 검증은 `bash scripts/codex/verify.sh`입니다.
+`python3 scripts/codex/goal.py 123`으로 이슈별 Goal을 출력합니다.
+Goal 생성은 실행이나 예약을 하지 않으며, 지원하는 Codex 작업에서 직접 활성화합니다.
+검증 로그는 Git 추적에서 제외된 `.codex-results/`에 기록됩니다.
