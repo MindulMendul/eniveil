@@ -1,4 +1,5 @@
 ---
+import Metadata from "../shared/seo/Metadata.astro";
 import { localePath, translate } from "../shared/lib/i18n.js";
 import { legalContact, legalDocuments, legalUpdatedAt, type LegalLocale, type LegalPolicy } from "../shared/lib/legal";
 import LegalLinks from "../widgets/app-footer/ui/LegalLinks.svelte";
@@ -15,9 +16,7 @@ const otherLocale = locale === "ko" ? "en" : "ko";
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#171c1a" />
-    <title>{title} · {translate(locale, "brand")}</title>
-    <link rel="alternate" hreflang="ko" href={localePath("ko", `/${policy}`)} />
-    <link rel="alternate" hreflang="en" href={localePath("en", `/${policy}`)} />
+    <Metadata />
   </head>
   <body>
     <div class="legal-shell">

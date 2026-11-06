@@ -36,7 +36,7 @@ def definition(source, target, sha):
     return {'services': {service: {
         'image': 'mindul-murder-'+target['branch']+':'+sha,
         'build': {'context': str(source), 'dockerfile': 'deploy/Dockerfile',
-                  'args': {'APP_RELEASE': sha, 'PUBLIC_GA_MEASUREMENT_ID': os.getenv('PUBLIC_GA_MEASUREMENT_ID', '')}},
+                  'args': {'APP_RELEASE': sha, 'PUBLIC_SITE_URL': target['origin'], 'PUBLIC_GA_MEASUREMENT_ID': os.getenv('PUBLIC_GA_MEASUREMENT_ID', '')}},
         'restart': 'unless-stopped', 'mem_limit': '768m', 'cpus': 2,
         'ports': [f"127.0.0.1:{target['port']}:3000"],
         'env_file': [str(Path.home()/'murder-parker/deploy/.env')],

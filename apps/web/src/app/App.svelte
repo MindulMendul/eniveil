@@ -3,6 +3,7 @@
   import NicknameField from "../features/account/NicknameField.svelte";
   import type { Guest } from "@festival/shared";
   import { Modal, Button, Panel, PageState } from "../shared/ui";
+  import { pageMetadata } from "../shared/seo/metadata";
   import { onMount, tick } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
@@ -330,7 +331,7 @@
 </script>
 
 <svelte:head>
-  <title>{currentPath === "/mypage" ? `${locale === "en" ? "My page" : "마이페이지"} · ${t("brand")}` : currentPath.startsWith("/workshop") ? t("workshopTitle") : room ? `${room.title} · ${t("brand")}` : t("homeTitle")}</title>
+  <title>{pageMetadata(localePath(locale, currentPath)).title}</title>
 </svelte:head>
 
 <div class="shell">
