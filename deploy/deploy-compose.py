@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -105,8 +106,18 @@ def deploy(environment, sha):
         file.chmod(0o600)
         command = ['docker','compose','-p',target['project'],'-f',str(file)]
         run(*command,'config','--quiet')
-        # Reclaim stale BuildKit layers before extracting dependencies on the small OCI volume.
-        run('docker','builder','prune','--all','--force')
+        docker_root = Path(run('docker','info','--format','{{.DockerRootDir}}',capture=True))
+        minimum_free_bytes = 4 * 1024 ** 3
+        free_bytes = shutil.disk_usage(docker_root).free
+        if free_bytes < minimum_free_bytes:
+            print('Docker storage is low; pruning unused BuildKit cache.', file=sys.stderr)
+            run('docker','builder','prune','--all','--force')
+            free_bytes = shutil.disk_usage(docker_root).free
+        if free_bytes < minimum_free_bytes:
+            raise RuntimeError(
+                f'Insufficient Docker storage for image build: {free_bytes} bytes free; '
+                f'{minimum_free_bytes} required after cache cleanup'
+            )
         run(*command,'build')
         # Back up the live databases before executing new application code.
         run(sys.executable,Path.home()/'mindul-ai-infra/ops/mindul_ops.py','backup')
