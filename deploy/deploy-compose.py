@@ -105,6 +105,8 @@ def deploy(environment, sha):
         file.chmod(0o600)
         command = ['docker','compose','-p',target['project'],'-f',str(file)]
         run(*command,'config','--quiet')
+        # Reclaim stale BuildKit layers before extracting dependencies on the small OCI volume.
+        run('docker','builder','prune','--all','--force')
         run(*command,'build')
         # Back up the live databases before executing new application code.
         run(sys.executable,Path.home()/'mindul-ai-infra/ops/mindul_ops.py','backup')
