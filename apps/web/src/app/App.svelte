@@ -305,7 +305,7 @@
     <GamePage {room} {session} {host} {busy} {connected} onCommand={command} />
   {/if}
 
-  <AppFooter {snapshot} {connected} {t} />
+  <AppFooter {snapshot} {connected} {t} {locale} />
 </div>
 
 <StoryPickerDialog
