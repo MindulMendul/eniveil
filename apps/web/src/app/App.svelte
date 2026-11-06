@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Modal, Button, TextInput, PageState } from "../shared/ui";
   import { onMount, tick } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
@@ -29,7 +30,7 @@
   const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "").replace(/\/+$/, "") || "/";
   let currentPath = $state(pagePath(location.pathname));
   let soloActive = $state(false);
-  let loginDialog: HTMLDialogElement;
+  let loginDialog = $state<HTMLDialogElement>(undefined!);
   let pendingWorkshopAction: (() => void) | undefined;
   let editorPath = $derived(currentPath === "/workshop/editor");
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
@@ -269,7 +270,7 @@
   {/if}
 
   {#if loading}
-    <main class="main center"><p>{t("workshopLoading")}</p></main>
+    <PageState kind="loading" message={t("workshopLoading")} />
   {:else if currentPath === "/workshop"}
     <WorkshopPage {locale} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
   {:else if editorPath && snapshot}
@@ -319,14 +320,30 @@
 />
 
 
-<dialog bind:this={loginDialog} class="workshop-login" onclose={() => pendingWorkshopAction = undefined} aria-labelledby="workshop-login-title">
+<Modal bind:element={loginDialog} class="workshop-login" onClose={() => pendingWorkshopAction = undefined} labelledby="workshop-login-title">
   <h2 id="workshop-login-title">{locale === "en" ? "Sign in to the workshop" : "창작마당 로그인"}</h2>
   <p>{locale === "en" ? "Sign in with a guest nickname to create stories and save favorites." : "닉네임으로 게스트 로그인하면 창작과 즐겨찾기를 이용할 수 있어요."}</p>
   <form onsubmit={(event) => { event.preventDefault(); void login(); }}>
     <label for="workshop-nickname">{locale === "en" ? "Nickname" : "닉네임"}</label>
-    <input id="workshop-nickname" class="input-field" bind:value={nickname} minlength="1" maxlength="20" required />
+    <TextInput id="workshop-nickname"  bind:value={nickname} minlength={1} maxlength={20} required />
     {#if error}<p role="alert">{error}</p>{/if}
-    <div class="login-actions"><button type="submit" class="primary" disabled={busy}>{locale === "en" ? "Sign in" : "로그인"}</button><button type="button" class="secondary" onclick={() => loginDialog.close()}>{locale === "en" ? "Cancel" : "취소"}</button></div>
+    <div class="login-actions"><Button type="submit" class="primary" disabled={busy} variant="primary">{locale === "en" ? "Sign in" : "로그인"}</Button><Button type="button" class="secondary" onclick={() => loginDialog.close()} variant="secondary">{locale === "en" ? "Cancel" : "취소"}</Button></div>
   </form>
-</dialog>
-<style>.workshop-login{width:min(440px,calc(100% - 2rem));padding:2rem;background:#202820;color:#eee9dd;border:1px solid #59634f}.workshop-login::backdrop{background:#000b}.workshop-login h2{font-size:1.5rem}.workshop-login p{margin:1rem 0;line-height:1.7}.workshop-login label{display:block;margin-bottom:.5rem}.workshop-login .primary,.workshop-login .secondary{width:auto;margin-top:0}.login-actions{display:flex;gap:1rem;margin-top:1rem}</style>
+</Modal>
+<style>
+:global(.workshop-login) h2 {
+  font-size:var(--typography-size-control-6)}
+:global(.workshop-login) p {
+  margin:var(--spacing-4) 0;
+  line-height:1.7}
+:global(.workshop-login) label {
+  display:block;
+  margin-bottom:var(--spacing-2)}
+:global(.workshop-login) :global(.primary),:global(.workshop-login) :global(.secondary) {
+  width:auto;
+  margin-top:0}
+.login-actions {
+  display:flex;
+  gap:var(--spacing-4);
+  margin-top:var(--spacing-4)}
+</style>

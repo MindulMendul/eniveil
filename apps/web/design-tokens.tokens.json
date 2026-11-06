@@ -13,6 +13,36 @@
         "value": 850,
         "unit": "px"
       }
+    },
+    "sm": {
+      "$value": {
+        "value": 640,
+        "unit": "px"
+      }
+    },
+    "md": {
+      "$value": {
+        "value": 768,
+        "unit": "px"
+      }
+    },
+    "lg": {
+      "$value": {
+        "value": 1024,
+        "unit": "px"
+      }
+    },
+    "xl": {
+      "$value": {
+        "value": 1280,
+        "unit": "px"
+      }
+    },
+    "2xl": {
+      "$value": {
+        "value": 1536,
+        "unit": "px"
+      }
     }
   },
   "layout": {
@@ -27,6 +57,72 @@
       "$value": {
         "value": 42.5,
         "unit": "rem"
+      }
+    },
+    "touch": {
+      "$value": {
+        "value": 2.75,
+        "unit": "rem"
+      }
+    },
+    "content": {
+      "$value": {
+        "value": 80,
+        "unit": "rem"
+      }
+    },
+    "card-min": {
+      "$value": {
+        "value": 18.125,
+        "unit": "rem"
+      }
+    },
+    "filter-min": {
+      "$value": {
+        "value": 9.375,
+        "unit": "rem"
+      }
+    },
+    "size-440-px": {
+      "$value": {
+        "value": 440.0,
+        "unit": "px"
+      }
+    },
+    "size-1-px": {
+      "$value": {
+        "value": 1.0,
+        "unit": "px"
+      }
+    },
+    "size-150-px": {
+      "$value": {
+        "value": 150.0,
+        "unit": "px"
+      }
+    },
+    "size-290-px": {
+      "$value": {
+        "value": 290.0,
+        "unit": "px"
+      }
+    },
+    "size-180-px": {
+      "$value": {
+        "value": 180.0,
+        "unit": "px"
+      }
+    },
+    "size-540-px": {
+      "$value": {
+        "value": 540.0,
+        "unit": "px"
+      }
+    },
+    "size-200-px": {
+      "$value": {
+        "value": 200.0,
+        "unit": "px"
       }
     }
   },
@@ -140,6 +236,48 @@
           "value": 8,
           "unit": "px"
         }
+      },
+      "control-6": {
+        "$value": {
+          "value": 1.5,
+          "unit": "rem"
+        }
+      },
+      "control-3-2": {
+        "$value": {
+          "value": 0.8,
+          "unit": "rem"
+        }
+      },
+      "control-12": {
+        "$value": {
+          "value": 3.0,
+          "unit": "rem"
+        }
+      },
+      "control-2-4": {
+        "$value": {
+          "value": 0.6,
+          "unit": "rem"
+        }
+      },
+      "control-2-6": {
+        "$value": {
+          "value": 0.65,
+          "unit": "rem"
+        }
+      },
+      "control-3": {
+        "$value": {
+          "value": 0.75,
+          "unit": "rem"
+        }
+      },
+      "control-4-8": {
+        "$value": {
+          "value": 1.2,
+          "unit": "rem"
+        }
       }
     },
     "line-height": {
@@ -215,6 +353,21 @@
           "Noto Serif KR",
           "serif"
         ]
+      }
+    },
+    "weight": {
+      "$type": "number",
+      "normal": {
+        "$value": 400
+      },
+      "medium": {
+        "$value": 500
+      },
+      "semibold": {
+        "$value": 600
+      },
+      "bold": {
+        "$value": 700
       }
     }
   },
@@ -728,6 +881,48 @@
           "hex": "#22291f"
         }
       }
+    },
+    "workshop": {
+      "$type": "color",
+      "panel": {
+        "$value": "#202820"
+      },
+      "text": {
+        "$value": "#eee9dd"
+      },
+      "border": {
+        "$value": "#59634f"
+      },
+      "backdrop": {
+        "$value": "#000b"
+      },
+      "line": {
+        "$value": "#39443b"
+      },
+      "muted": {
+        "$value": "#b2b8ad"
+      },
+      "accent": {
+        "$value": "#c7ad70"
+      },
+      "accent-text": {
+        "$value": "#e1c985"
+      },
+      "selected": {
+        "$value": "#30382a"
+      },
+      "thumbnail": {
+        "$value": "#35443a"
+      },
+      "overlay": {
+        "$value": "#171c1ae8"
+      },
+      "favorite": {
+        "$value": "#3d4833"
+      },
+      "warning": {
+        "$value": "#f4bc9d"
+      }
     }
   },
   "$extensions": {
@@ -736,6 +931,219 @@
         "modal-height": "90vh",
         "viewport": "100dvh"
       }
+    }
+  },
+  "spacing": {
+    "$type": "dimension",
+    "0": {
+      "$value": {
+        "value": 0.0,
+        "unit": "rem"
+      }
+    },
+    "0-5": {
+      "$value": {
+        "value": 0.125,
+        "unit": "rem"
+      }
+    },
+    "1": {
+      "$value": {
+        "value": 0.25,
+        "unit": "rem"
+      }
+    },
+    "1-5": {
+      "$value": {
+        "value": 0.375,
+        "unit": "rem"
+      }
+    },
+    "2": {
+      "$value": {
+        "value": 0.5,
+        "unit": "rem"
+      }
+    },
+    "2-5": {
+      "$value": {
+        "value": 0.625,
+        "unit": "rem"
+      }
+    },
+    "3": {
+      "$value": {
+        "value": 0.75,
+        "unit": "rem"
+      }
+    },
+    "3-5": {
+      "$value": {
+        "value": 0.875,
+        "unit": "rem"
+      }
+    },
+    "4": {
+      "$value": {
+        "value": 1.0,
+        "unit": "rem"
+      }
+    },
+    "4-5": {
+      "$value": {
+        "value": 1.125,
+        "unit": "rem"
+      }
+    },
+    "5": {
+      "$value": {
+        "value": 1.25,
+        "unit": "rem"
+      }
+    },
+    "5-5": {
+      "$value": {
+        "value": 1.375,
+        "unit": "rem"
+      }
+    },
+    "6": {
+      "$value": {
+        "value": 1.5,
+        "unit": "rem"
+      }
+    },
+    "7": {
+      "$value": {
+        "value": 1.75,
+        "unit": "rem"
+      }
+    },
+    "8": {
+      "$value": {
+        "value": 2.0,
+        "unit": "rem"
+      }
+    },
+    "9": {
+      "$value": {
+        "value": 2.25,
+        "unit": "rem"
+      }
+    },
+    "10": {
+      "$value": {
+        "value": 2.5,
+        "unit": "rem"
+      }
+    },
+    "11": {
+      "$value": {
+        "value": 2.75,
+        "unit": "rem"
+      }
+    },
+    "12": {
+      "$value": {
+        "value": 3.0,
+        "unit": "rem"
+      }
+    },
+    "13": {
+      "$value": {
+        "value": 3.25,
+        "unit": "rem"
+      }
+    },
+    "14": {
+      "$value": {
+        "value": 3.5,
+        "unit": "rem"
+      }
+    },
+    "16": {
+      "$value": {
+        "value": 4.0,
+        "unit": "rem"
+      }
+    },
+    "18": {
+      "$value": {
+        "value": 4.5,
+        "unit": "rem"
+      }
+    },
+    "20": {
+      "$value": {
+        "value": 5.0,
+        "unit": "rem"
+      }
+    },
+    "24": {
+      "$value": {
+        "value": 6.0,
+        "unit": "rem"
+      }
+    },
+    "2-8": {
+      "$value": {
+        "value": 0.7,
+        "unit": "rem"
+      }
+    },
+    "3-2": {
+      "$value": {
+        "value": 0.8,
+        "unit": "rem"
+      }
+    },
+    "2-4": {
+      "$value": {
+        "value": 0.6,
+        "unit": "rem"
+      }
+    },
+    "1-4": {
+      "$value": {
+        "value": 0.35,
+        "unit": "rem"
+      }
+    },
+    "2-6": {
+      "$value": {
+        "value": 0.65,
+        "unit": "rem"
+      }
+    },
+    "4-8": {
+      "$value": {
+        "value": 1.2,
+        "unit": "rem"
+      }
+    }
+  },
+  "border": {
+    "$type": "dimension",
+    "thin": {
+      "$value": {
+        "value": 1,
+        "unit": "px"
+      }
+    },
+    "strong": {
+      "$value": {
+        "value": 2,
+        "unit": "px"
+      }
+    }
+  },
+  "motion": {
+    "$type": "number",
+    "fast": {
+      "$value": 150
+    },
+    "loading": {
+      "$value": 1200
     }
   }
 }
