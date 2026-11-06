@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { convertToWebp, webpFilename } from './convert';
+  import { convertToWebp } from './convert';
+  import { webpFilename } from './headers';
   let { locale }: { locale: 'ko' | 'en' } = $props();
   const label = (ko: string, en: string) => locale === 'en' ? en : ko;
   let busy = $state(false), error = $state(''), result = $state(''), filename = $state(''), summary = $state('');

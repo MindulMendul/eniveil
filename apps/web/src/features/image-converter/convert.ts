@@ -1,13 +1,15 @@
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-export const MAX_IMAGE_PIXELS = 16_000_000;
+import { checkDimensions, imageDimensions } from './headers';
 
 /** Converts locally; verifies actual encoder output rather than renaming a PNG fallback. */
 export async function convertToWebp(file: File): Promise<Blob> {
   if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) throw Error('format');
   if (!file.size || file.size > MAX_IMAGE_BYTES) throw Error('size');
+  const dimensions = imageDimensions(new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer()), file.type);
+  checkDimensions(dimensions.width, dimensions.height);
   const bitmap = await createImageBitmap(file);
   try {
-    if (!bitmap.width || !bitmap.height || bitmap.width * bitmap.height > MAX_IMAGE_PIXELS) throw Error('dimensions');
+    checkDimensions(bitmap.width, bitmap.height);
     const canvas = document.createElement('canvas');
     canvas.width = bitmap.width; canvas.height = bitmap.height;
     const context = canvas.getContext('2d');
@@ -17,8 +19,4 @@ export async function convertToWebp(file: File): Promise<Blob> {
     if (blob.type !== 'image/webp') throw Error('unsupported');
     return blob;
   } finally { bitmap.close(); }
-}
-
-export function webpFilename(name: string): string {
-  return `${name.replace(/\.[^.]*$/, '') || 'image'}.webp`;
 }
