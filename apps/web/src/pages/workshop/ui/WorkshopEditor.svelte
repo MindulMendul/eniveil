@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button, Select, TextInput } from "../../../shared/ui";
   import { onDestroy, onMount } from 'svelte';
   import { workshopRequest, type WorkshopStory } from '../model/_story';
   let { locale, storyId, onBack, onSaved }: { locale: 'ko' | 'en'; storyId?: string; onBack: () => void; onSaved: (id: string) => void } = $props();
@@ -49,7 +50,7 @@
   }
 </script>
 <main class="main editor">
-  <button class="text-button" onclick={onBack}>← {label('창작마당으로 돌아가기', 'Back to workshop')}</button>
+  <Button class="text-button" onclick={onBack} variant="text">← {label('창작마당으로 돌아가기', 'Back to workshop')}</Button>
   <div class="page-heading"><div><p class="eyebrow">STORY SANDBOX</p><h1 class="heading-one">{storyId ? label('머미 수정하기', 'Edit story') : label('새 머미 만들기', 'Create a story')}</h1><p class="muted">{label('이야기가 시작되는 작업 공간', 'A workspace for your next story')}</p></div></div>
   <section class="panel"><h2 class="heading-two">{label('샌드박스', 'Sandbox')}</h2><p class="muted">{label('스토리 편집 도구는 준비 중이에요. 지금은 .mstory 파일을 불러오고 내 작품으로 저장할 수 있어요.', 'The story editor is being prepared. For now, import a .mstory file and save it to your stories.')}</p>
     {#if loading}<p role="status">{label('기존 스토리를 불러오는 중…', 'Loading your story…')}</p>{/if}
@@ -58,10 +59,42 @@
     <label class="file-label">{label('.mstory 파일 불러오기', 'Import .mstory file')}<input bind:this={fileInput} type="file" accept=".mstory,application/json" disabled={loading || saving || validating} onchange={importFile} /><small class="muted">{label('최대 900 KB · 유효한 스토리 패키지', 'Up to 900 KB · Valid story package')}</small></label>
     {#if validating}<p role="status">{label('파일을 확인하는 중…', 'Validating file…')}</p>{/if}
     {#if source}<div class="source-summary"><h3 class="heading-three">{title}</h3><p class="muted">{label('스토리 파일을 불러왔어요. 공개 여부와 작품 정보를 설정해 주세요.', 'Story loaded. Choose its visibility and metadata.')}</p></div>
-      <div class="metadata"><label>{label('난이도', 'Difficulty')}<select class="input-field" bind:value={difficulty} disabled={saving || validating || loading}><option value="">{label('미지정', 'Unspecified')}</option><option value="easy">{label('쉬움', 'Easy')}</option><option value="normal">{label('보통', 'Normal')}</option><option value="hard">{label('어려움', 'Hard')}</option></select></label><label>{label('썸네일 URL', 'Thumbnail URL')}<input class="input-field" type="url" maxlength="2048" disabled={saving || validating || loading} bind:value={thumbnailUrl} placeholder="https://…" /></label></div>
+      <div class="metadata"><label>{label('난이도', 'Difficulty')}<Select bind:value={difficulty} disabled={saving || validating || loading}><option value="">{label('미지정', 'Unspecified')}</option><option value="easy">{label('쉬움', 'Easy')}</option><option value="normal">{label('보통', 'Normal')}</option><option value="hard">{label('어려움', 'Hard')}</option></Select></label><label>{label('썸네일 URL', 'Thumbnail URL')}<TextInput type="url" maxlength={2048} disabled={saving || validating || loading} bind:value={thumbnailUrl} placeholder="https://…"  /></label></div>
       <label class="visibility"><input type="checkbox" disabled={saving || validating || loading} bind:checked={published} /> {label('창작마당에 공개하기', 'Publish in the workshop')}</label><p class="muted">{label('공개하지 않으면 내가 만든 목록에서만 볼 수 있어요. 원본 파일은 만든 이만 열 수 있어요.', 'Private drafts appear only in your stories. Only the creator can access the source file.')}</p>
-      <button class="primary" disabled={saving || validating || loading} onclick={() => void save()}>{saving ? label('저장 중…', 'Saving…') : label('스토리 저장', 'Save story')}</button>
+      <Button class="primary" disabled={saving || validating || loading} onclick={() => void save()} variant="primary">{saving ? label('저장 중…', 'Saving…') : label('스토리 저장', 'Save story')}</Button>
     {/if}
   </section>
 </main>
-<style>.editor{padding-bottom:4rem}.primary{width:auto}.page-heading{margin-top:2rem}.file-label{display:flex;flex-direction:column;gap:1rem;border:1px dashed #59634f;padding:1.5rem;margin:1.5rem 0}.metadata{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin:1.5rem 0}.metadata label{display:flex;flex-direction:column;gap:.5rem}.visibility{display:flex;align-items:center;gap:.5rem}.notice{color:#f4bc9d}.source-summary{border-bottom:1px solid #39443b;padding-bottom:1rem}</style>
+<style>
+.editor {
+  padding-bottom:var(--spacing-16)}
+.editor :global(.primary) {
+  width:auto}
+.page-heading {
+  margin-top:var(--spacing-8)}
+.file-label {
+  display:flex;
+  flex-direction:column;
+  gap:var(--spacing-4);
+  border:var(--border-thin) dashed var(--color-workshop-border);
+  padding:var(--spacing-6);
+  margin:var(--spacing-6) 0}
+.metadata {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--layout-size-200-px)),1fr));
+  gap:var(--spacing-4);
+  margin:var(--spacing-6) 0}
+.metadata label {
+  display:flex;
+  flex-direction:column;
+  gap:var(--spacing-2)}
+.visibility {
+  display:flex;
+  align-items:center;
+  gap:var(--spacing-2)}
+.notice {
+  color:var(--color-workshop-warning)}
+.source-summary {
+  border-bottom:var(--border-thin) solid var(--color-workshop-line);
+  padding-bottom:var(--spacing-4)}
+</style>

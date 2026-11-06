@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TextInput, Button } from "../../shared/ui";
   let { value = $bindable(''), locale, id = 'account-nickname', busy = false }: {
     value?: string; locale: 'ko' | 'en'; id?: string; busy?: boolean;
   } = $props();
@@ -17,7 +18,7 @@
   }
 </script>
 <label class="input-label" for={id}>{label('닉네임', 'Nickname')}</label>
-<input class="input-field" {id} bind:value maxlength="20" required autocomplete="nickname" aria-describedby={`${id}-hint`} oninput={() => message = ''} />
+<TextInput {id} bind:value maxlength={20} required autocomplete="nickname" aria-describedby={`${id}-hint`} oninput={() => message = ''} />
 <p class="fine" id={`${id}-hint`}>{label('문자·숫자·밑줄 2~10자 / 영문·숫자·밑줄만 사용하면 4~20자. 대소문자를 구분하지 않아요.', '2–10 letters, digits or underscores; 4–20 for ASCII names. Names are case insensitive.')}</p>
-<button type="button" class="secondary" disabled={busy || checking || !value.trim()} onclick={check}>{label('중복 확인', 'Check availability')}</button>
+<Button variant="secondary" disabled={busy || checking || !value.trim()} onclick={check}>{label('중복 확인', 'Check availability')}</Button>
 <p role="status" aria-live="polite">{message}</p>

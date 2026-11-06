@@ -53,7 +53,7 @@
   .brand, .identity { flex-shrink: 0; }
   .identity { white-space: nowrap; }
   @media (max-width: 640px) {
-    .header { height: auto; flex-wrap: wrap; gap: 1rem; padding: 1rem 0; }
-    .header-actions { width: 100%; flex-wrap: wrap; gap: .75rem; }
+    .header { height: auto; flex-wrap: wrap; gap: var(--spacing-4); padding: var(--spacing-4) 0; }
+    .header-actions { width: 100%; flex-wrap: wrap; gap: var(--spacing-3); }
   }
 </style>

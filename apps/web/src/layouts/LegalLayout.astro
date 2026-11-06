@@ -1,0 +1,69 @@
+---
+import { localePath, translate } from "../shared/lib/i18n.js";
+import { legalContact, legalDocuments, legalUpdatedAt, type LegalLocale, type LegalPolicy } from "../shared/lib/legal";
+import LegalLinks from "../widgets/app-footer/ui/LegalLinks.svelte";
+
+interface Props { locale: LegalLocale; policy: LegalPolicy }
+const { locale, policy } = Astro.props;
+const document = legalDocuments[locale][policy];
+const title = translate(locale, policy === "terms" ? "termsOfService" : "privacyPolicy");
+const otherLocale = locale === "ko" ? "en" : "ko";
+---
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#171c1a" />
+    <title>{title} · {translate(locale, "brand")}</title>
+    <link rel="alternate" hreflang="ko" href={localePath("ko", `/${policy}`)} />
+    <link rel="alternate" hreflang="en" href={localePath("en", `/${policy}`)} />
+  </head>
+  <body>
+    <div class="legal-shell">
+      <header>
+        <a href={localePath(locale)}>{translate(locale, "brand")}</a>
+        <nav aria-label={translate(locale, "language")}>
+          <a href={localePath(otherLocale, `/${policy}`)} lang={otherLocale} hreflang={otherLocale}>{translate(otherLocale, "languageName")}</a>
+        </nav>
+      </header>
+      <main>
+        <h1>{title}</h1>
+        <p class="updated">{translate(locale, "legalUpdatedLabel")}: <time datetime={legalUpdatedAt}>{legalUpdatedAt}</time></p>
+        <p>{document.introduction}</p>
+        {document.sections.map((section) => (
+          <section>
+            <h2>{section.title}</h2>
+            {section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+          </section>
+        ))}
+        <section>
+          <h2>{translate(locale, "legalContactHeading")}</h2>
+          <p><a href={legalContact}>{translate(locale, "legalContactOperator")}</a></p>
+          {policy === "privacy" && (
+            <ul>
+              <li><a href={`https://policies.google.com/privacy?hl=${locale}`}>{translate(locale, "googlePrivacy")}</a></li>
+              <li><a href={`https://tools.google.com/dlpage/gaoptout?hl=${locale}`}>{translate(locale, "analyticsOptOut")}</a></li>
+            </ul>
+          )}
+        </section>
+      </main>
+      <footer><LegalLinks {locale} /><a href={localePath(locale)}>{translate(locale, "legalBackToHome")}</a></footer>
+    </div>
+  </body>
+</html>
+
+<style>
+  :global(body) { margin: 0; background: #171c1a; color: #eee9dd; font-family: system-ui, sans-serif; }
+  .legal-shell { max-width: 52rem; margin: auto; padding: 0 1.25rem; }
+  header, footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 0; }
+  header { border-bottom: 1px solid #455047; }
+  footer { border-top: 1px solid #455047; font-size: .75rem; }
+  main { padding: 2rem 0 3rem; line-height: 1.85; overflow-wrap: anywhere; }
+  h1 { font-size: clamp(1.75rem, 6vw, 2.5rem); line-height: 1.3; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; }
+  .updated { color: #b9bfaf; font-size: .875rem; }
+  a { color: #e0c078; text-underline-offset: .25rem; }
+  header a, footer > a { display: inline-flex; align-items: center; min-height: 2.75rem; }
+  a:focus-visible { outline: 2px solid #e0c078; outline-offset: 4px; }
+</style>

@@ -1,22 +1,19 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
+  import type { HTMLButtonAttributes } from "svelte/elements";
   type Variant = "primary" | "secondary" | "text" | "dismiss" | "tab" | "scenario";
 
   let {
+    children,
     variant = "primary",
     class: className = "",
     disabled = false,
     type = "button",
     ariaLabel,
-    title,
-    onclick,
-  }: {
+    ...rest
+  }: HTMLButtonAttributes & { children?: Snippet;
     variant?: Variant;
-    class?: string;
-    disabled?: boolean;
-    type?: "button" | "submit" | "reset";
     ariaLabel?: string;
-    title?: string;
-    onclick?: (event: MouseEvent) => void;
   } = $props();
 
   const variantClass: Record<Variant, string> = {
@@ -34,8 +31,7 @@
   {disabled}
   {type}
   aria-label={ariaLabel}
-  {title}
-  {onclick}
+  {...rest}
 >
-  <slot />
+  {@render children?.()}
 </button>

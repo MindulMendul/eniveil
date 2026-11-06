@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button } from "../../../shared/ui";
+  import { Select, TextInput, Button, Modal, StateMessage, Card, Badge } from "../../../shared/ui";
 
   type CatalogStory = {
     id: string;
@@ -49,16 +49,6 @@
   let pages = $state(0);
   let retry = $state(0);
   const pageSize = 6;
-
-  function openDialog(node: HTMLDialogElement, initiallyOpen: boolean) {
-    if (initiallyOpen && !node.open) node.showModal();
-    return {
-      update(nextOpen: boolean) {
-        if (nextOpen && !node.open) node.showModal();
-        if (!nextOpen && node.open) node.close();
-      },
-    };
-  }
 
   $effect(() => {
     if (!open) return;
@@ -116,8 +106,7 @@
 </script>
 
 {#if open}
-  <div class="modal-backdrop" role="presentation">
-    <dialog class="modal max-h-[88vh] overflow-y-auto" use:openDialog={open} oncancel={onClose} aria-labelledby="picker-title">
+  <Modal {open} {onClose} labelledby="picker-title">
       <div class="section-heading">
         <p class="eyebrow section-eyebrow">CHOOSE YOUR STORY</p>
         <Button variant="dismiss" ariaLabel={t("closeStoryPicker")} onclick={onClose}>×</Button>
@@ -130,56 +119,55 @@
 
       <section class="panel mb-4 mt-4">
         <label class="input-label" for="story-catalog-search">{t("workshopSearchPlaceholder")}</label>
-        <input
-          class="input-field"
+        <TextInput
           id="story-catalog-search"
           type="search"
-          maxlength="100"
+          maxlength={100}
           bind:value={search}
           oninput={resetPage}
           placeholder={t("workshopSearchPlaceholder")}
-        />
+         />
         <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label class="input-label">
             {t("storyOrigin")}
-            <select class="input-field" bind:value={origin} onchange={resetPage}>
+            <Select bind:value={origin} onchange={resetPage}>
               <option value="all">{t("workshopFilterAll")}</option>
               <option value="original">{t("storyOriginal")}</option>
               <option value="demo">{t("storyDemo")}</option>
-            </select>
+            </Select>
           </label>
           <label class="input-label">
             {t("storyDifficulty")}
-            <select class="input-field" bind:value={difficulty} onchange={resetPage}>
+            <Select bind:value={difficulty} onchange={resetPage}>
               <option value="all">{t("workshopFilterAll")}</option>
               <option value="easy">{t("difficultyEasy")}</option>
               <option value="normal">{t("difficultyNormal")}</option>
               <option value="hard">{t("difficultyHard")}</option>
               <option value="unset">{t("difficultyUndetermined")}</option>
-            </select>
+            </Select>
           </label>
           <label class="input-label">
             {t("workshopPlayers")}
-            <select class="input-field" bind:value={players} onchange={resetPage}>
+            <Select bind:value={players} onchange={resetPage}>
               <option value="all">{t("allPlayerCounts")}</option>
               {#each Array.from({ length: 20 }, (_, index) => index + 1) as playerCount}
                 <option value={playerCount}>{playerCount}{t("playerUnit")}</option>
               {/each}
-            </select>
+            </Select>
           </label>
           <label class="input-label">
             {t("storySort")}
-            <select class="input-field" bind:value={sort} onchange={resetPage}>
+            <Select bind:value={sort} onchange={resetPage}>
               <option value="latest">{t("sortLatest")}</option>
               <option value="rating">{t("sortRating")}</option>
               <option value="popular">{t("sortPopular")}</option>
-            </select>
+            </Select>
           </label>
         </div>
       </section>
 
       {#if loading}
-        <div class="empty" role="status"><p>{t("workshopLoading")}</p></div>
+        <StateMessage kind="loading" message={t("workshopLoading")} />
       {:else if error}
         <div class="empty" role="alert"><p>{error}</p><Button variant="secondary" onclick={() => (retry += 1)}>{t("workshopRetry")} ↻</Button></div>
       {:else if !stories.length}
@@ -187,10 +175,10 @@
       {:else}
         <div class="grid gap-3 md:grid-cols-2">
           {#each stories as story (story.id + ":" + story.version)}
-            <article class="panel flex flex-col">
+            <Card class="flex flex-col">
               <div class="section-heading">
                 <span class="eyebrow section-eyebrow">{story.origin === "original" ? t("storyOriginal") : t("storyDemo")}</span>
-                <span class="tag">{story.available ? t("storyAvailable") : t("storyComingSoon")}</span>
+                <Badge>{story.available ? t("storyAvailable") : t("storyComingSoon")}</Badge>
               </div>
               <h3 class="heading-three mt-3">{story.title}</h3>
               <p class="muted grow">{story.subtitle}</p>
@@ -205,7 +193,7 @@
               <Button class="mt-4 w-full" disabled={!story.available || busy || !connected} onclick={() => onCreate(story.id)}>
                 {story.available ? t("createRoom") : t("storyComingSoon")}
               </Button>
-            </article>
+            </Card>
           {/each}
         </div>
       {/if}
@@ -215,6 +203,5 @@
         <span class="muted text-sm">{page} / {Math.max(pages, 1)}</span>
         <Button variant="secondary" disabled={page >= pages || loading} onclick={() => (page += 1)}>{t("next")} →</Button>
       </footer>
-    </dialog>
-  </div>
+  </Modal>
 {/if}

@@ -2,6 +2,7 @@
   import MyPage from "../pages/account/_MyPage.svelte";
   import NicknameField from "../features/account/NicknameField.svelte";
   import type { Guest } from "@festival/shared";
+  import { Modal, Button, Panel, PageState } from "../shared/ui";
   import { onMount, tick } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
@@ -15,6 +16,7 @@
   import WorkshopEditor from "../pages/workshop/ui/WorkshopEditor.svelte";
   import { RoomPage } from "../pages/room";
   import { AppFooter } from "../widgets/app-footer";
+  import LegalLinks from "../widgets/app-footer/ui/LegalLinks.svelte";
   import { AppHeader } from "../widgets/app-header";
   import { ErrorNotice } from "../widgets/error-notice";
   import { StoryPickerDialog } from "../widgets/story-picker";
@@ -34,7 +36,7 @@
   const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "").replace(/\/+$/, "") || "/";
   let currentPath = $state(pagePath(location.pathname));
   let soloActive = $state(false);
-  let loginDialog: HTMLDialogElement;
+  let loginDialog = $state<HTMLDialogElement>(undefined!);
   let pendingWorkshopAction: (() => void) | undefined;
   type AuthDestination = { page: "workshop" | "editor" | "account"; id?: string };
   let pendingAuthDestination: AuthDestination | undefined;
@@ -341,9 +343,9 @@
   {/if}
 
   {#if loading}
-    <main class="main center"><p>{t("workshopLoading")}</p></main>
+    <PageState kind="loading" message={t("workshopLoading")} />
   {:else if account.needsNickname}
-    <main class="main"><section class="panel"><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><button class="primary" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</button></form><button class="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</button></section></main>
+    <main class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
   {:else if currentPath === "/mypage" && snapshot}
     <MyPage me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={logout} onEdit={openEditor} onWorkshop={openWorkshop} />
   {:else if currentPath === "/workshop"}
@@ -381,8 +383,10 @@
     <GamePage {room} {session} {host} {busy} {connected} onCommand={command} />
   {/if}
 
-  {#if !entryHome}
-    <AppFooter {snapshot} {connected} {t} />
+  {#if entryHome}
+    <footer class="flex justify-center py-4 text-festival-muted"><LegalLinks {locale} /></footer>
+  {:else}
+    <AppFooter {snapshot} {connected} {t} {locale} />
   {/if}
 </div>
 
@@ -397,14 +401,30 @@
 />
 
 
-<dialog bind:this={loginDialog} class="workshop-login" onclose={() => { pendingWorkshopAction = undefined; pendingAuthDestination = undefined; }} aria-labelledby="workshop-login-title">
+<Modal bind:element={loginDialog} class="workshop-login" onClose={() => { pendingWorkshopAction = undefined; pendingAuthDestination = undefined; }} labelledby="workshop-login-title">
   <h2 id="workshop-login-title">{locale === "en" ? "Sign in to the workshop" : "창작마당 로그인"}</h2>
   <p>{locale === "en" ? "Sign in with a guest nickname to create stories and save favorites." : "닉네임으로 게스트 로그인하면 창작과 즐겨찾기를 이용할 수 있어요."}</p>
-  <button type="button" class="secondary" disabled={busy} onclick={() => void googleLogin()}>{locale === "en" ? "Continue with Google" : "구글로 로그인"}{authConfig.demo ? (locale === "en" ? " (test)" : " (테스트)") : ""}</button>
+  <Button variant="secondary" disabled={busy} onclick={() => void googleLogin()}>{locale === "en" ? "Continue with Google" : "구글로 로그인"}{authConfig.demo ? (locale === "en" ? " (test)" : " (테스트)") : ""}</Button>
   <form onsubmit={(event) => { event.preventDefault(); void login(); }}>
     <NicknameField id="workshop-nickname" bind:value={nickname} {locale} {busy} />
     {#if error}<p role="alert">{error}</p>{/if}
-    <div class="login-actions"><button type="submit" class="primary" disabled={busy}>{locale === "en" ? "Sign in" : "로그인"}</button><button type="button" class="secondary" onclick={() => loginDialog.close()}>{locale === "en" ? "Cancel" : "취소"}</button></div>
+    <div class="login-actions"><Button type="submit" class="primary" disabled={busy} variant="primary">{locale === "en" ? "Sign in" : "로그인"}</Button><Button type="button" class="secondary" onclick={() => loginDialog.close()} variant="secondary">{locale === "en" ? "Cancel" : "취소"}</Button></div>
   </form>
-</dialog>
-<style>.workshop-login{width:min(440px,calc(100% - 2rem));padding:2rem;background:#202820;color:#eee9dd;border:1px solid #59634f}.workshop-login::backdrop{background:#000b}.workshop-login h2{font-size:1.5rem}.workshop-login p{margin:1rem 0;line-height:1.7}.workshop-login .primary,.workshop-login .secondary{width:auto;margin-top:0}.login-actions{display:flex;gap:1rem;margin-top:1rem}</style>
+</Modal>
+<style>
+:global(.workshop-login) h2 {
+  font-size:var(--typography-size-control-6)}
+:global(.workshop-login) p {
+  margin:var(--spacing-4) 0;
+  line-height:1.7}
+:global(.workshop-login) label {
+  display:block;
+  margin-bottom:var(--spacing-2)}
+:global(.workshop-login) :global(.primary),:global(.workshop-login) :global(.secondary) {
+  width:auto;
+  margin-top:0}
+.login-actions {
+  display:flex;
+  gap:var(--spacing-4);
+  margin-top:var(--spacing-4)}
+</style>
