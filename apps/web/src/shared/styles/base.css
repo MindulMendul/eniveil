@@ -3,6 +3,7 @@
 html { overflow-wrap: anywhere; }
 body { min-width: 0; }
 button, input, select, textarea { font: inherit; }
+button { min-height: var(--layout-touch); }
 button, a, input, select, textarea { touch-action: manipulation; }
 input, select, textarea { min-width: 0; max-width: 100%; min-height: var(--layout-touch); }
 textarea { resize: vertical; }
