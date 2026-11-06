@@ -4,7 +4,8 @@
 설명, canonical, hreflang, Open Graph, Twitter summary와 JSON-LD를 포함한다.
 로그인한 사람의 닉네임, 방 코드, 초안 본문은 메타데이터에 넣지 않는다.
 마이페이지·편집 화면·404는 noindex이며 sitemap에 포함하지 않는다.
-robots.txt의 제외 규칙은 접근 권한 검사를 대체하지 않는다.
+검색 봇이 noindex를 읽을 수 있도록 해당 HTML은 robots.txt로 차단하지 않는다.
+클라이언트 경로·언어 전환에도 메타 태그를 갱신한다. 접근 권한은 서버가 검사한다.
 
 `PUBLIC_SITE_URL`은 빌드 시 사용할 공개 origin이다. 기본값은 운영 도메인이다.
 로컬/별도 미리보기는 빌드 전에 실제 origin을 지정한다. 쿼리·경로·사용자정보가 들어간
