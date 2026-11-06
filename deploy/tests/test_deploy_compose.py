@@ -53,7 +53,7 @@ class ComposeDeploymentTests(unittest.TestCase):
             return ''
         with tempfile.TemporaryDirectory() as tmp, patch.object(deployment.Path,'home',return_value=Path(tmp)), \
              patch.object(deployment,'run',side_effect=fake_run), \
-             patch.object(deployment.shutil,'disk_usage',return_value=SimpleNamespace(free=5 * 1024 ** 3)), \\
+             patch.object(deployment.shutil,'disk_usage',return_value=SimpleNamespace(free=5 * 1024 ** 3)), \
              patch.object(deployment,'wait_https',side_effect=RuntimeError('HTTPS failed')):
             with self.assertRaisesRegex(RuntimeError,'HTTPS failed'):
                 deployment.deploy('production',sha)
