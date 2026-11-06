@@ -69,7 +69,8 @@
       offset: String((page - 1) * pageSize),
       sort,
     });
-    if (search.trim()) params.set("q", search.trim());
+    const keyword = search.trim().slice(0, 100);
+    if (keyword) params.set("q", keyword);
     if (origin !== "all") params.set("origin", origin);
     if (difficulty !== "all") params.set("difficulty", difficulty);
     if (players !== "all") params.set("players", players);
@@ -134,8 +135,9 @@
           class="input-field"
           id="story-catalog-search"
           type="search"
-          bind:value={search}
-          oninput={resetPage}
+          value={search}
+          maxlength="100"
+          oninput={(event) => { search = event.currentTarget.value.slice(0, 100); resetPage(); }}
           placeholder={t("workshopSearchPlaceholder")}
         />
         <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
