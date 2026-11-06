@@ -16,7 +16,8 @@
       "authFailure": {
         "localizedApp": true,
         "noSession": true,
-        "stateCookieCleared": true
+        "unrelatedCallbackPreservesPending": true,
+        "matchingCallbackClearsState": true
       },
       "privacy": {
         "googleSubject": true,
@@ -25,7 +26,8 @@
       },
       "nicknames": {
         "available": true,
-        "selfExcluded": true
+        "selfExcluded": true,
+        "localizedLimit": true
       },
       "jpeg": {
         "inputBytes": 328476,
@@ -47,7 +49,8 @@
       "authFailure": {
         "localizedApp": true,
         "noSession": true,
-        "stateCookieCleared": true
+        "unrelatedCallbackPreservesPending": true,
+        "matchingCallbackClearsState": true
       },
       "privacy": {
         "googleSubject": true,
@@ -56,7 +59,8 @@
       },
       "nicknames": {
         "available": true,
-        "selfExcluded": true
+        "selfExcluded": true,
+        "localizedLimit": true
       },
       "jpeg": {
         "inputBytes": 328476,

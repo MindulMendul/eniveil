@@ -23,7 +23,7 @@ function fixture(options: Partial<Parameters<typeof createAccountRoutes>[0]> = {
   app.route("/api/platform", createPlatformRoutes({ store, runs, production: false, stories: new FileStoryCatalog(join(import.meta.dir, "../../../stories")) }));
   app.onError((_error, c) => c.json({ error: "Invalid input" }, 400));
   cleanups.push(() => store.close());
-  const req = (path: string, cookie = "", body?: unknown, headers: Record<string, string> = {}) => app.request(`http://localhost/api/platform${path}`, { method: body === undefined ? "GET" : "POST", headers: { Cookie: cookie, "Content-Type": "application/json", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const req = (path: string, cookie = "", body?: unknown, headers: Record<string, string> = {}, address = "192.0.2.1") => app.request(`http://localhost/api/platform${path}`, { method: body === undefined ? "GET" : "POST", headers: { Cookie: cookie, "Content-Type": "application/json", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) }, { requestIP: () => ({ address, family: "IPv4", port: 1234 }) });
   const guest = async (nickname: string) => {
     const response = await req("/guest", "", { nickname });
     expect(response.status).toBe(201);
@@ -243,27 +243,61 @@ test("OAuth invalid state returns to a fixed localized app URL without contactin
     const response = await f.req(`/auth/google/callback?${query}`, boundCookie);
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe(expected);
-    expect(response.headers.getSetCookie().some(value => value.startsWith("festival_oauth_state=;") && value.includes("Max-Age=0"))).toBe(true);
+    const preservedPending = boundCookie === cookie;
+    expect(response.headers.getSetCookie().some(value => value.startsWith("festival_oauth_state=;") && value.includes("Max-Age=0"))).toBe(!preservedPending);
     expect(response.headers.getSetCookie().some(value => value.startsWith("festival_guest="))).toBe(false);
   }
   setSystemTime(Date.now() + 600001);
   const expired = await f.req(`/auth/google/callback?state=${state}&code=x`, cookie);
   expect(expired.headers.get("location")).toBe("/en/?auth=failed");
+  expect(expired.headers.getSetCookie().some(value => value.startsWith("festival_oauth_state=;"))).toBe(true);
   expect(calls).toBe(0);
   expect(f.store.db.query("SELECT * FROM credentials").all()).toHaveLength(0);
   expect(f.store.db.query("SELECT * FROM oauth_consumed").all()).toHaveLength(0);
 });
 
-test("nickname availability is throttled globally, ignores forged IP headers and recovers after the window", async () => {
+test("nickname availability throttles transport IPs independently, ignores forged headers and preserves account access", async () => {
   const f = fixture();
   const owner = await f.guest("ThrottleOwner");
   for (let i = 0; i < 60; i++) expect((await f.req("/nicknames/availability?nickname=Available")).status).toBe(200);
-  const limited = await f.req("/nicknames/availability?nickname=Available", owner.cookie, undefined, { "X-Forwarded-For": "203.0.113.9", "X-Real-IP": "203.0.113.10" });
+  const limited = await f.req("/nicknames/availability?nickname=Available", "", undefined, { "X-Forwarded-For": "203.0.113.9", "X-Real-IP": "203.0.113.10" });
   expect(limited.status).toBe(429);
   expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+  expect((await f.req("/nicknames/availability?nickname=Available", "", undefined, {}, "192.0.2.2")).status).toBe(200);
+  expect((await f.req("/nicknames/availability?nickname=Available", owner.cookie)).status).toBe(200);
   expect(f.store.authenticate(owner.cookie.split("=")[1])?.id).toBe(owner.me.id);
   setSystemTime(Date.now() + 60000);
   expect((await f.req("/nicknames/availability?nickname=Available")).status).toBe(200);
+});
+
+test("a mismatched or missing OAuth state leaves the valid pending browser attempt usable", async () => {
+  let calls = 0;
+  const f = fixture({ google: { clientId: "client", clientSecret: "secret", origin: "http://localhost" }, fetch: async (url) => { calls++; return Response.json(url.endsWith("/token") ? { access_token: "token" } : { sub: "preserved" }); } });
+  const start = await f.req("/auth/google?locale=en");
+  let cookie = sessionCookie(start, "festival_oauth_state");
+  const state = new URL(start.headers.get("location")!).searchParams.get("state")!;
+  for (const query of ["state=unrelated", "code=stray"]) {
+    const stray = await f.req(`/auth/google/callback?${query}`, cookie);
+    expect(stray.headers.get("location")).toBe("/en/?auth=failed");
+    // Apply any cookie update as a browser would, before the legitimate callback.
+    const update = stray.headers.getSetCookie().find(value => value.startsWith("festival_oauth_state="));
+    if (update) cookie = update.includes("Max-Age=0") ? "" : update.split(";")[0]!;
+  }
+  expect(calls).toBe(0);
+  const valid = await f.req(`/auth/google/callback?state=${state}&code=legitimate`, cookie);
+  expect(valid.headers.get("location")).toBe("/en/");
+  expect(sessionCookie(valid)).toContain("festival_guest=");
+  expect(calls).toBe(2);
+});
+
+test("nickname limiter bounds client buckets and releases expired capacity", async () => {
+  const f = fixture();
+  for (let i = 0; i < 4096; i++) {
+    expect((await f.req("/nicknames/availability?nickname=Available", "", undefined, {}, `client-${i}`)).status).toBe(200);
+  }
+  expect((await f.req("/nicknames/availability?nickname=Available", "", undefined, {}, "new-client")).status).toBe(429);
+  setSystemTime(Date.now() + 60000);
+  expect((await f.req("/nicknames/availability?nickname=Available", "", undefined, {}, "new-client")).status).toBe(200);
 });
 
 test("nickname index restores Unicode names on restart and updates only after successful account mutations", () => {

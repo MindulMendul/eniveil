@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
-import { checkDimensions, imageDimensions, webpFilename } from '../src/features/image-converter/headers';
+import { expect, spyOn, test } from 'bun:test';
+import { checkDimensions, imageDimensions, jpegDimensions, webpFilename } from '../src/features/image-converter/headers';
 import { convertToWebp, MAX_IMAGE_BYTES } from '../src/features/image-converter/convert';
 
 test('oversized metadata rejects before decoding; wrong headers reject safely', async () => {
@@ -31,6 +31,29 @@ test('JPEG metadata beyond 256 KiB reaches decoding only after the bounded dimen
     await expect(convertToWebp(new File([new Uint8Array(MAX_IMAGE_BYTES + 1)], 'large.jpg', { type: 'image/jpeg' }))).rejects.toThrow('size');
     expect(decodes).toBe(1);
   } finally { globalThis.createImageBitmap = previous; }
+});
+
+test('JPEG inspection skips large payloads, stops at SOF and bounds malformed metadata work', async () => {
+  const frame = new Uint8Array([255, 192, 0, 8, 8, 0, 60, 0, 80, 0]);
+  const segment = new Uint8Array(65537); segment.set([255, 239, 255, 255]);
+  for (const metadata of [[], Array.from({ length: 5 }, () => segment)]) {
+    const file = new File([new Uint8Array([255,216]), ...metadata, frame, new Uint8Array(9 * 1024 * 1024)], 'bounded.jpg');
+    const originalSlice = file.slice.bind(file);
+    let readBytes = 0;
+    const slice = spyOn(file, 'slice').mockImplementation((start = 0, end = file.size) => { readBytes += Math.min(end, file.size) - start; return originalSlice(start, end); });
+    const fullRead = spyOn(file, 'arrayBuffer').mockImplementation(() => { throw Error('full file read'); });
+    try {
+      expect(await jpegDimensions(file)).toEqual({ width: 80, height: 60 });
+      expect(readBytes).toBeLessThan(256 * 1024);
+    } finally { slice.mockRestore(); fullRead.mockRestore(); }
+  }
+  for (const bytes of [
+    [255,216,255,225,0,1], // invalid length
+    [255,216,255,225,255,255], // truncated segment
+    [255,216,255,218,0,2], // no frame before compressed data
+  ]) await expect(jpegDimensions(new Blob([new Uint8Array(bytes)]))).rejects.toThrow('format');
+  const tooMany = new Blob([new Uint8Array([255,216]), ...Array.from({ length: 4097 }, () => new Uint8Array([255,225,0,2])), frame]);
+  await expect(jpegDimensions(tooMany)).rejects.toThrow('format');
 });
 
 test('PNG, GIF, JPEG, WebP VP8X/VP8L/VP8 metadata dimensions', () => {
