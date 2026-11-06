@@ -1,4 +1,11 @@
 export const publicPaths = ['/', '/workshop/', '/terms/', '/privacy/'];
+export function shareImage(en: boolean, origin: string) {
+  return {
+    url: new URL(`/og/story-archive-${en ? 'en' : 'ko'}-v1.png`, origin).href,
+    alt: en ? 'Story Archive — discover, play and create interactive mystery stories.' : '스토리 아카이브 — 추리 이야기를 발견하고, 플레이하고, 창작하세요.',
+    width: '1200', height: '630', type: 'image/png',
+  };
+}
 export function siteOrigin(value = 'https://mindul-murder-mystery.duckdns.org') {
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw Error('PUBLIC_SITE_URL must be an HTTP(S) origin.');
