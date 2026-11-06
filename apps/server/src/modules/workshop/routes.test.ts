@@ -1,4 +1,5 @@
 import { afterEach, expect, setSystemTime, spyOn, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +16,7 @@ import type { WorkshopItem } from "./model";
 const cleanups: (() => void)[] = [];
 afterEach(() => { setSystemTime(); for (const cleanup of cleanups.splice(0)) cleanup(); });
 
-function fixture(limits: Partial<WorkshopLimits> | ((source: StoryPackage) => Partial<WorkshopLimits>) = {}) {
+function fixture(limits: Partial<WorkshopLimits> | ((source: StoryPackage) => Partial<WorkshopLimits>) = {}, diskBacked = false) {
   const directory = mkdtempSync(join(tmpdir(), "festival-workshop-"));
   const source = storyPackageSchema.parse(JSON.parse(readFileSync(join(import.meta.dir, "../../../stories/deokil-trading-murder.mstory"), "utf8")));
   const first = structuredClone(source);
@@ -30,7 +31,8 @@ function fixture(limits: Partial<WorkshopLimits> | ((source: StoryPackage) => Pa
   second.story.title = "Beta story";
   for (const [name, story] of Object.entries({ first, newest, second }))
     writeFileSync(join(directory, `${name}.mstory`), JSON.stringify(story));
-  const store = new Store(":memory:");
+  const databasePath = diskBacked ? join(directory, "workshop.sqlite") : ":memory:";
+  const store = new Store(databasePath);
   const runs = new SQLiteStoryRunStore(store.db);
   const workshop = new SQLiteWorkshopStore(store.db, typeof limits === "function" ? limits(source) : limits);
   const stories = new FileStoryCatalog(directory);
@@ -62,7 +64,7 @@ function fixture(limits: Partial<WorkshopLimits> | ((source: StoryPackage) => Pa
     expect(response.status).toBe(200);
     return await response.json() as { items: WorkshopItem[]; total: number; offset: number; limit: number };
   };
-  return { source, store, runs, workshop, stories, guest, request, create, list };
+  return { source, store, runs, workshop, stories, guest, request, create, list, databasePath };
 }
 
 test("anonymous catalog exposes only the latest version and public metadata", async () => {
@@ -148,6 +150,10 @@ test("lower quotas preserve legacy records and allow same-size or decreasing edi
   const owner = f.guest("Owner");
   const first = await f.create(owner.cookie);
   const second = await f.create(owner.cookie);
+  const countLimited = new SQLiteWorkshopStore(f.store.db, { guestDrafts: 1, totalDrafts: 1 });
+  const growing = structuredClone(f.source);
+  growing.story.title += " larger existing story";
+  expect(countLimited.update(first.id, owner, { package: growing, published: false, difficulty: null, thumbnailUrl: null })?.id).toBe(first.id);
   const limited = new SQLiteWorkshopStore(f.store.db, { guestDrafts: 1, totalDrafts: 1, guestBytes: 1, totalBytes: 1 });
   const draft = { package: f.source, published: false, difficulty: null, thumbnailUrl: null };
   expect(limited.update(first.id, owner, draft)?.id).toBe(first.id);
@@ -156,8 +162,113 @@ test("lower quotas preserve legacy records and allow same-size or decreasing edi
   expect(limited.update(first.id, owner, { ...draft, package: smaller })?.id).toBe(first.id);
   expect(() => limited.update(first.id, owner, draft)).toThrow(WorkshopQuotaError);
   expect(limited.source(second.id, owner.id)).toEqual(f.source);
-  expect(limited.list(owner.id)).toHaveLength(1);
+  expect(limited.list(owner.id)).toHaveLength(2);
   expect((f.store.db.query("SELECT COUNT(*) AS count FROM workshop_drafts").get() as { count: number }).count).toBe(2);
+});
+
+test("SQLite triggers track old-image writers and startup repairs nonzero stale byte counts", async () => {
+  const f = fixture((source) => ({ guestBytes: payloadBytes(source, "A") * 10, totalBytes: payloadBytes(source, "A") * 2 }), true);
+  const owner = f.guest("A");
+  const first = await f.create(owner.cookie);
+  const legacy = new Database(f.databasePath);
+  try {
+    const modified = structuredClone(f.source);
+    modified.story.title += "한글";
+    const actualBytes = payloadBytes(modified, owner.nickname);
+    // An old image updates source/metadata without knowing the payload_bytes column exists.
+    legacy.query("UPDATE workshop_drafts SET package_json=?, story_json=? WHERE id=?")
+      .run(JSON.stringify(modified), JSON.stringify(modified.story), first.id);
+    const recorded = () => (f.store.db.query("SELECT payload_bytes FROM workshop_drafts WHERE id=?").get(first.id) as { payload_bytes: number }).payload_bytes;
+    expect(recorded()).toBe(actualBytes);
+    legacy.query(`INSERT INTO workshop_drafts (
+      id, owner_id, author_name, story_json, package_json, thumbnail_url, difficulty,
+      published, published_at, updated_at
+    ) SELECT ?, owner_id, author_name, story_json, package_json, thumbnail_url, difficulty,
+      published, published_at, updated_at FROM workshop_drafts WHERE id=?`)
+      .run("community-legacy-insert", first.id);
+    expect((f.store.db.query("SELECT payload_bytes FROM workshop_drafts WHERE id=?").get("community-legacy-insert") as { payload_bytes: number }).payload_bytes).toBe(actualBytes);
+    expect((await f.request("/drafts", { method: "POST", cookie: owner.cookie, body: { package: f.source } })).status).toBe(413);
+    legacy.query("UPDATE workshop_drafts SET payload_bytes=1 WHERE id=?").run(first.id);
+    new SQLiteWorkshopStore(f.store.db);
+    expect(recorded()).toBe(actualBytes);
+    expect(f.workshop.source(first.id, owner.id)).toEqual(modified);
+  } finally {
+    legacy.close();
+  }
+});
+
+test("legacy owners retain every item, accurate filtered totals and growing edits above the count limit", async () => {
+  const f = fixture();
+  const owner = f.guest("Owner");
+  const oldest = await f.create(owner.cookie);
+  const source = structuredClone(f.source);
+  source.story.title = "needle oldest legacy";
+  f.store.db.query("UPDATE workshop_drafts SET story_json=?, package_json=?, updated_at=? WHERE id=?")
+    .run(JSON.stringify(source.story), JSON.stringify(source), "2000-01-01T00:00:00.000Z", oldest.id);
+  for (let index = 1; index < 25; index++) {
+    f.store.db.query(`INSERT INTO workshop_drafts (
+      id, owner_id, author_name, story_json, package_json, published, updated_at
+    ) VALUES (?, ?, ?, ?, ?, 0, ?)`)
+      .run(`community-legacy-${index}`, owner.id, owner.nickname, JSON.stringify(f.source.story), JSON.stringify(f.source), "2026-11-06T01:00:00.000Z");
+  }
+  const page = await f.list("/stories?view=mine&limit=24", owner.cookie);
+  expect(page.total).toBe(25);
+  expect(page.items).toHaveLength(24);
+  expect((await f.list("/stories?view=mine&limit=24&offset=24", owner.cookie)).items.map((item) => item.id)).toEqual([oldest.id]);
+  const search = await f.list("/stories?view=mine&q=needle&author=Owner", owner.cookie);
+  expect(search.total).toBe(1);
+  expect(search.items[0].id).toBe(oldest.id);
+  source.story.title += " expanded";
+  expect((await f.request(`/drafts/${oldest.id}`, { method: "PUT", cookie: owner.cookie, body: { package: source } })).status).toBe(200);
+  expect(f.workshop.source(oldest.id, owner.id)).toEqual(source);
+  expect((await f.request("/drafts", { method: "POST", cookie: owner.cookie, body: { package: f.source } })).status).toBe(429);
+  expect((await f.list("/stories?view=mine", owner.cookie)).total).toBe(25);
+});
+
+test("global creation budget survives new guest IDs and database connections and expires automatically", async () => {
+  const f = fixture({ globalCreatesPerMinute: 2 }, true);
+  const a = f.guest("A"), b = f.guest("B"), c = f.guest("C");
+  setSystemTime(new Date("2026-11-06T10:00:00.000Z"));
+  const first = await f.create(a.cookie);
+  await f.create(b.cookie);
+  expect((await f.request("/drafts", { method: "POST", cookie: c.cookie, body: { package: f.source } })).status).toBe(429);
+  const reopened = new Database(f.databasePath);
+  try {
+    const independent = new SQLiteWorkshopStore(reopened, { globalCreatesPerMinute: 2 });
+    expect(() => independent.create(c, { package: f.source, published: false, difficulty: null, thumbnailUrl: null })).toThrow(WorkshopQuotaError);
+  } finally {
+    reopened.close();
+  }
+  const updated = structuredClone(f.source);
+  updated.story.title += " update without creation budget";
+  expect((await f.request(`/drafts/${first.id}`, { method: "PUT", cookie: a.cookie, body: { package: updated } })).status).toBe(200);
+  setSystemTime(new Date("2026-11-06T10:00:59.999Z"));
+  expect((await f.request("/drafts", { method: "POST", cookie: c.cookie, body: { package: f.source } })).status).toBe(429);
+  setSystemTime(new Date("2026-11-06T10:01:00.000Z"));
+  await f.create(c.cookie);
+  expect((f.store.db.query("SELECT creations FROM workshop_creation_budget WHERE id=1").get() as { creations: number }).creations).toBe(1);
+});
+
+test("rejected storage quotas do not consume the persistent creation budget", async () => {
+  const f = fixture((source) => ({ guestBytes: payloadBytes(source, "A"), globalCreatesPerMinute: 1 }));
+  const owner = f.guest("A");
+  const oversized = structuredClone(f.source);
+  oversized.story.title += "x";
+  expect((await f.request("/drafts", { method: "POST", cookie: owner.cookie, body: { package: oversized } })).status).toBe(413);
+  await f.create(owner.cookie);
+  expect((f.store.db.query("SELECT creations FROM workshop_creation_budget WHERE id=1").get() as { creations: number }).creations).toBe(1);
+});
+
+test("concurrent creators share one global creation budget", async () => {
+  const f = fixture({ globalCreatesPerMinute: 1 });
+  const creators = [f.guest("A"), f.guest("B")];
+  const responses = await Promise.all(creators.map((guest) => f.request("/drafts", {
+    method: "POST", cookie: guest.cookie, body: { package: f.source },
+  })));
+  expect(responses.map((response) => response.status).sort()).toEqual([201, 429]);
+  expect((f.store.db.query("SELECT COUNT(*) AS count FROM workshop_drafts").get() as { count: number }).count).toBe(1);
+  expect((f.store.db.query("SELECT creations FROM workshop_creation_budget WHERE id=1").get() as { creations: number }).creations).toBe(1);
+  expect(f.store.db.inTransaction).toBe(false);
 });
 
 test("legacy databases backfill stored payload bytes without deleting packages", async () => {

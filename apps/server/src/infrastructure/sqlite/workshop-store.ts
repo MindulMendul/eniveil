@@ -20,6 +20,7 @@ export type WorkshopLimits = {
   totalDrafts: number;
   totalBytes: number;
   publicCatalogLimit: number;
+  globalCreatesPerMinute: number;
 };
 
 const defaultLimits: WorkshopLimits = {
@@ -28,7 +29,11 @@ const defaultLimits: WorkshopLimits = {
   totalDrafts: 1000,
   totalBytes: 100 * 1024 * 1024,
   publicCatalogLimit: 1000,
+  globalCreatesPerMinute: 10,
 };
+
+const payloadSizeSql = `length(CAST(package_json AS BLOB)) + length(CAST(story_json AS BLOB)) +
+  length(CAST(COALESCE(thumbnail_url, '') AS BLOB)) + length(CAST(author_name AS BLOB))`;
 
 export class WorkshopQuotaError extends Error {
   constructor(message: string, readonly status: 429 | 413) {
@@ -75,17 +80,30 @@ export class SQLiteWorkshopStore {
       );
       CREATE INDEX IF NOT EXISTS workshop_favorites_guest_idx
         ON workshop_favorites(guest_id, story_id);
+      CREATE TABLE IF NOT EXISTS workshop_creation_budget (
+        id INTEGER PRIMARY KEY CHECK (id=1),
+        window_started_at INTEGER NOT NULL,
+        creations INTEGER NOT NULL CHECK (creations >= 0)
+      );
     `);
     db.transaction(() => {
       const columns = db.query("PRAGMA table_info(workshop_drafts)").all() as { name: string }[];
       if (!columns.some((column) => column.name === "payload_bytes")) {
         db.exec("ALTER TABLE workshop_drafts ADD COLUMN payload_bytes INTEGER NOT NULL DEFAULT 0 CHECK (payload_bytes >= 0)");
       }
-      // Also cover records written by an older application image after a rollback.
-      db.exec(`UPDATE workshop_drafts SET payload_bytes=
-        length(CAST(package_json AS BLOB)) + length(CAST(story_json AS BLOB)) +
-        length(CAST(COALESCE(thumbnail_url, '') AS BLOB)) + length(CAST(author_name AS BLOB))
-        WHERE payload_bytes=0`);
+      // Reconcile nonzero stale values left by older images as well as newly migrated rows.
+      db.exec(`UPDATE workshop_drafts SET payload_bytes=${payloadSizeSql}`);
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS workshop_payload_insert AFTER INSERT ON workshop_drafts
+        BEGIN
+          UPDATE workshop_drafts SET payload_bytes=${payloadSizeSql} WHERE id=NEW.id;
+        END;
+        CREATE TRIGGER IF NOT EXISTS workshop_payload_update
+          AFTER UPDATE OF package_json, story_json, thumbnail_url, author_name ON workshop_drafts
+        BEGIN
+          UPDATE workshop_drafts SET payload_bytes=${payloadSizeSql} WHERE id=NEW.id;
+        END;
+      `);
     }).immediate();
   }
 
@@ -94,8 +112,9 @@ export class SQLiteWorkshopStore {
       SELECT id, owner_id, author_name, story_json, thumbnail_url, difficulty,
         published, published_at, updated_at
       FROM workshop_drafts WHERE ${ownerId === undefined ? "published=1" : "owner_id=?"}
-      ORDER BY ${ownerId === undefined ? "published_at" : "updated_at"} DESC, id ASC LIMIT ?
-    `).all(...(ownerId === undefined ? [] : [ownerId]), ownerId === undefined ? this.limits.publicCatalogLimit : this.limits.guestDrafts) as DraftRow[];
+      ORDER BY ${ownerId === undefined ? "published_at" : "updated_at"} DESC, id ASC
+      ${ownerId === undefined ? "LIMIT ?" : ""}
+    `).all(...(ownerId === undefined ? [this.limits.publicCatalogLimit] : [ownerId])) as DraftRow[];
     return rows.map((row) => this.metadata(row));
   }
 
@@ -120,7 +139,9 @@ export class SQLiteWorkshopStore {
     const now = new Date().toISOString();
     const payload = this.serialize(owner, draft);
     return this.db.transaction(() => {
-      this.checkQuota(owner.id, payload.bytes);
+      this.checkCountQuota(owner.id);
+      this.checkByteQuota(owner.id, payload.bytes);
+      this.consumeCreationBudget();
       this.db.query(`
       INSERT INTO workshop_drafts (
         id, owner_id, author_name, story_json, package_json, thumbnail_url,
@@ -141,7 +162,7 @@ export class SQLiteWorkshopStore {
       const previous = this.db.query("SELECT payload_bytes FROM workshop_drafts WHERE id=? AND owner_id=?")
         .get(id, owner.id) as { payload_bytes: number } | null;
       if (!previous) return undefined;
-      if (payload.bytes > previous.payload_bytes) this.checkQuota(owner.id, payload.bytes, id);
+      if (payload.bytes > previous.payload_bytes) this.checkByteQuota(owner.id, payload.bytes, id);
       this.db.query(`
       UPDATE workshop_drafts SET author_name=?, story_json=?, package_json=?,
         thumbnail_url=?, difficulty=?, published=?, payload_bytes=?,
@@ -167,20 +188,22 @@ export class SQLiteWorkshopStore {
   }
 
   /** Called under an IMMEDIATE transaction so competing connections cannot pass stale totals. */
-  private checkQuota(ownerId: string, bytes: number, excludedId = "") {
+  private checkCountQuota(ownerId: string) {
     const guestCount = this.db.query(`
       SELECT COUNT(*) AS count FROM (
-        SELECT 1 FROM workshop_drafts WHERE owner_id=? AND id<>? LIMIT ?
+        SELECT 1 FROM workshop_drafts WHERE owner_id=? LIMIT ?
       )
-    `).get(ownerId, excludedId, this.limits.guestDrafts) as { count: number };
+    `).get(ownerId, this.limits.guestDrafts) as { count: number };
     if (guestCount.count >= this.limits.guestDrafts)
       throw new WorkshopQuotaError(`한 사람당 작품은 ${this.limits.guestDrafts}개까지 저장할 수 있어. 기존 작품을 수정해 줘.`, 429);
     const totalCount = this.db.query(`
-      SELECT COUNT(*) AS count FROM (SELECT 1 FROM workshop_drafts WHERE id<>? LIMIT ?)
-    `).get(excludedId, this.limits.totalDrafts) as { count: number };
+      SELECT COUNT(*) AS count FROM (SELECT 1 FROM workshop_drafts LIMIT ?)
+    `).get(this.limits.totalDrafts) as { count: number };
     if (totalCount.count >= this.limits.totalDrafts)
       throw new WorkshopQuotaError("창작마당 저장 작품 수가 한도에 도달했어. 기존 작품을 수정해 줘.", 429);
-    // Count checks bound these metadata-only sums, including databases predating the limits.
+  }
+
+  private checkByteQuota(ownerId: string, bytes: number, excludedId = "") {
     const usage = this.db.query(`
       SELECT COALESCE(SUM(payload_bytes), 0) AS total,
         COALESCE(SUM(CASE WHEN owner_id=? THEN payload_bytes ELSE 0 END), 0) AS guest
@@ -190,6 +213,20 @@ export class SQLiteWorkshopStore {
       throw new WorkshopQuotaError("내 작품의 총 저장 용량 한도를 넘었어. 파일 크기를 줄여 줘.", 413);
     if (usage.total + bytes > this.limits.totalBytes)
       throw new WorkshopQuotaError("창작마당의 총 저장 용량 한도를 넘었어. 파일 크기를 줄여 줘.", 413);
+  }
+
+  private consumeCreationBudget() {
+    const now = Date.now();
+    const previous = this.db.query("SELECT window_started_at, creations FROM workshop_creation_budget WHERE id=1")
+      .get() as { window_started_at: number; creations: number } | null;
+    const active = previous && now >= previous.window_started_at && now - previous.window_started_at < 60000;
+    const count = active ? previous.creations : 0;
+    if (count >= this.limits.globalCreatesPerMinute)
+      throw new WorkshopQuotaError("새 작품 저장 요청이 많아. 잠시 후 다시 저장해 줘.", 429);
+    this.db.query(`
+      INSERT INTO workshop_creation_budget (id, window_started_at, creations) VALUES (1, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET window_started_at=excluded.window_started_at, creations=excluded.creations
+    `).run(active ? previous.window_started_at : now, count + 1);
   }
 
   favorite(storyId: string, guestId: string, selected: boolean) {
