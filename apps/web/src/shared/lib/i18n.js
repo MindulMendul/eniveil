@@ -71,6 +71,7 @@ const translations = {
   closeStoryPicker: ["작품 선택 닫기", "Close story picker"],
   showStoryFilters: ["검색·필터 펼치기", "Show search and filters"],
   hideStoryFilters: ["검색·필터 접기", "Hide search and filters"],
+  activeStoryFilters: ["적용된 조건", "Active conditions"],
   workshopNav: ["작품 둘러보기", "Explore stories"],
   workshopTitle: ["인터랙티브 작품", "Interactive stories"],
   workshopDescription: ["다양한 장르와 플레이 방식의 이야기를 발견해 봐.", "Find stories across genres and ways to play."],

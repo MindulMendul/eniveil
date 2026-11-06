@@ -49,6 +49,10 @@
   let pages = $state(0);
   let retry = $state(0);
   let filtersOpen = $state(false);
+  let activeFilterCount = $derived(
+    [search.trim() !== "", origin !== "all", difficulty !== "all", players !== "all", sort !== "latest"]
+      .filter(Boolean).length,
+  );
   const pageSize = 6;
 
   $effect(() => {
@@ -130,7 +134,12 @@
           aria-controls="story-picker-filter-fields"
           onclick={() => (filtersOpen = !filtersOpen)}
         >
-          {t(filtersOpen ? "hideStoryFilters" : "showStoryFilters")}
+          <span class="flex min-w-0 items-center gap-2">
+            <span>{t(filtersOpen ? "hideStoryFilters" : "showStoryFilters")}</span>
+            {#if activeFilterCount > 0}
+              <Badge tone="gold" aria-label={`${t("activeStoryFilters")}: ${activeFilterCount}`}>{activeFilterCount}</Badge>
+            {/if}
+          </span>
           <span aria-hidden="true">{filtersOpen ? "−" : "+"}</span>
         </Button>
         <div id="story-picker-filter-fields" class="story-picker-filter-fields" hidden={!filtersOpen}>
