@@ -1,0 +1,225 @@
+import { afterEach, expect, setSystemTime, spyOn, test } from "bun:test";
+import { Hono } from "hono";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { nicknameSchema, type StoryPackage } from "@festival/shared";
+import { Store } from "../../store";
+import { SQLiteStoryRunStore } from "../../infrastructure/sqlite/story-run-store";
+import { SQLiteWorkshopStore } from "../../infrastructure/sqlite/workshop-store";
+import { FileStoryCatalog } from "./stories/file-catalog";
+import { createAccountRoutes } from "./account-routes";
+import { createPlatformRoutes } from "./routes";
+
+async function read<T = { me: { id: string; nickname: string }; accountType: string; needsNickname: boolean }>(response: Response): Promise<T> { return await response.json() as T; }
+const cleanups: (() => void)[] = [];
+afterEach(() => { setSystemTime(); for (const cleanup of cleanups.splice(0).reverse()) cleanup(); });
+function fixture(options: Partial<Parameters<typeof createAccountRoutes>[0]> = {}, path = ":memory:") {
+  const store = new Store(path);
+  const runs = new SQLiteStoryRunStore(store.db);
+  const workshop = new SQLiteWorkshopStore(store.db);
+  const app = new Hono();
+  app.route("/api/platform", createAccountRoutes({ store, production: false, googleDemo: true, ...options }));
+  app.route("/api/platform", createPlatformRoutes({ store, runs, production: false, stories: new FileStoryCatalog(join(import.meta.dir, "../../../stories")) }));
+  app.onError((_error, c) => c.json({ error: "Invalid input" }, 400));
+  cleanups.push(() => store.close());
+  const req = (path: string, cookie = "", body?: unknown) => app.request(`http://localhost/api/platform${path}`, { method: body === undefined ? "GET" : "POST", headers: { Cookie: cookie, "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const guest = async (nickname: string) => {
+    const response = await req("/guest", "", { nickname });
+    expect(response.status).toBe(201);
+    return { cookie: sessionCookie(response), me: (await read(response)).me as { id: string; nickname: string } };
+  };
+  return { store, workshop, req, guest };
+}
+function sessionCookie(response: Response, name = "festival_guest") {
+  return response.headers.getSetCookie().find((cookie) => cookie.startsWith(`${name}=`))!.split(";")[0]!;
+}
+const source = JSON.parse(readFileSync(join(import.meta.dir, "../../../stories/deokil-trading-murder.mstory"), "utf8")) as StoryPackage;
+
+test("nickname lengths, Unicode normalization and invalid characters", () => {
+  for (const valid of ["가나", "가".repeat(10), "abcd", "a".repeat(20), "ab_1", "가나", "ｆｏｏｏ"])
+    expect(nicknameSchema.safeParse(valid).success).toBe(true);
+  for (const invalid of ["", "가", "가".repeat(11), "abc", "a".repeat(21), "ab cd", "ab<script>", "😀😀", "ｆｏｏ"])
+    expect(nicknameSchema.safeParse(invalid).success).toBe(false);
+  expect(nicknameSchema.parse(" 가나 ")).toBe("가나");
+});
+
+test("guest registration and rename enforce global case-insensitive uniqueness at write time", async () => {
+  const f = fixture();
+  const a = await f.guest("Alpha"), b = await f.guest("다른이");
+  expect((await f.req("/guest", "", { nickname: "ALPHA" })).status).toBe(409);
+  expect(await read<{ available: boolean }>((await f.req("/nicknames/availability?nickname=alpha")))).toEqual({ available: false });
+  expect(await read<{ available: boolean }>((await f.req("/nicknames/availability?nickname=Alpha", a.cookie)))).toEqual({ available: true });
+  expect((await f.req("/account/nickname", b.cookie, { nickname: "Alpha" })).status).toBe(409);
+  expect((await f.req("/nicknames/availability?nickname=a")).status).toBe(400);
+  expect((await f.req("/account/nickname", "", { nickname: "새로운이" })).status).toBe(401);
+  const responses = await Promise.all([f.req("/guest", "", { nickname: "경쟁닉네임" }), f.req("/guest", "", { nickname: "경쟁닉네임" })]);
+  expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+});
+
+test("Google onboarding cannot use lobby credentials before nickname; guest and Google names share a namespace", async () => {
+  const f = fixture();
+  await f.guest("공통닉네임");
+  const response = await f.req("/auth/google/demo", "", {}), cookie = sessionCookie(response);
+  expect(response.status).toBe(200);
+  expect((await read(response)).needsNickname).toBe(true);
+  expect(f.store.authenticate(cookie.split("=")[1])).toBeNull();
+  expect((await f.req("/guest", cookie, { nickname: "다른닉네임" })).status).toBe(409);
+  expect((await f.req("/account/nickname", cookie, { nickname: "공통닉네임" })).status).toBe(409);
+  expect((await f.req("/account/nickname", cookie, { nickname: "구글닉네임" })).status).toBe(200);
+  expect(f.store.authenticate(cookie.split("=")[1])?.nickname).toBe("구글닉네임");
+  expect((await f.req("/guest", "", { nickname: "구글닉네임" })).status).toBe(409);
+});
+
+test("guest logout revokes every session, deletes drafts and favorites, releases nickname", async () => {
+  const f = fixture();
+  const a = await f.guest("GuestOne");
+  const otherToken = f.store.issue(a.me.id);
+  const draft = f.workshop.create(a.me, { package: source, published: true, thumbnailUrl: null, difficulty: null });
+  f.workshop.favorite(draft.id, a.me.id, true);
+  f.workshop.favorite(draft.id, "someone-else", true);
+  expect((await f.req("/account/logout", a.cookie, {})).status).toBe(200);
+  expect(f.store.authenticate(otherToken)).toBeNull();
+  expect((await read((await f.req("/account", a.cookie)))).me).toBeNull();
+  expect(f.workshop.get(draft.id)).toBeUndefined();
+  expect(f.store.db.query("SELECT * FROM workshop_favorites").all()).toHaveLength(0);
+  expect(f.store.nicknameAvailable(a.me.nickname)).toBe(true);
+});
+
+test("Google logout preserves identity, drafts and renamed author for subsequent login", async () => {
+  const f = fixture();
+  const response = await f.req("/auth/google/demo", "", {}), cookie = sessionCookie(response), demoCookie = sessionCookie(response, "festival_google_demo");
+  const renamed = await read((await f.req("/account/nickname", cookie, { nickname: "GoogleOne" })));
+  const draft = f.workshop.create(renamed.me, { package: source, published: false, thumbnailUrl: null, difficulty: null });
+  await f.req("/account/nickname", cookie, { nickname: "GoogleTwo" });
+  expect(f.workshop.get(draft.id)?.author.name).toBe("GoogleTwo");
+  await f.req("/account/logout", cookie, {});
+  expect(f.workshop.get(draft.id)).toBeDefined();
+  const next = await f.req("/auth/google/demo", demoCookie, {});
+  expect((await read(next)).me).toEqual({ id: renamed.me.id, nickname: "GoogleTwo" });
+  expect((await read((await f.req("/account", cookie)))).me).toBeNull();
+});
+
+test("auto-login cookie is HttpOnly, SameSite and persistent; stored sessions survive server restart and expire", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "festival-account-"));
+  const path = join(directory, "db.sqlite");
+  // Register directory cleanup first so databases close before removal.
+  cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
+  const f = fixture({}, path);
+  const response = await f.req("/guest", "", { nickname: "Persistent" });
+  expect(response.headers.get("set-cookie")).toContain("HttpOnly");
+  expect(response.headers.get("set-cookie")).toContain("SameSite=Lax");
+  expect(response.headers.get("set-cookie")).toContain("Max-Age=2592000");
+  const cookie = sessionCookie(response);
+  const second = new Store(path);
+  expect(second.authenticate(cookie.split("=")[1])?.nickname).toBe("Persistent");
+  second.db.query("UPDATE credentials SET expires=0").run();
+  expect(second.authenticate(cookie.split("=")[1])).toBeNull();
+  second.close();
+});
+
+test("demo login is disabled by default and always disabled in production", async () => {
+  for (const options of [{ googleDemo: false }, { googleDemo: true, production: true }]) {
+    const f = fixture(options);
+    expect((await f.req("/auth/google/demo", "", {})).status).toBe(503);
+    expect((await f.req("/auth/google")).status).toBe(503);
+  }
+});
+
+test("room membership blocks rename and logout to preserve active game identities", async () => {
+  const f = fixture();
+  const a = await f.guest("RoomGuest");
+  f.store.state.rooms.test = { id: "test", code: "ABCDEF", hostId: a.me.id, scenarioId: "rehearsal", memberIds: [a.me.id], sessionId: null };
+  expect((await f.req("/account/logout", a.cookie, {})).status).toBe(409);
+  expect((await f.req("/account/nickname", a.cookie, { nickname: "Changed" })).status).toBe(409);
+  expect(f.store.authenticate(a.cookie.split("=")[1])).not.toBeNull();
+});
+
+test("OAuth uses PKCE and browser-bound, expiring, single-use state; identity comes only from Google", async () => {
+  const calls: { url: string; options?: RequestInit }[] = [];
+  const mockFetch = (async (url: string, options?: RequestInit) => {
+    calls.push({ url, options });
+    return Response.json(url.endsWith("/token") ? { access_token: "server-only-token" } : { sub: "verified-subject" });
+  });
+  const f = fixture({ google: { clientId: "client", clientSecret: "secret", origin: "http://localhost" }, fetch: mockFetch });
+  async function start() {
+    const response = await f.req("/auth/google?locale=en");
+    const target = new URL(response.headers.get("location")!);
+    expect(target.origin).toBe("https://accounts.google.com");
+    expect(target.searchParams.get("code_challenge_method")).toBe("S256");
+    return { state: target.searchParams.get("state")!, cookie: sessionCookie(response, "festival_oauth_state"), challenge: target.searchParams.get("code_challenge") };
+  }
+  const a = await start();
+  const callback = `/auth/google/callback?state=${a.state}&code=code`;
+  expect((await f.req(callback)).status).toBe(400);
+  expect(calls).toHaveLength(0);
+  const response = await f.req(callback, a.cookie);
+  expect(response.headers.get("location")).toBe("/en/");
+  const tokenBody = calls[0]!.options!.body as URLSearchParams;
+  expect(tokenBody.get("client_secret")).toBe("secret");
+  expect(tokenBody.get("code_verifier")).toBeTruthy();
+  expect((await f.req(callback, a.cookie)).status).toBe(400);
+  const cookie = sessionCookie(response);
+  const profile = await read((await f.req("/account", cookie)));
+  expect(profile.accountType).toBe("google");
+  expect(profile.needsNickname).toBe(true);
+  expect(JSON.stringify(profile)).not.toContain("token");
+  await f.req("/account/nickname", cookie, { nickname: "Verified" });
+  await f.req("/account/logout", cookie, {});
+  const b = await start();
+  const again = await f.req(`/auth/google/callback?state=${b.state}&code=new-code`, b.cookie);
+  expect((await read((await f.req("/account", sessionCookie(again))))).me.id).toBe(profile.me.id);
+});
+
+
+test("OAuth cancellation, expired state and upstream failure never issue a session", async () => {
+  const f = fixture({ google: { clientId: "client", clientSecret: "secret", origin: "http://localhost" }, fetch: (async () => new Response("unavailable", { status: 503 })) });
+  const start = async () => {
+    const response = await f.req("/auth/google");
+    return { state: new URL(response.headers.get("location")!).searchParams.get("state")!, cookie: sessionCookie(response, "festival_oauth_state") };
+  };
+  const cancelled = await start();
+  const denial = await f.req(`/auth/google/callback?state=${cancelled.state}&error=access_denied`, cancelled.cookie);
+  expect(denial.headers.get("location")).toBe("/?auth=cancelled");
+  expect(denial.headers.getSetCookie().some((cookie) => cookie.startsWith("festival_guest="))).toBe(false);
+  const failed = await start();
+  const failure = await f.req(`/auth/google/callback?state=${failed.state}&code=untrusted`, failed.cookie);
+  expect(failure.headers.get("location")).toBe("/?auth=failed");
+  expect(failure.headers.getSetCookie().some((cookie) => cookie.startsWith("festival_guest="))).toBe(false);
+  const expired = await start();
+  setSystemTime(Date.now() + 601000);
+  expect((await f.req(`/auth/google/callback?state=${expired.state}&code=old`, expired.cookie)).status).toBe(400);
+  expect(Object.values(f.store.state.guests)).toHaveLength(0);
+});
+
+
+test("failed persistence rolls back account memory, credentials and workshop mutations", async () => {
+  const f = fixture();
+  const a = await f.guest("Rollback");
+  const draft = f.workshop.create(a.me, { package: source, published: false, thumbnailUrl: null, difficulty: null });
+  const save = spyOn(f.store, "save").mockImplementation(() => { throw Error("disk failure"); });
+  try {
+    expect(() => f.store.logout(a.me)).toThrow("disk failure");
+    expect(f.store.authenticate(a.cookie.split("=")[1])?.id).toBe(a.me.id);
+    expect(f.workshop.get(draft.id)).toBeDefined();
+    expect(() => f.store.rename(f.store.state.guests[a.me.id]!, "Changed")).toThrow("disk failure");
+    expect(f.store.state.guests[a.me.id]?.nickname).toBe("Rollback");
+    expect(f.workshop.get(draft.id)?.author.name).toBe("Rollback");
+    expect(() => f.store.createGuest("Rejected")).toThrow("disk failure");
+    expect(() => f.store.googleAccount("google:rejected")).toThrow("disk failure");
+    expect(Object.values(f.store.state.guests)).toHaveLength(1);
+    expect(f.store.db.query("SELECT * FROM google_accounts").all()).toHaveLength(0);
+  } finally { save.mockRestore(); }
+});
+
+
+test("OAuth initiation has no shared pending capacity; cookie tampering cannot create a session", async () => {
+  const f = fixture({ google: { clientId: "client", clientSecret: "secret", origin: "http://localhost" } });
+  let response: Response | undefined;
+  for (let i = 0; i < 1001; i++) response = await f.req("/auth/google");
+  expect(response!.status).toBe(302);
+  const state = new URL(response!.headers.get("location")!).searchParams.get("state")!;
+  const cookie = sessionCookie(response!, "festival_oauth_state");
+  expect((await f.req(`/auth/google/callback?state=${state}&code=bad`, cookie + "tampered")).status).toBe(400);
+  expect(f.store.db.query("SELECT * FROM oauth_consumed").all()).toHaveLength(0);
+});

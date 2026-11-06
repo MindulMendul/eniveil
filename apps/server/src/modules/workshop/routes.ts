@@ -261,6 +261,15 @@ export function createWorkshopRoutes(deps: {
     return c.json({ item: enrich([entry], guest)[0], package: source });
   });
 
+  app.delete('/drafts/:id', (c) => {
+    const guest = authenticate(c);
+    if (!guest) return c.json({ error: loginRequired }, 401);
+    const result = deps.workshop.deletePrivate(c.req.param('id'), guest.id);
+    if (result === 'missing') return c.json({ error: notFound }, 404);
+    if (result === 'published') return c.json({ error: '공개 작품은 삭제할 수 없어.' }, 409);
+    return c.json({ deleted: true });
+  });
+
   app.post("/drafts", async (c) => {
     const guest = authenticate(c);
     if (!guest) return c.json({ error: loginRequired }, 401);

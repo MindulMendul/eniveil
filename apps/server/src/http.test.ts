@@ -120,6 +120,14 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     await send(aa, "return");
     expect(aa.latest.room!.session).toBeNull();
     expect(aa.latest.room!.count).toBe(2);
+    expect((await req("/api/platform/account/logout", a.cookie, {})).status).toBe(409);
+    await send(aa, "leave");
+    let closed = false;
+    aa.ws.addEventListener("close", () => { closed = true; });
+    expect((await req("/api/platform/account/logout", a.cookie, {})).status).toBe(200);
+    await wait(() => closed);
+    expect((await req("/api/lobby/state", a.cookie)).status).toBe(401);
+    expect((await req("/api/lobby/state", b.cookie)).status).toBe(200);
     expect((await fetch(origin + "/api/health")).status).toBe(200);
   } finally {
     for (const ws of sockets) ws.close();

@@ -1,9 +1,10 @@
 import { z } from "zod";
-export const nicknameSchema = z
-  .string()
-  .trim()
-  .min(1, "이름을 입력해 줘.")
-  .max(20, "이름은 20자까지 가능해.");
+export const nicknameSchema = z.string().trim().normalize("NFKC").refine(
+  (name) => /^[A-Za-z0-9_]+$/.test(name)
+    ? name.length >= 4 && name.length <= 20
+    : /^[\p{L}\p{N}_]+$/u.test(name) && [...name].length >= 2 && [...name].length <= 10,
+  "닉네임은 문자·숫자·밑줄로 2~10자, 영문·숫자·밑줄만 쓰면 4~20자로 입력해 줘.",
+);
 export const guestSchema = z.object({ nickname: nicknameSchema });
 export const createRoomSchema = z.object({
   scenarioId: z.string().min(1).max(80),

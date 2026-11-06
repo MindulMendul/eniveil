@@ -179,6 +179,19 @@ export class SQLiteWorkshopStore {
     }).immediate();
   }
 
+  deletePrivate(id: string, ownerId: string): 'deleted' | 'missing' | 'published' {
+    return this.db.transaction(() => {
+      const row = this.db.query('SELECT published FROM workshop_drafts WHERE id=? AND owner_id=?')
+        .get(id, ownerId) as { published: number } | null;
+      if (!row) return 'missing' as const;
+      if (row.published) return 'published' as const;
+      // Quotas sum existing rows, so removing the payload restores count and bytes atomically.
+      this.db.query('DELETE FROM workshop_favorites WHERE story_id=?').run(id);
+      this.db.query('DELETE FROM workshop_drafts WHERE id=? AND owner_id=? AND published=0').run(id, ownerId);
+      return 'deleted' as const;
+    }).immediate();
+  }
+
   private serialize(owner: Guest, draft: WorkshopDraftInput) {
     const story = JSON.stringify(draft.package.story);
     const source = JSON.stringify(draft.package);

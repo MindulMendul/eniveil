@@ -29,9 +29,9 @@ export function createPlatformRoutes(deps: {
     const existing = deps.store.authenticate(getCookie(c, "festival_guest"));
     if (existing) return c.json({ me: existing });
     const { nickname } = guestSchema.parse(await c.req.json());
-    const me = { id: crypto.randomUUID(), nickname };
-    deps.store.state.guests[me.id] = me;
-    deps.store.save();
+    if (deps.store.authenticateSession(getCookie(c, "festival_guest"))) return c.json({ error: "닉네임 설정을 먼저 완료해 줘." }, 409);
+    if (!deps.store.nicknameAvailable(nickname)) return c.json({ error: "이미 사용 중인 닉네임이야." }, 409);
+    const me = deps.store.createGuest(nickname);
     const token = deps.store.issue(me.id);
     setCookie(c, "festival_guest", token, {
       httpOnly: true,

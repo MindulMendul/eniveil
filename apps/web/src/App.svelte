@@ -1,5 +1,4 @@
-<script>
-  import PlatformApp from './features/platform/PlatformApp.svelte';
+<script lang="ts">
+  import App from "./app/App.svelte";
 </script>
-
-<PlatformApp />
+<App />

@@ -17,9 +17,10 @@ export function createLobbyRoutes(deps: {
 }) {
   const app = new Hono<ApiEnv>();
   const { upgradeWebSocket, websocket } = createBunWebSocket();
-  const sockets = new Map<WSContext, Guest>();
+  const sockets = new Map<WSContext, { guest: Guest; expires: number }>();
   const broadcast = () => {
-    for (const [ws, guest] of sockets) {
+    for (const [ws, { guest, expires }] of sockets) {
+      if (expires <= Date.now()) { ws.close(1008, "Expired"); continue; }
       try {
         ws.send(JSON.stringify({ type: "snapshot", data: deps.game.snapshot(guest) }));
       } catch {
@@ -101,7 +102,7 @@ export function createLobbyRoutes(deps: {
       return {
         onOpen(_event, ws) {
           connection = ws;
-          sockets.set(ws, guest);
+          sockets.set(ws, { guest, expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
           deps.game.online.set(guest.id, (deps.game.online.get(guest.id) ?? 0) + 1);
           broadcast();
         },
@@ -165,5 +166,11 @@ export function createLobbyRoutes(deps: {
   );
   setInterval(broadcast, 30000).unref();
 
-  return { app, websocket, connectionCount: () => sockets.size };
+  const disconnect = (guestId: string) => {
+    for (const [ws, entry] of sockets) if (entry.guest.id === guestId) {
+      entry.expires = 0;
+      ws.close(1008, "Signed out");
+    }
+  };
+  return { app, websocket, disconnect, connectionCount: () => sockets.size };
 }

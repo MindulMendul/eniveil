@@ -1,8 +1,10 @@
 ---
+import "../shared/styles/base.css";
+import Metadata from "../shared/seo/Metadata.astro";
 import App from "../app/App.svelte";
 
 const { locale = "ko" } = Astro.props;
-const title = locale === "en" ? "Story Archive · Interactive Stories" : "스토리 아카이브 · 인터랙티브 작품";
+
 ---
 <!doctype html>
 <html lang={locale}>
@@ -13,7 +15,7 @@ const title = locale === "en" ? "Story Archive · Interactive Stories" : "스토
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <title>{title}</title>
+    <Metadata />
   </head>
   <body class="m-0 min-h-screen bg-festival-bg font-sans text-festival-text font-normal font-synthesis-none">
     <script>
