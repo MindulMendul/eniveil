@@ -4,7 +4,7 @@
 
 ## 승격 단계
 
-- [ ] `feat/* → dev`
+- [ ] 작업 브랜치 → `dev` (`feat`, `fix`, `bugfix`, `style`, `chore`, `refactor`, `docs`, `test`, `ci`, `build`, `perf`; `docs/branch-naming.md` 참고)
 - [ ] `dev → qa`
 - [ ] `qa → main`
 
