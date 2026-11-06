@@ -143,6 +143,10 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     await send(aa, "start");
     const firstAttempt = aa.latest.room!.soloPlayId;
     expect(firstAttempt).toBeString();
+    const sameHostTab = await connect(a.cookie);
+    expect(sameHostTab.latest.room!.soloPlayId).toBe(firstAttempt);
+    sameHostTab.ws.close();
+    expect(((await (await req("/api/lobby/state", a.cookie)).json()) as Snapshot).room!.soloStarted).toBe(true);
     expect((await req(exitPath, a.cookie, { roomId: crypto.randomUUID(), soloPlayId: firstAttempt })).status).toBe(400);
     expect((await req(exitPath, a.cookie, { roomId, soloPlayId: firstAttempt })).status).toBe(200);
     await wait(() => aa.latest.room?.status === "waiting");
