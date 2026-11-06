@@ -1,7 +1,8 @@
 ---
-import { pageMetadata, siteOrigin } from './metadata';
+import { pageMetadata, shareImage, siteOrigin } from './metadata';
 const meta = pageMetadata(Astro.url.pathname);
 const origin = siteOrigin(import.meta.env.PUBLIC_SITE_URL);
+const image = shareImage(meta.en, origin);
 const canonical = new URL(meta.localized(meta.en ? 'en' : 'ko'), origin).href;
 const schema = meta.indexable ? {
   '@context': 'https://schema.org',
@@ -25,7 +26,14 @@ const schema = meta.indexable ? {
   <meta data-site-meta property="og:url" content={canonical} />
   <meta data-site-meta property="og:locale" content={meta.en ? 'en_US' : 'ko_KR'} />
   <meta data-site-meta property="og:locale:alternate" content={meta.en ? 'ko_KR' : 'en_US'} />
-  <meta data-site-meta name="twitter:card" content="summary" />
+  <meta data-site-meta property="og:image" content={image.url} />
+  <meta data-site-meta property="og:image:type" content={image.type} />
+  <meta data-site-meta property="og:image:width" content={image.width} />
+  <meta data-site-meta property="og:image:height" content={image.height} />
+  <meta data-site-meta property="og:image:alt" content={image.alt} />
+  <meta data-site-meta name="twitter:card" content="summary_large_image" />
+  <meta data-site-meta name="twitter:image" content={image.url} />
+  <meta data-site-meta name="twitter:image:alt" content={image.alt} />
   <meta data-site-meta name="twitter:title" content={meta.title} />
   <meta data-site-meta name="twitter:description" content={meta.description} />
 </>}
