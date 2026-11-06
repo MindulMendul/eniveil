@@ -38,6 +38,12 @@ export class Game {
       status: r.sessionId ? "playing" : "waiting",
     };
   }
+  private joinError(room: Room): string | null {
+    if (room.sessionId) return "이미 게임이 진행 중이야.";
+    if (room.memberIds.length >= this.storyCatalog.get(room.scenarioId)!.scenario.players)
+      return "방이 가득 찼어.";
+    return null;
+  }
   snapshot(me: Guest): Snapshot {
     const r = this.roomFor(me.id);
     let room: RoomView | null = null;
@@ -91,8 +97,8 @@ export class Game {
       me,
       scenarios: this.storyCatalog.list(),
       rooms: Object.values(this.state.rooms)
-        .map((r) => this.summary(r))
-        .filter((room) => room.status === "waiting" && room.count < room.capacity),
+        .filter((room) => this.joinError(room) === null)
+        .map((room) => this.summary(room)),
       room,
     };
   }
@@ -199,12 +205,8 @@ export class Game {
     if (!r) throw Error("초대 코드에 해당하는 방이 없어.");
     if (r.memberIds.includes(me.id)) return r;
     if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
-    if (r.sessionId) throw Error("이미 게임이 진행 중이야.");
-    if (
-      r.memberIds.length >=
-      this.storyCatalog.get(r.scenarioId)!.scenario.players
-    )
-      throw Error("방이 가득 찼어.");
+    const error = this.joinError(r);
+    if (error) throw Error(error);
     r.memberIds.push(me.id);
     this.store.save();
     return r;
