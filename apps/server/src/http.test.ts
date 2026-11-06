@@ -26,6 +26,17 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
       await Bun.sleep(30);
     }
     expect(ready).toBe(true);
+    for (const path of ["/missing-page", "/en/missing-page/", "/workshop/unknown", "/missing.js"]) {
+      const response = await fetch(origin + path);
+      expect(response.status).toBe(404);
+      expect(await response.text()).toContain('content="noindex,nofollow"');
+    }
+    for (const path of ["/", "/en", "/workshop", "/en/workshop/", "/workshop/editor", "/en/mypage/", "/privacy", "/en/privacy/", "/terms/", "/en/terms", "/robots.txt", "/sitemap.xml"]) {
+      expect((await fetch(origin + path)).status).toBe(200);
+    }
+    expect((await fetch(origin + "/api/missing")).status).toBe(404);
+    expect((await fetch(origin + "/api")).status).toBe(404);
+    expect((await fetch(origin + "/en/missing", { method: "HEAD" })).status).toBe(404);
     const req = async (
       path: string,
       cookie = "",
