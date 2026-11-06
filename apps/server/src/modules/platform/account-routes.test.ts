@@ -37,9 +37,9 @@ function sessionCookie(response: Response, name = "festival_guest") {
 const source = JSON.parse(readFileSync(join(import.meta.dir, "../../../stories/deokil-trading-murder.mstory"), "utf8")) as StoryPackage;
 
 test("nickname lengths, Unicode normalization and invalid characters", () => {
-  for (const valid of ["가나", "가".repeat(10), "abcd", "a".repeat(20), "ab_1", "가나"])
+  for (const valid of ["가나", "가".repeat(10), "abcd", "a".repeat(20), "ab_1", "가나", "ｆｏｏｏ"])
     expect(nicknameSchema.safeParse(valid).success).toBe(true);
-  for (const invalid of ["", "가", "가".repeat(11), "abc", "a".repeat(21), "ab cd", "ab<script>", "😀😀"])
+  for (const invalid of ["", "가", "가".repeat(11), "abc", "a".repeat(21), "ab cd", "ab<script>", "😀😀", "ｆｏｏ"])
     expect(nicknameSchema.safeParse(invalid).success).toBe(false);
   expect(nicknameSchema.parse(" 가나 ")).toBe("가나");
 });
@@ -210,4 +210,16 @@ test("failed persistence rolls back account memory, credentials and workshop mut
     expect(Object.values(f.store.state.guests)).toHaveLength(1);
     expect(f.store.db.query("SELECT * FROM google_accounts").all()).toHaveLength(0);
   } finally { save.mockRestore(); }
+});
+
+
+test("OAuth initiation has no shared pending capacity; cookie tampering cannot create a session", async () => {
+  const f = fixture({ google: { clientId: "client", clientSecret: "secret", origin: "http://localhost" } });
+  let response: Response | undefined;
+  for (let i = 0; i < 1001; i++) response = await f.req("/auth/google");
+  expect(response!.status).toBe(302);
+  const state = new URL(response!.headers.get("location")!).searchParams.get("state")!;
+  const cookie = sessionCookie(response!, "festival_oauth_state");
+  expect((await f.req(`/auth/google/callback?state=${state}&code=bad`, cookie + "tampered")).status).toBe(400);
+  expect(f.store.db.query("SELECT * FROM oauth_consumed").all()).toHaveLength(0);
 });

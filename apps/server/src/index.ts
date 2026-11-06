@@ -78,7 +78,7 @@ const lobby = createLobbyRoutes({ store, game, notifyTemporal });
 const google = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.APP_ORIGIN
   ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, origin: new URL(process.env.APP_ORIGIN).origin }
   : undefined;
-app.route("/api/platform", createAccountRoutes({ store, production, google, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
+app.route("/api/platform", createAccountRoutes({ store, production, google, onLogout: lobby.disconnect, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
 app.route("/api/platform", createPlatformRoutes({
   store,
   stories: fileStoryCatalog,

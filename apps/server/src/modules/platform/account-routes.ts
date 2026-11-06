@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { deleteCookie, getCookie, setCookie } from "hono/cookie";
+import { deleteCookie, getCookie, getSignedCookie, setCookie, setSignedCookie } from "hono/cookie";
 import { createHash } from "node:crypto";
 import { guestSchema, nicknameSchema, type Guest } from "@festival/shared";
 import type { Store } from "../../store";
@@ -7,6 +7,7 @@ import type { Store } from "../../store";
 export type GoogleConfig = { clientId: string; clientSecret: string; origin: string };
 export function createAccountRoutes(deps: {
   store: Store; production: boolean; google?: GoogleConfig; googleDemo?: boolean;
+  onLogout?: (id: string) => void;
   fetch?: (url: string, options?: RequestInit) => Promise<Response>;
 }) {
   const app = new Hono();
@@ -17,7 +18,7 @@ export function createAccountRoutes(deps: {
     setCookie(c, "festival_guest", deps.store.issue(me.id), cookieOptions);
   };
   const demo = !deps.production && deps.googleDemo === true;
-  const pending = new Map<string, { verifier: string; expires: number; locale: string }>();
+
   const request = deps.fetch ?? fetch;
   let demoAttempts = 0, demoUntil = 0;
   app.use("*", async (c, next) => { c.header("Cache-Control", "no-store"); await next(); });
@@ -40,7 +41,7 @@ export function createAccountRoutes(deps: {
   app.post("/account/logout", (c) => {
     const me = session(c);
     if (me && deps.store.inRoom(me.id)) return c.json({ error: "방에서 나온 뒤 로그아웃해 줘." }, 409);
-    if (me) deps.store.logout(me);
+    if (me) { deps.store.logout(me); deps.onLogout?.(me.id); }
     deleteCookie(c, "festival_guest", cookieOptions);
     return c.json({ ok: true });
   });
@@ -56,33 +57,34 @@ export function createAccountRoutes(deps: {
     signIn(c, me);
     return c.json(profile(me));
   });
-  app.get("/auth/google", (c) => {
+  app.get("/auth/google", async (c) => {
     const config = deps.google;
     if (!config) return c.json({ error: "구글 로그인 설정이 필요해. 게스트 로그인을 이용해 줘." }, 503);
     if (session(c)) return c.json({ error: "먼저 로그아웃해 줘." }, 409);
     const now = Date.now();
-    for (const [key, value] of pending) if (value.expires <= now) pending.delete(key);
-    if (pending.size >= 1000) return c.json({ error: "잠시 후 다시 시도해 줘." }, 429);
     const state = crypto.randomUUID();
     const verifier = crypto.randomUUID() + crypto.randomUUID();
     const locale = c.req.query("locale") === "en" ? "en" : "ko";
-    pending.set(state, { verifier, expires: now + 600000, locale });
-    setCookie(c, "festival_oauth_state", state, { ...cookieOptions, maxAge: 600 });
+    await setSignedCookie(c, "festival_oauth_state", JSON.stringify({ state, verifier, expires: now + 600000, locale }), `oauth-state:${config.clientSecret}`, { ...cookieOptions, maxAge: 600 });
     const params = new URLSearchParams({ client_id: config.clientId, redirect_uri: `${config.origin}/api/platform/auth/google/callback`, response_type: "code", scope: "openid", state, code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256" });
     return c.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   });
   app.get("/auth/google/callback", async (c) => {
     const config = deps.google;
     const state = c.req.query("state");
-    const attempt = state ? pending.get(state) : undefined;
-    if (!config || !state || !attempt || state !== getCookie(c, "festival_oauth_state") || attempt.expires <= Date.now())
+    let attempt: { state: string; verifier: string; expires: number; locale: string } | undefined;
+    if (config) {
+      const signed = await getSignedCookie(c, `oauth-state:${config.clientSecret}`, "festival_oauth_state");
+      if (signed) { try { attempt = JSON.parse(signed); } catch { /* invalid cookie */ } }
+    }
+    if (!config || !state || !attempt || state !== attempt.state || typeof attempt.verifier !== "string" || !Number.isFinite(attempt.expires) || attempt.expires <= Date.now() || !deps.store.consumeOAuthState(state, attempt.expires))
       return c.json({ error: "로그인 요청이 만료됐어. 다시 시도해 줘." }, 400);
-    pending.delete(state);
     deleteCookie(c, "festival_oauth_state", cookieOptions);
     const home = attempt.locale === "en" ? "/en/" : "/";
     if (c.req.query("error")) return c.redirect(`${home}?auth=cancelled`);
     const code = c.req.query("code");
     if (!code || session(c)) return c.redirect(`${home}?auth=failed`);
+    let stage = "token_exchange";
     try {
       const tokenResponse = await request("https://oauth2.googleapis.com/token", {
         method: "POST", body: new URLSearchParams({ code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: `${config.origin}/api/platform/auth/google/callback`, grant_type: "authorization_code", code_verifier: attempt.verifier }), signal: AbortSignal.timeout(10000),
@@ -90,13 +92,17 @@ export function createAccountRoutes(deps: {
       if (!tokenResponse.ok) throw Error("OAuth token exchange failed");
       const token = await tokenResponse.json() as { access_token?: string };
       if (!token.access_token) throw Error("Missing access token");
+      stage = "user_lookup";
       const userResponse = await request("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${token.access_token}` }, signal: AbortSignal.timeout(10000) });
       if (!userResponse.ok) throw Error("OAuth user lookup failed");
       const user = await userResponse.json() as { sub?: string };
       if (!user.sub || typeof user.sub !== "string" || user.sub.length > 255) throw Error("Missing subject");
+      stage = "session_persistence";
       signIn(c, deps.store.googleAccount(`google:${user.sub}`));
       return c.redirect(home);
     } catch {
+      // Do not log upstream bodies, exception messages or request URLs: they may contain credentials.
+      console.error("Google sign-in failed", { stage });
       return c.redirect(`${home}?auth=failed`);
     }
   });

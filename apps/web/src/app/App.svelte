@@ -36,6 +36,9 @@
   let soloActive = $state(false);
   let loginDialog: HTMLDialogElement;
   let pendingWorkshopAction: (() => void) | undefined;
+  type AuthDestination = { page: "workshop" | "editor" | "account"; id?: string };
+  let pendingAuthDestination: AuthDestination | undefined;
+  let pendingGoogleAction: (() => void) | undefined;
   let editorPath = $derived(currentPath === "/workshop/editor");
   let entryHome = $derived(currentPath === "/" && snapshot === null);
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
@@ -158,20 +161,21 @@
   }
 
   function openEditor(id?: string) {
-    if (!snapshot) { requestWorkshopLogin(() => openEditor(id)); return; }
+    if (!snapshot) { requestWorkshopLogin(() => openEditor(id), { page: "editor", id }); return; }
     editorId = id;
     currentPath = "/workshop/editor";
     history.pushState({}, "", `${localePath(locale, currentPath)}${id ? `?id=${encodeURIComponent(id)}` : ""}`);
   }
 
-  function requestWorkshopLogin(resume?: () => void) {
+  function requestWorkshopLogin(resume?: () => void, destination: AuthDestination = { page: "workshop" }) {
     pendingWorkshopAction = resume;
+    pendingAuthDestination = destination;
     loginDialog.showModal();
   }
 
   function createWorkshopStory() {
     if (snapshot) openEditor();
-    else requestWorkshopLogin(() => openEditor());
+    else requestWorkshopLogin(() => openEditor(), { page: "editor" });
   }
 
   function savedWorkshopStory(id: string) {
@@ -194,17 +198,41 @@
     if (account.me && !account.needsNickname) {
       snapshot = await api("/lobby/state");
       if (!socket || socket.readyState > 1) connect();
+      resumeGoogleAction();
     }
   }
   function openAccount() {
-    if (!snapshot) { requestWorkshopLogin(openAccount); return; }
+    if (!snapshot) { requestWorkshopLogin(openAccount, { page: "account" }); return; }
     currentPath = "/mypage";
     history.pushState({}, "", localePath(locale, currentPath));
   }
+  function rememberGoogleAction() {
+    const destination = pendingAuthDestination ?? (editorPath ? { page: "editor", id: editorId } : currentPath === "/mypage" ? { page: "account" } : currentPath === "/workshop" ? { page: "workshop" } : undefined);
+    pendingGoogleAction = pendingWorkshopAction;
+    sessionStorage.removeItem("festival_auth_return");
+    if (destination) sessionStorage.setItem("festival_auth_return", JSON.stringify(destination));
+  }
+  function resumeGoogleAction() {
+    if (!snapshot || account.needsNickname) return;
+    const stored = sessionStorage.getItem("festival_auth_return");
+    sessionStorage.removeItem("festival_auth_return");
+    const resume = pendingGoogleAction;
+    pendingGoogleAction = undefined;
+    pendingAuthDestination = undefined;
+    if (resume) { resume(); return; }
+    if (!stored) return;
+    try {
+      const destination = JSON.parse(stored) as AuthDestination;
+      if (destination.page === "editor" && (destination.id === undefined || typeof destination.id === "string" && destination.id.length <= 200)) openEditor(destination.id);
+      else if (destination.page === "account") openAccount();
+      else if (destination.page === "workshop") openWorkshop();
+    } catch { /* Ignore an invalid saved destination; never navigate to an arbitrary URL. */ }
+  }
   async function googleLogin() {
-    if (authConfig.google) { location.assign(`/api/platform/auth/google?locale=${locale}`); return; }
+    if (authConfig.google) { rememberGoogleAction(); location.assign(`/api/platform/auth/google?locale=${locale}`); return; }
     await action(async () => {
       if (!authConfig.demo) throw Error(locale === "en" ? "Google sign-in is not configured. Please use guest sign-in." : "구글 로그인 설정이 필요해요. 게스트 로그인을 이용해 주세요.");
+      rememberGoogleAction();
       account = await api("/platform/auth/google/demo", {});
       nickname = "";
       loginDialog?.close();
@@ -217,6 +245,7 @@
   async function logout() {
     await action(async () => {
       await api("/platform/account/logout", {});
+      sessionStorage.removeItem("festival_auth_return");
       if (socket) { socket.onclose = null; socket.close(); }
       clearTimeout(reconnectTimer);
       location.assign(localePath(locale));
@@ -274,8 +303,9 @@
     void (async () => {
       try {
         authConfig = await api("/platform/auth/config");
-        await loadAccount();
         const authError = new URLSearchParams(location.search).get("auth");
+        if (authError) sessionStorage.removeItem("festival_auth_return");
+        await loadAccount();
         if (authError) error = locale === "en" ? "Google sign-in was cancelled or failed. Please try again." : "구글 로그인이 취소되었거나 실패했어요. 다시 시도해 주세요.";
       } catch (cause) {
         if ((cause as { status?: number }).status !== 401) {
@@ -367,7 +397,7 @@
 />
 
 
-<dialog bind:this={loginDialog} class="workshop-login" onclose={() => pendingWorkshopAction = undefined} aria-labelledby="workshop-login-title">
+<dialog bind:this={loginDialog} class="workshop-login" onclose={() => { pendingWorkshopAction = undefined; pendingAuthDestination = undefined; }} aria-labelledby="workshop-login-title">
   <h2 id="workshop-login-title">{locale === "en" ? "Sign in to the workshop" : "창작마당 로그인"}</h2>
   <p>{locale === "en" ? "Sign in with a guest nickname to create stories and save favorites." : "닉네임으로 게스트 로그인하면 창작과 즐겨찾기를 이용할 수 있어요."}</p>
   <button type="button" class="secondary" disabled={busy} onclick={() => void googleLogin()}>{locale === "en" ? "Continue with Google" : "구글로 로그인"}{authConfig.demo ? (locale === "en" ? " (test)" : " (테스트)") : ""}</button>

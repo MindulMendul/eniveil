@@ -1,5 +1,5 @@
 import { z } from "zod";
-export const nicknameSchema = z.string().trim().normalize().refine(
+export const nicknameSchema = z.string().trim().normalize("NFKC").refine(
   (name) => /^[A-Za-z0-9_]+$/.test(name)
     ? name.length >= 4 && name.length <= 20
     : /^[\p{L}\p{N}_]+$/u.test(name) && [...name].length >= 2 && [...name].length <= 10,

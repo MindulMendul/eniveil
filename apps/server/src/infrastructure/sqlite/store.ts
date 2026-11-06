@@ -14,7 +14,7 @@ export class Store {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path, { create: true });
     this.db.exec(
-      "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS google_accounts (subject TEXT PRIMARY KEY, guest_id TEXT NOT NULL UNIQUE); CREATE TABLE IF NOT EXISTS credentials (hash TEXT PRIMARY KEY, guest_id TEXT NOT NULL, expires INTEGER NOT NULL);",
+      "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS oauth_consumed (state_hash TEXT PRIMARY KEY, expires INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS google_accounts (subject TEXT PRIMARY KEY, guest_id TEXT NOT NULL UNIQUE); CREATE TABLE IF NOT EXISTS credentials (hash TEXT PRIMARY KEY, guest_id TEXT NOT NULL, expires INTEGER NOT NULL);",
     );
     const row = this.db.query("SELECT payload FROM state WHERE id=1").get() as {
       payload: string;
@@ -36,6 +36,17 @@ export class Store {
       .query("INSERT INTO credentials VALUES(?,?,?)")
       .run(digest(token), guestId, Date.now() + 30 * 86400000);
     return token;
+  }
+  consumeOAuthState(state: string, expires: number) {
+    return this.db.transaction(() => {
+      this.db.query("DELETE FROM oauth_consumed WHERE expires<=?").run(Date.now());
+      return this.db.query("INSERT OR IGNORE INTO oauth_consumed VALUES(?,?)").run(digest(state), expires).changes === 1;
+    })();
+  }
+  sessionExpiry(token: string | undefined) {
+    if (!token) return 0;
+    const row = this.db.query("SELECT expires FROM credentials WHERE hash=?").get(digest(token)) as { expires: number } | null;
+    return row?.expires ?? 0;
   }
   authenticateSession(token: string | undefined) {
     if (!token) return null;
