@@ -16,6 +16,14 @@ export const joinRoomSchema = z.object({
     .toUpperCase()
     .regex(/^[A-Z0-9]{6}$/, "6자리 초대 코드를 확인해 줘."),
 });
+export const soloRoomExitSchema = z.object({
+  roomId: z.uuid(),
+  soloPlayId: z.uuid().nullable(),
+});
+export const supportedSoloStory = {
+  id: "deokil-trading-murder",
+  title: "덕일상사 살인사건",
+} as const;
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mode"), mode: z.enum(["solo", "multiplayer"]), requestId: z.string().max(80) }),
   z.object({ type: z.literal("solo-return"), requestId: z.string().max(80) }),
@@ -64,6 +72,8 @@ export type SessionView = {
 export type RoomView = RoomSummary & {
   mode: "solo" | "multiplayer";
   soloStarted: boolean;
+  soloPlayId: string | null;
+  soloStory: { id: string; title: string };
   hostId: string;
   members: Member[];
   scenario: Scenario;

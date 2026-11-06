@@ -32,6 +32,9 @@
   let busy = $state(false);
   let connected = $state(false);
   let loading = $state(true);
+  let accountLoaded = false;
+  let soloRecovery = $state<{ roomId: string; soloPlayId: string | null } | null>(null);
+  let soloEndedNotice = $state(false);
   let picker = $state(false);
   let copied = $state(false);
   let locale = $state<"ko" | "en">(getLocaleFromPath(location.pathname));
@@ -139,6 +142,7 @@
 
   function command(type: Command["type"], targetId?: string, mode?: "solo" | "multiplayer") {
     if (!connected || busy || !socket) return;
+    if (type === "start") soloEndedNotice = false;
     error = "";
     busy = true;
     const requestId = crypto.randomUUID();
@@ -196,9 +200,21 @@
     account = await api("/platform/account");
     if (account.me && !account.needsNickname) {
       snapshot = await api("/lobby/state");
+      if (!accountLoaded && snapshot?.room?.soloStarted) {
+        soloRecovery = { roomId: snapshot.room.id, soloPlayId: snapshot.room.soloPlayId };
+        await reconcileSolo();
+      }
+      accountLoaded = true;
       if (!socket || socket.readyState > 1) connect();
       resumeGoogleAction();
     }
+  }
+  async function reconcileSolo() {
+    if (!soloRecovery) return;
+    await api("/lobby/rooms/solo-exit", soloRecovery);
+    snapshot = await api("/lobby/state");
+    soloRecovery = null;
+    soloEndedNotice = true;
   }
   function openAccount() {
     if (editorPath && editorHasChanges && !window.confirm(locale === 'en' ? 'Discard unsaved changes?' : '저장하지 않은 변경을 버리고 나갈까요?')) return;
@@ -339,6 +355,9 @@
   {#if error}
     <ErrorNotice message={error} onDismiss={() => (error = "")} />
   {/if}
+  {#if soloEndedNotice}
+    <p class="main" role="status">{locale === "en" ? "Your previous solo investigation ended when you left the page. You are back in the room; start a new investigation when ready." : "페이지를 떠나 이전 1인 수사가 종료됐어. 같은 방으로 돌아왔으니 준비되면 새 수사를 시작해 줘."}</p>
+  {/if}
 
   {#if loading}
     <PageState kind="loading" message={t("workshopLoading")} />
@@ -352,8 +371,10 @@
     {#key editorId}<WorkshopEditor {locale} onDirtyChange={(dirty) => { editorHasChanges = dirty; }} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
+  {:else if soloRecovery}
+    <main class="main"><Panel><p role="status">{locale === "en" ? "The previous solo investigation has ended. Reconnect to return to your room." : "이전 1인 수사가 종료됐어. 연결을 확인한 뒤 같은 방으로 돌아가 줘."}</p><Button disabled={busy} onclick={() => void action(async () => { await reconcileSolo(); if (!socket || socket.readyState > 1) connect(); })}>{locale === "en" ? "Retry returning to room" : "방 복귀 다시 시도"}</Button></Panel></main>
   {:else if room?.soloStarted}
-    <main class="main"><SoloGame {locale} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>
+    {#key room.soloPlayId}<main class="main"><SoloGame {locale} storyId={room.soloStory.id} roomLifecycle={{ roomId: room.id, soloPlayId: room.soloPlayId }} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>{/key}
   {:else if !room}
     <LobbyPage
       bind:code

@@ -5,6 +5,7 @@ import type {
   Snapshot,
   RoomView,
 } from "@festival/shared";
+import { supportedSoloStory } from "@festival/shared";
 import type { Room, Session, State } from "./model";
 import type { GameStateStore } from "./ports/state-store";
 import type { StoryCatalog } from "./story-catalog";
@@ -32,7 +33,7 @@ export class Game {
     return {
       id: r.id,
       code: r.code,
-      title: r.mode === "solo" ? "덕일상사 살인사건" : s.title,
+      title: r.mode === "solo" ? supportedSoloStory.title : s.title,
       count: r.memberIds.length,
       capacity: r.mode === "solo" ? 1 : s.players,
       status: r.sessionId || r.soloStarted ? "playing" : "waiting",
@@ -53,6 +54,8 @@ export class Game {
         hostId: r.hostId,
         mode: r.mode ?? "multiplayer",
         soloStarted: r.soloStarted ?? false,
+        soloPlayId: r.soloPlayId ?? null,
+        soloStory: supportedSoloStory,
         scenario,
         members: r.memberIds.map((id) => ({
           ...this.state.guests[id],
@@ -226,6 +229,7 @@ export class Game {
         host();
         if (r.mode !== "solo" || !r.soloStarted) throw Error("진행 중인 1인 게임이 없어.");
         r.soloStarted = false;
+        r.soloPlayId = null;
         break;
       case "start": {
         host();
@@ -233,6 +237,7 @@ export class Game {
         if (r.mode === "solo") {
           if (r.memberIds.length !== 1 || !this.online.get(me.id)) throw Error("참가자가 접속해야 시작할 수 있어.");
           r.soloStarted = true;
+          r.soloPlayId = crypto.randomUUID();
           break;
         }
         const scenario = this.storyCatalog.get(r.scenarioId)!.scenario;
@@ -294,5 +299,13 @@ export class Game {
         break;
     }
     this.store.save();
+  }
+  endSolo(me: Guest, roomId: string, soloPlayId: string | null) {
+    const room = this.needRoom(me.id);
+    if (room.hostId !== me.id) throw Error("방장만 진행할 수 있어.");
+    if (room.id !== roomId) throw Error("현재 방을 확인해 줘.");
+    // Page exits can arrive after a return or a new start. Only end their own attempt.
+    if (!room.soloStarted || (room.soloPlayId ?? null) !== soloPlayId) return;
+    this.command(me, { type: "solo-return", requestId: crypto.randomUUID() });
   }
 }
