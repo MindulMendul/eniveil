@@ -12,6 +12,7 @@
   import WorkshopEditor from "../pages/workshop/ui/WorkshopEditor.svelte";
   import { RoomPage } from "../pages/room";
   import { AppFooter } from "../widgets/app-footer";
+  import LegalLinks from "../widgets/app-footer/ui/LegalLinks.svelte";
   import { AppHeader } from "../widgets/app-header";
   import { ErrorNotice } from "../widgets/error-notice";
   import { StoryPickerDialog } from "../widgets/story-picker";
@@ -308,8 +309,10 @@
     <GamePage {room} {session} {host} {busy} {connected} onCommand={command} />
   {/if}
 
-  {#if !entryHome}
-    <AppFooter {snapshot} {connected} {t} />
+  {#if entryHome}
+    <footer class="flex justify-center py-4 text-festival-muted"><LegalLinks {locale} /></footer>
+  {:else}
+    <AppFooter {snapshot} {connected} {t} {locale} />
   {/if}
 </div>
 
