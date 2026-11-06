@@ -1,6 +1,6 @@
 <script lang="ts">
   import { GuestLoginForm } from "../../../features/guest-login";
-  import { Panel } from "../../../shared/ui";
+  import { Button } from "../../../shared/ui";
 
   let {
     nickname = $bindable(""),
@@ -15,23 +15,24 @@
   } = $props();
 </script>
 
-<main class="main entrance">
-  <section>
-    <p class="eyebrow">INTERACTIVE STORY PLATFORM</p>
-    <h1 class="heading-one entrance-title">
-      {t("entryHeadline")}<br /><em class="not-italic text-festival-gold">{t("entryAccent")}</em>.
-    </h1>
-    <p class="intro">{t("entryDescription")}</p>
-    <div class="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t border-festival-line pt-4 text-[10px] tracking-[1.5px] text-festival-muted">
-      <span>{t("entryEdition")}</span>
+<main class="main flex items-center justify-center">
+  <section class="w-full max-w-sm py-8" aria-labelledby="entry-title">
+    <div class="mb-10 text-center">
+      <span class="emblem" aria-hidden="true">S</span>
+      <p class="eyebrow mt-4">{t("brand")}</p>
+      <h1 id="entry-title" class="heading-two text-festival-gold">{t("entryInvitation")}</h1>
+      <p class="muted">{t("entryWelcome")}</p>
+    </div>
+    <div class="border-t border-festival-line pt-2">
+      <GuestLoginForm bind:nickname {busy} {t} onSubmit={onLogin} />
+    </div>
+    <div class="mt-6 border-t border-festival-line pt-1">
+      <Button variant="secondary" disabled={busy} onclick={() => window.alert(t("googleLoginPending"))}>
+        {t("googleLogin")}
+      </Button>
+      <Button variant="secondary" disabled={busy} onclick={() => window.alert(t("emailLoginPending"))}>
+        {t("emailLogin")}
+      </Button>
     </div>
   </section>
-
-  <Panel class="login">
-    <p class="eyebrow">START PLAYING</p>
-    <h2 class="heading-two">{t("startPlaying")}</h2>
-    <p class="muted">{t("namePrompt")}</p>
-    <GuestLoginForm bind:nickname {busy} {t} onSubmit={onLogin} />
-    <p class="fine">{t("entryHint")}</p>
-  </Panel>
 </main>

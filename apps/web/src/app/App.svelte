@@ -32,6 +32,7 @@
   let loginDialog: HTMLDialogElement;
   let pendingWorkshopAction: (() => void) | undefined;
   let editorPath = $derived(currentPath === "/workshop/editor");
+  let entryHome = $derived(currentPath === "/" && snapshot === null);
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
@@ -262,7 +263,9 @@
 </svelte:head>
 
 <div class="shell">
-  <AppHeader {snapshot} {connected} {locale} {t} onLocaleChange={changeLocale} />
+  {#if !entryHome}
+    <AppHeader {snapshot} {connected} {locale} {t} onLocaleChange={changeLocale} />
+  {/if}
 
   {#if error}
     <ErrorNotice message={error} onDismiss={() => (error = "")} />
@@ -305,7 +308,9 @@
     <GamePage {room} {session} {host} {busy} {connected} onCommand={command} />
   {/if}
 
-  <AppFooter {snapshot} {connected} {t} />
+  {#if !entryHome}
+    <AppFooter {snapshot} {connected} {t} />
+  {/if}
 </div>
 
 <StoryPickerDialog
