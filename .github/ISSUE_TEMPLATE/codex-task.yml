@@ -1,0 +1,23 @@
+name: Codex 개발 작업
+description: 자율 구현에 필요한 목표와 완료 조건
+title: "[Task] "
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 원하는 결과
+      description: 사용자가 어떤 행동을 했을 때 무엇이 달라져야 하는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 조건과 검증
+      description: 관찰 가능한 동작, 재현 절차, 필요한 검증 근거를 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 범위와 제약
+      description: 유지해야 할 동작과 관련 자료를 적어주세요.
