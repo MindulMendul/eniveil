@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { translate } from "../../../shared/lib";
 
   type StoryCatalogItem = {
@@ -20,6 +20,8 @@
   let total = $state(0);
   let offset = $state(0);
   let loadRequestVersion = 0;
+  let pendingOffset = 0;
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
   const pageSize = 100;
   let loading = $state(true);
   let error = $state("");
@@ -47,6 +49,7 @@
   }
 
   async function loadStories(nextOffset = 0) {
+    pendingOffset = nextOffset;
     const requestVersion = ++loadRequestVersion;
     loading = true;
     error = "";
@@ -85,8 +88,21 @@
     }
   }
 
+  function handleSearchInput(event: Event) {
+    query = (event.currentTarget as HTMLInputElement).value;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchTimer = undefined;
+      void loadStories(0);
+    }, 250);
+  }
+
   onMount(() => {
     void loadStories(0);
+  });
+
+  onDestroy(() => {
+    clearTimeout(searchTimer);
   });
 </script>
 
@@ -104,18 +120,18 @@
 
   <section class="panel mb-6">
     <label class="input-label" for="story-search">{t("workshopSearchPlaceholder")}</label>
-    <input class="input-field" id="story-search" value={query} maxlength="100" oninput={(event) => { query = event.currentTarget.value; void loadStories(0); }} type="search" placeholder={t("workshopSearchPlaceholder")} />
+    <input class="input-field" id="story-search" value={query} maxlength="100" oninput={handleSearchInput} type="search" placeholder={t("workshopSearchPlaceholder")} />
     <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label={t("workshopDescription")}>
-      <button class:active={mode === "all"} class="tab" onclick={() => { mode = "all"; void loadStories(0); }}>{t("workshopFilterAll")}</button>
-      <button class:active={mode === "solo"} class="tab" onclick={() => { mode = "solo"; void loadStories(0); }}>{t("workshopFilterSolo")}</button>
-      <button class:active={mode === "multiplayer"} class="tab" onclick={() => { mode = "multiplayer"; void loadStories(0); }}>{t("workshopFilterMultiplayer")}</button>
+      <button class:active={mode === "all"} class="tab" onclick={() => { clearTimeout(searchTimer); mode = "all"; void loadStories(0); }}>{t("workshopFilterAll")}</button>
+      <button class:active={mode === "solo"} class="tab" onclick={() => { clearTimeout(searchTimer); mode = "solo"; void loadStories(0); }}>{t("workshopFilterSolo")}</button>
+      <button class:active={mode === "multiplayer"} class="tab" onclick={() => { clearTimeout(searchTimer); mode = "multiplayer"; void loadStories(0); }}>{t("workshopFilterMultiplayer")}</button>
     </div>
   </section>
 
   {#if loading}
     <div class="empty" role="status"><p>{t("workshopLoading")}</p></div>
   {:else if error}
-    <div class="empty" role="alert"><p>{error}</p><button class="secondary" onclick={() => void loadStories()}>{t("workshopRetry")} ↻</button></div>
+    <div class="empty" role="alert"><p>{error}</p><button class="secondary" onclick={() => void loadStories(pendingOffset)}>{t("workshopRetry")} ↻</button></div>
   {:else if !filteredStories.length}
     <div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{query.trim() || mode !== "all" ? t("workshopNoMatches") : t("workshopEmpty")}</h2></div>
   {:else}
