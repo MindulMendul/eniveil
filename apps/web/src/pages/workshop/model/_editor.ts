@@ -41,9 +41,9 @@ export function serializeDraft(source: StoryPackage): string {
   return serialized;
 }
 
-export function renameScene(source: StoryPackage, index: number, id: string): void {
+export function renameScene(source: StoryPackage, index: number, id: string): boolean {
   const scene = source.content.scenes[index];
-  if (!scene) return;
+  if (!scene || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) || source.content.scenes.some((entry, other) => other !== index && entry.id === id)) return false;
   const previous = scene.id;
   scene.id = id;
   if (source.story.startSceneId === previous) source.story.startSceneId = id;
@@ -54,6 +54,7 @@ export function renameScene(source: StoryPackage, index: number, id: string): vo
   for (const information of source.content.information) {
     if (information.releasedWhen.type === 'scene_entered' && information.releasedWhen.sceneId === previous) information.releasedWhen.sceneId = id;
   }
+  return true;
 }
 
 export function hasPreservedSceneReference(source: StoryPackage, id: string): boolean {

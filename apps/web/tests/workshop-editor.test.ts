@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { createStoryDraft, editorErrors, serializeDraft, renameScene, hasPreservedSceneReference } from '../../web/src/pages/workshop/model/_editor';
+import { createStoryDraft, editorErrors, serializeDraft, renameScene, hasPreservedSceneReference } from '../src/pages/workshop/model/_editor';
 import { storyPackageSchema } from '@festival/shared';
 
 test('localized starter is valid and preserves non-editor content across export/import', () => {
@@ -49,4 +49,17 @@ test('scene rename updates preserved choice/information references and deletion 
   const roundtrip = JSON.parse(serializeDraft(raw));
   expect(roundtrip.content.information[0].title).toBe(' News ');
   expect(roundtrip.content.scenes[1].choices).toBeUndefined();
+});
+
+
+test('duplicate or invalid proposed IDs never rewire another scene', () => {
+  const source = createStoryDraft('en');
+  const before = structuredClone(source);
+  expect(renameScene(source, 1, 'intro')).toBe(false);
+  expect(source).toEqual(before);
+  expect(renameScene(source, 1, '')).toBe(false);
+  expect(source).toEqual(before);
+  expect(renameScene(source, 1, 'intro-two')).toBe(true);
+  expect(source.story.startSceneId).toBe('intro');
+  expect(source.content.scenes[0]!.nextSceneId).toBe('intro-two');
 });
