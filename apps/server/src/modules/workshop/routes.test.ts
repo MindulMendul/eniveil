@@ -549,3 +549,41 @@ test("invalid filters, unsafe metadata, malformed files and oversized writes fai
   expect((await f.request("/stories/validate", { method: "POST", body: {} })).status).toBe(422);
   expect((await f.request("/drafts", { method: "POST", cookie: owner.cookie, raw: " ".repeat(1024 * 1024 + 1) })).status).toBe(413);
 });
+
+test('private draft deletion is owner-only, rejects public stories, clears favorites and retries safely', async () => {
+  const f = fixture();
+  const owner = f.guest('Owner'), other = f.guest('Other');
+  const draft = await f.create(owner.cookie);
+  const published = await f.create(owner.cookie, true);
+  const untouched = await f.create(other.cookie);
+  f.workshop.favorite(draft.id, other.id, true);
+  expect((await f.request(`/drafts/${draft.id}`, { method: 'DELETE' })).status).toBe(401);
+  expect((await f.request(`/drafts/${draft.id}`, { method: 'DELETE', cookie: other.cookie })).status).toBe(404);
+  expect((await f.request(`/drafts/${published.id}`, { method: 'DELETE', cookie: owner.cookie })).status).toBe(409);
+  expect((await f.request(`/drafts/${draft.id}`, { method: 'DELETE', cookie: owner.cookie })).status).toBe(200);
+  expect(f.workshop.source(draft.id, owner.id)).toBeUndefined();
+  expect(f.workshop.favorites([draft.id], other.id).get(draft.id)?.count ?? 0).toBe(0);
+  expect((await f.request(`/drafts/${draft.id}`, { method: 'DELETE', cookie: owner.cookie })).status).toBe(404);
+  expect((await f.request(`/drafts/${draft.id}`, { cookie: owner.cookie })).status).toBe(404);
+  expect((await f.request(`/stories/${draft.id}`, { cookie: owner.cookie })).status).toBe(404);
+  expect((await f.request(`/drafts/${draft.id}`, { method: 'PUT', cookie: owner.cookie, body: { package: f.source } })).status).toBe(404);
+  expect(f.workshop.source(untouched.id, other.id)).toBeDefined();
+  expect(f.workshop.get(published.id)?.published).toBe(true);
+});
+
+test('deletion restores exact count/byte quotas and rolls back linked cleanup on failure', async () => {
+  const f = fixture(source => ({ guestDrafts: 1, totalDrafts: 1, guestBytes: payloadBytes(source, 'Owner'), totalBytes: payloadBytes(source, 'Owner'), globalCreatesPerMinute: 100 }));
+  const owner = f.guest('Owner');
+  const draft = await f.create(owner.cookie);
+  const create = () => f.request('/drafts', { method: 'POST', cookie: owner.cookie, body: { package: f.source } });
+  expect((await create()).status).toBe(429);
+  f.workshop.favorite(draft.id, owner.id, true);
+  f.store.db.exec(`CREATE TRIGGER reject_draft_delete BEFORE DELETE ON workshop_drafts BEGIN SELECT RAISE(ABORT, 'simulated failure'); END`);
+  expect(() => f.workshop.deletePrivate(draft.id, owner.id)).toThrow('simulated failure');
+  expect(f.workshop.source(draft.id, owner.id)).toBeDefined();
+  expect(f.workshop.favorites([draft.id], owner.id).get(draft.id)?.count).toBe(1);
+  expect((await create()).status).toBe(429);
+  f.store.db.exec('DROP TRIGGER reject_draft_delete');
+  expect(f.workshop.deletePrivate(draft.id, owner.id)).toBe('deleted');
+  expect((await create()).status).toBe(201);
+});
