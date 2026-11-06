@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ImageConverter from "../../../features/image-converter/ImageConverter.svelte";
   import { Button, Select, TextInput } from "../../../shared/ui";
   import { onDestroy, onMount } from 'svelte';
   import { workshopRequest, type WorkshopStory } from '../model/_story';
@@ -57,6 +58,7 @@
     {#if error}<p role="alert" class="notice">{error}</p>{/if}
     {#if message}<p role="status">{message}</p>{/if}
     <label class="file-label">{label('.mstory 파일 불러오기', 'Import .mstory file')}<input bind:this={fileInput} type="file" accept=".mstory,application/json" disabled={loading || saving || validating} onchange={importFile} /><small class="muted">{label('최대 900 KB · 유효한 스토리 패키지', 'Up to 900 KB · Valid story package')}</small></label>
+    <ImageConverter {locale} />
     {#if validating}<p role="status">{label('파일을 확인하는 중…', 'Validating file…')}</p>{/if}
     {#if source}<div class="source-summary"><h3 class="heading-three">{title}</h3><p class="muted">{label('스토리 파일을 불러왔어요. 공개 여부와 작품 정보를 설정해 주세요.', 'Story loaded. Choose its visibility and metadata.')}</p></div>
       <div class="metadata"><label>{label('난이도', 'Difficulty')}<Select bind:value={difficulty} disabled={saving || validating || loading}><option value="">{label('미지정', 'Unspecified')}</option><option value="easy">{label('쉬움', 'Easy')}</option><option value="normal">{label('보통', 'Normal')}</option><option value="hard">{label('어려움', 'Hard')}</option></Select></label><label>{label('썸네일 URL', 'Thumbnail URL')}<TextInput type="url" maxlength={2048} disabled={saving || validating || loading} bind:value={thumbnailUrl} placeholder="https://…"  /></label></div>
