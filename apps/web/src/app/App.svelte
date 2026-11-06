@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
+  import { gameModes } from "./game-modes.js";
   import { getLocaleFromPath, localePath, translate } from "../shared/lib";
 
   import { EntryPage } from "../pages/entry";
@@ -99,7 +100,7 @@
       if (!disposed) {
         reconnectTimer = setTimeout(async () => {
           try {
-            snapshot = await api("/state");
+            snapshot = await api("/lobby/state");
             connect();
           } catch (cause) {
             if ((cause as { status?: number }).status === 401) {
@@ -141,29 +142,40 @@
 
   function openWorkshop() {
     picker = false;
-    window.location.assign(localePath(locale, "/workshop"));
+    currentPath = "/workshop";
+    history.pushState({}, "", localePath(locale, "/workshop"));
+  }
+
+  function startSolo() {
+    if (!snapshot) return;
+    soloActive = true;
+  }
+
+  function selectGameMode(modeId: string) {
+    if (modeId === "solo") startSolo();
+    if (modeId === "host") picker = true;
   }
 
   async function login() {
     await action(async () => {
-      await api("/guest", { nickname });
-      snapshot = await api("/state");
+      await api("/platform/guest", { nickname });
+      snapshot = await api("/lobby/state");
       connect();
     });
   }
 
   async function create(scenarioId: string) {
     await action(async () => {
-      await api("/rooms", { scenarioId });
-      snapshot = await api("/state");
+      await api("/lobby/rooms", { scenarioId });
+      snapshot = await api("/lobby/state");
       picker = false;
     });
   }
 
   async function join(invite = code) {
     await action(async () => {
-      await api("/rooms/join", { code: invite });
-      snapshot = await api("/state");
+      await api("/lobby/rooms/join", { code: invite });
+      snapshot = await api("/lobby/state");
       code = "";
     });
   }
@@ -187,7 +199,7 @@
     window.addEventListener("popstate", syncLocale);
     void (async () => {
       try {
-        snapshot = await api("/state");
+        snapshot = await api("/lobby/state");
         connect();
       } catch (cause) {
         if ((cause as { status?: number }).status !== 401) {
@@ -222,12 +234,12 @@
 
   {#if loading}
     <main class="main center"><p>축제의 문을 여는 중…</p></main>
+  {:else if !snapshot}
+    <EntryPage bind:nickname {busy} {t} onLogin={login} />
   {:else if currentPath === "/workshop"}
     <WorkshopPage {locale} />
   {:else if soloActive}
     <main class="main"><SoloGame {locale} onExit={() => (soloActive = false)} /></main>
-  {:else if !snapshot}
-    <EntryPage bind:nickname {busy} {t} onLogin={login} onSolo={() => (soloActive = true)} />
   {:else if !room}
     <LobbyPage
       bind:code
@@ -235,9 +247,9 @@
       {busy}
       {connected}
       {t}
-      onOpenStoryPicker={() => (picker = true)}
+      modes={gameModes}
+      onSelectMode={selectGameMode}
       onJoin={join}
-      onSolo={() => (soloActive = true)}
     />
   {:else if !session}
     <RoomPage
@@ -260,7 +272,6 @@
 
 <StoryPickerDialog
   open={picker && snapshot !== null}
-  scenarios={snapshot?.scenarios ?? []}
   {busy}
   {connected}
   {t}

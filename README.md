@@ -62,7 +62,7 @@ bun run start  # http://localhost:3000
 
 ## 통신과 권한
 
-HTTP: `POST /api/platform/guest`, `GET /api/lobby/state`, `POST /api/lobby/rooms`, `POST /api/lobby/rooms/join`, `GET /api/health`.
+HTTP: `POST /api/platform/guest`, `GET /api/lobby/state`, `POST /api/lobby/rooms`, `POST /api/lobby/rooms/join`, `GET /api/health`. Story catalog filters, sorting and pagination are documented in [docs/api.md](docs/api.md).
 
 WS: `/api/lobby/ws`, 쿠키 인증 + Origin 검증. 클라이언트 명령은 `start`, `advance`, `vote`, `return`, `leave`이며 requestId를 포함합니다. 서버는 개인화된 `snapshot`, `ack`, `error`를 전달합니다. 서버가 방장 권한·정원·단계·중복 투표를 검증합니다. 시작을 재요청하면 이미 진행 중인 세션을 유지합니다. 클라이언트는 끊긴 연결을 2초 뒤 재연결하고 서버 snapshot으로 화면을 복원합니다. 서버는 30초마다 snapshot을 전송합니다.
 
