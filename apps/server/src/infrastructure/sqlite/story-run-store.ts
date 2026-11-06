@@ -151,6 +151,40 @@ export class SQLiteStoryRunStore implements StoryRunStore {
     );
   }
 
+  catalogMetrics(storyIds: readonly string[]) {
+    const result = new Map<string, { playCount: number; ratingCount: number; averageRating: number | null }>();
+    const ids = [...new Set(storyIds)];
+    for (let offset = 0; offset < ids.length; offset += 400) {
+      const batch = ids.slice(offset, offset + 400);
+      const placeholders = batch.map(() => "?").join(",");
+      const rows = this.db.query(`
+      WITH plays AS (
+        SELECT story_id, COUNT(*) AS play_count FROM story_runs
+        WHERE story_id IN (${placeholders}) GROUP BY story_id
+      ), ratings AS (
+        SELECT story_id, COUNT(*) AS rating_count, AVG(rating) AS average_rating
+        FROM story_ratings WHERE story_id IN (${placeholders}) GROUP BY story_id
+      ), ids AS (
+        SELECT story_id FROM plays UNION SELECT story_id FROM ratings
+      )
+      SELECT ids.story_id, COALESCE(plays.play_count, 0) AS play_count,
+        COALESCE(ratings.rating_count, 0) AS rating_count, ratings.average_rating
+      FROM ids LEFT JOIN plays USING (story_id) LEFT JOIN ratings USING (story_id)
+    `).all(...batch, ...batch) as {
+      story_id: string;
+      play_count: number;
+      rating_count: number;
+      average_rating: number | null;
+    }[];
+      for (const row of rows) result.set(row.story_id, {
+        playCount: row.play_count,
+        ratingCount: row.rating_count,
+        averageRating: row.average_rating,
+      });
+    }
+    return result;
+  }
+
   metrics(storyId: string): StoryMetrics {
     const eventRow = this.db.query(`
       SELECT

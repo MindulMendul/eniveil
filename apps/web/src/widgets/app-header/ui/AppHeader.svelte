@@ -19,7 +19,7 @@
 
 <header class="header">
   <a class="brand" href={localePath(locale)} aria-label={`${t("brand")} home`}>
-    <span class="emblem">✳</span>
+    <span class="emblem">S</span>
     <span>{t("brand")}<small class="brand-subtitle">{t("brandSubtitle")}</small></span>
   </a>
   <div class="flex items-center gap-4">
@@ -40,7 +40,7 @@
         <span>{snapshot.me.nickname}</span>
         <span class="tag identity-tag">GUEST</span>
       {:else}
-        <span class="edition">첫 번째 밤의 초대</span>
+        <span class="edition">{t("brandSubtitle")}</span>
       {/if}
     </div>
   </div>

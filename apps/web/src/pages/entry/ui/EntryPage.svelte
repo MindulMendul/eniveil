@@ -17,21 +17,21 @@
 
 <main class="main entrance">
   <section>
-    <p class="eyebrow">AN INVITATION TO THE UNKNOWN</p>
+    <p class="eyebrow">INTERACTIVE STORY PLATFORM</p>
     <h1 class="heading-one entrance-title">
-      {t("invitation")}<br />{t("hiddenStory")} <em class="not-italic text-festival-gold">{t("story")}</em>.
+      {t("entryHeadline")}<br /><em class="not-italic text-festival-gold">{t("entryAccent")}</em>.
     </h1>
-    <p class="intro">{t("invitationDescription")}</p>
-    <div class="ticket">
-      <span>ADMIT ONE</span><span>비밀을 가진 당신에게</span><span>NO. 001</span>
+    <p class="intro">{t("entryDescription")}</p>
+    <div class="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t border-festival-line pt-4 text-[10px] tracking-[1.5px] text-festival-muted">
+      <span>{t("entryEdition")}</span>
     </div>
   </section>
 
   <Panel class="login">
-    <p class="eyebrow">ENTER THE FESTIVAL</p>
-    <h2 class="heading-two">{t("enterFestival")}</h2>
+    <p class="eyebrow">START PLAYING</p>
+    <h2 class="heading-two">{t("startPlaying")}</h2>
     <p class="muted">{t("namePrompt")}</p>
     <GuestLoginForm bind:nickname {busy} {t} onSubmit={onLogin} />
-    <p class="fine">가입 없이 시작해. 같은 브라우저에서 다시 접속하면<br />참가 정보가 이어져.</p>
+    <p class="fine">{t("entryHint")}</p>
   </Panel>
 </main>

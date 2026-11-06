@@ -23,8 +23,8 @@ jobs:
         run: |
           case "$PR_BASE" in
             dev)
-              if [[ "$PR_HEAD" != feat/* ]]; then
-                echo "Only feat/* branches may target dev; received: $PR_HEAD."
+              if [[ ! "$PR_HEAD" =~ ^(feat|fix|bugfix|style|chore|refactor|docs|test|ci|build|perf)/.+$ ]]; then
+                echo "Only feat/*, fix/*, bugfix/*, style/*, chore/*, refactor/*, docs/*, test/*, ci/*, build/*, or perf/* branches with a nonempty purpose may target dev; received: $PR_HEAD."
                 exit 1
               fi
               ;;

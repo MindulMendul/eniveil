@@ -27,7 +27,7 @@
 </script>
 
 <main class="main">
-  <p class="eyebrow">BEFORE THE CURTAIN RISES</p>
+  <p class="eyebrow">ROOM DETAILS</p>
   <div class="page-heading">
     <div>
       <h1 class="heading-one page-title">{room.title}</h1>

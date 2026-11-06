@@ -8,6 +8,7 @@ import { metrics, observeHTTP } from "./observability";
 import { storyCatalog } from "./modules/platform/stories/catalog";
 import { fileStoryCatalog } from "./modules/platform/stories/file-catalog";
 import { SQLiteStoryRunStore } from "./infrastructure/sqlite/story-run-store";
+import { SQLiteWorkshopStore } from "./infrastructure/sqlite/workshop-store";
 import { StorySessionService } from "./modules/game/story-session-service";
 import { createPlatformRoutes } from "./modules/platform/routes";
 import { createWorkshopRoutes } from "./modules/workshop/routes";
@@ -23,6 +24,7 @@ export const store = new Store(
 );
 export const game = new Game(store, storyCatalog);
 const storyRunStore = new SQLiteStoryRunStore(store.db);
+const workshopStore = new SQLiteWorkshopStore(store.db);
 const storySessions = new StorySessionService(fileStoryCatalog, storyRunStore);
 
 const notifyTemporal = (action: "start" | "event" | "end", payload: object) => {
@@ -79,7 +81,12 @@ app.route("/api/platform", createPlatformRoutes({
   production,
   adminToken: process.env.STORY_ADMIN_TOKEN,
 }));
-app.route("/api/workshop", createWorkshopRoutes({ stories: fileStoryCatalog }));
+app.route("/api/workshop", createWorkshopRoutes({
+  stories: fileStoryCatalog,
+  store,
+  workshop: workshopStore,
+  runs: storyRunStore,
+}));
 app.route("/api/game", createGameRoutes({
   stories: fileStoryCatalog,
   runs: storyRunStore,
