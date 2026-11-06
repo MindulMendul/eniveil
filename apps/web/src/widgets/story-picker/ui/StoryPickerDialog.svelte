@@ -134,6 +134,7 @@
           class="input-field"
           id="story-catalog-search"
           type="search"
+          maxlength="100"
           bind:value={search}
           oninput={resetPage}
           placeholder={t("workshopSearchPlaceholder")}
