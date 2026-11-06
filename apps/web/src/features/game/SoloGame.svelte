@@ -1,4 +1,5 @@
 <script>
+  import { Button } from "../../shared/ui";
   import { onMount } from 'svelte';
   import { translate } from '../../shared/lib/i18n.js';
   import { trackEvent } from '../../analytics.js';
@@ -231,7 +232,7 @@
 
 {#if storyLoadError}<p class="mx-auto mb-4 max-w-[960px] border border-red-700/50 bg-festival-panel px-5 py-3 text-sm text-red-300" role="alert">{storyLoadError}</p>{/if}
 {#if hintMessage}
-  <aside class="mx-auto mb-6 flex max-w-[960px] items-start justify-between gap-4 border border-festival-gold-border bg-festival-panel px-5 py-4" role="status"><p class="m-0 text-sm leading-[1.9] text-festival-copy"><span class="mr-2 text-festival-gold">힌트</span>{hintMessage}</p><button class="dismiss" aria-label="힌트 닫기" onclick={() => hintMessage = ''}>×</button></aside>
+  <aside class="mx-auto mb-6 flex max-w-[960px] items-start justify-between gap-4 border border-festival-gold-border bg-festival-panel px-5 py-4" role="status"><p class="m-0 text-sm leading-[1.9] text-festival-copy"><span class="mr-2 text-festival-gold">힌트</span>{hintMessage}</p><Button class="dismiss" ariaLabel="힌트 닫기" onclick={() => hintMessage = ''} variant="dismiss">×</Button></aside>
 {/if}
 
 {#if phase === 'title'}
@@ -248,7 +249,7 @@
         <div class="border border-festival-line px-4 py-3"><span class="text-[10px] tracking-[1px] text-festival-gold">{step.number}</span><p class="mb-0 mt-2 text-sm">{step.label}</p></div>
       {/each}
     </div>
-    <button class="primary mx-auto max-w-[540px]" disabled={!storyPackage} onclick={startOver}>{t('caseStart')} <span>→</span></button>
+    <Button class="primary mx-auto max-w-[540px]" disabled={!storyPackage} onclick={startOver} variant="primary">{t('caseStart')} <span>→</span></Button>
     <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>{t('backToPlatform')}</button>
   </section>
 {:else if phase === 'intro'}
@@ -262,7 +263,7 @@
         <article class="panel"><div class="section-heading"><span class="eyebrow section-eyebrow">SUSPECT 0{i + 1}</span><span class="tag">{t('suspect')}</span></div><h2 class="heading-two mb-2 mt-4">{suspect.name}</h2><p class="muted">{suspect.details}</p></article>
       {/each}
     </div>
-    <button class="primary mt-6" onclick={() => { phase = 'explore'; }}>{t('investigate')} <span>→</span></button>
+    <Button class="primary mt-6" onclick={() => { phase = 'explore'; }} variant="primary">{t('investigate')} <span>→</span></Button>
   </section>
 {:else if phase === 'explore'}
   <section class="mx-auto max-w-[960px]">
@@ -278,11 +279,11 @@
     </section><aside class="panel min-h-[210px]">
       {#if selectedRoom}
         <p class="eyebrow">SEARCH THE ROOM</p><h2 class="heading-two">{selectedRoom.name}</h2><p class="muted">{selectedRoom.mood}</p>
-        <div class="grid gap-2">{#each selectedRoom.evidence as id}<button class="secondary mt-0" onclick={() => inspect(id)}><span>{found.includes(id) ? '✓ ' : ''}{evidence[id].name}</span><span>↗</span></button>{/each}</div>
+        <div class="grid gap-2">{#each selectedRoom.evidence as id}<Button class="secondary mt-0" onclick={() => inspect(id)} variant="secondary"><span>{found.includes(id) ? '✓ ' : ''}{evidence[id].name}</span><span>↗</span></Button>{/each}</div>
         {#if currentEvidence}<div class="mt-5 border-t border-festival-line pt-4"><p class="mb-2 text-xs text-festival-gold">{evidence[currentEvidence].icon} {evidence[currentEvidence].name}</p><p class="m-0 text-sm leading-[1.9] text-festival-copy-soft">{evidence[currentEvidence].detail}</p></div>{/if}
       {:else}<p class="eyebrow">CRIME SCENE</p><h2 class="heading-two">{t('whereStart')}</h2><p class="muted">{t('searchRoom')}</p>{/if}
     </aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><button class="primary mt-0 w-auto min-w-[230px]" onclick={() => { phase = 'alibi'; selectedSuspect = ''; }}>{t('exploreNext')} <span>→</span></button></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><Button class="text-button" onclick={showHint} variant="text">{t('hint')}</Button><Button class="primary mt-0 w-auto min-w-[230px]" onclick={() => { phase = 'alibi'; selectedSuspect = ''; }} variant="primary">{t('exploreNext')} <span>→</span></Button></div>
   </section>
 {:else if phase === 'alibi' || phase === 'cross'}
   <section class="mx-auto max-w-[960px]">
@@ -293,21 +294,21 @@
     {/each}</section><aside class="panel min-h-[300px]">
       {#if selected}
         <p class="eyebrow">QUESTION · {selected.name}</p><h2 class="heading-two">{t('chooseQuestion')}</h2>
-        {#if phase === 'alibi'}<div class="grid gap-2"><button class="secondary mt-0" onclick={() => askAlibi(0)}>{t('askAlibi')} <span>↗</span></button><button class="secondary mt-0" onclick={() => askAlibi(1)}>{t('askRelationship')} <span>↗</span></button></div>
-        {:else}<p class="muted mb-3">{t('showEvidence')}</p>{#if found.length}<div class="grid max-h-[230px] gap-2 overflow-auto">{#each found as id}<button class="secondary mt-0" onclick={() => presentEvidence(id)}><span>{evidence[id].icon} {evidence[id].name}</span><span>↗</span></button>{/each}</div>{:else}<p class="muted">{t('noEvidence')}</p>{/if}{/if}
+        {#if phase === 'alibi'}<div class="grid gap-2"><Button class="secondary mt-0" onclick={() => askAlibi(0)} variant="secondary">{t('askAlibi')} <span>↗</span></Button><Button class="secondary mt-0" onclick={() => askAlibi(1)} variant="secondary">{t('askRelationship')} <span>↗</span></Button></div>
+        {:else}<p class="muted mb-3">{t('showEvidence')}</p>{#if found.length}<div class="grid max-h-[230px] gap-2 overflow-auto">{#each found as id}<Button class="secondary mt-0" onclick={() => presentEvidence(id)} variant="secondary"><span>{evidence[id].icon} {evidence[id].name}</span><span>↗</span></Button>{/each}</div>{:else}<p class="muted">{t('noEvidence')}</p>{/if}{/if}
         <div class="mt-5 grid gap-3">{#each responses.slice().reverse() as response}<blockquote class="m-0 border-l-2 border-festival-gold-border bg-festival-panel-input px-4 py-3"><span class="text-[10px] tracking-[1px] text-festival-gold">{response.source}</span><p class="mb-0 mt-2 text-sm leading-[1.9] text-festival-copy">“{response.text}”</p></blockquote>{/each}</div>
       {:else}<p class="eyebrow">INTERVIEW NOTES</p><h2 class="heading-two">{t('chooseSuspect')}</h2><p class="muted">{t('compareStatements')}</p>{/if}
     </aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><div class="flex flex-wrap gap-3"><button class="secondary mt-0 w-auto" onclick={() => { phase = phase === 'alibi' ? 'explore' : 'alibi'; selectedSuspect = ''; }}>← {t('previous')}</button>{#if phase === 'alibi'}<button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'cross'; selectedSuspect = ''; }}>{t('presentEvidence')} <span>→</span></button>{:else}<button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'accuse'; selectedSuspect = ''; accusation = []; }}>{t('accusationTitle')} <span>→</span></button>{/if}</div></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><Button class="text-button" onclick={showHint} variant="text">{t('hint')}</Button><div class="flex flex-wrap gap-3"><Button class="secondary mt-0 w-auto" onclick={() => { phase = phase === 'alibi' ? 'explore' : 'alibi'; selectedSuspect = ''; }} variant="secondary">← {t('previous')}</Button>{#if phase === 'alibi'}<Button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'cross'; selectedSuspect = ''; }} variant="primary">{t('presentEvidence')} <span>→</span></Button>{:else}<Button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'accuse'; selectedSuspect = ''; accusation = []; }} variant="primary">{t('accusationTitle')} <span>→</span></Button>{/if}</div></div>
   </section>
 {:else if phase === 'accuse'}
   <section class="mx-auto max-w-[960px]">
     <p class="eyebrow">FINAL · 04</p><h1 class="heading-one page-title">{t('accusationTitle')}</h1><p class="muted mb-7">{t('accusationDescription')}</p>
-    <div class="lobby-grid"><section class="panel"><h2 class="heading-two">{t('culpritQuestion')}</h2><div class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">{#each suspects as suspect}<button class="cursor-pointer border p-4 text-left focus-visible:outline-2 focus-visible:outline-festival-gold {selectedSuspect === suspect.id ? 'border-festival-gold bg-festival-panel-hover' : 'border-festival-line bg-transparent hover:border-festival-gold-border'}" onclick={() => chooseSuspect(suspect.id)}><span class="text-xs text-festival-muted">{selectedSuspect === suspect.id ? `● ${t('selectedLabel')}` : `○ ${t('selectLabel')}`}</span><h3 class="heading-three mb-0 mt-2">{suspect.name}</h3></button>{/each}</div></section><aside class="panel"><div class="section-heading"><h2 class="heading-two mb-0">{t('decisiveEvidence')}</h2><span class="tag gold">{accusation.length} / 3</span></div><p class="muted my-4">{t('chooseThreeEvidence')}</p><div class="grid max-h-[390px] gap-2 overflow-auto">{#each found as id}<button class="secondary mt-0" onclick={() => toggleAccusation(id)}><span>{accusation.includes(id) ? '☑' : '☐'} {evidence[id].icon} {evidence[id].name}</span><span>{accusation.includes(id) ? t('selectedLabel') : ''}</span></button>{/each}</div></aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><div class="flex gap-3"><button class="secondary mt-0 w-auto" onclick={() => { phase = 'cross'; selectedSuspect = ''; }}>{t('reviewEvidence')}</button><button class="primary mt-0 w-auto min-w-[190px]" disabled={!selectedSuspect || accusation.length !== 3} onclick={arrest}>{t('arrest')} <span>→</span></button></div></div>
+    <div class="lobby-grid"><section class="panel"><h2 class="heading-two">{t('culpritQuestion')}</h2><div class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">{#each suspects as suspect}<button class="cursor-pointer border p-4 text-left focus-visible:outline-2 focus-visible:outline-festival-gold {selectedSuspect === suspect.id ? 'border-festival-gold bg-festival-panel-hover' : 'border-festival-line bg-transparent hover:border-festival-gold-border'}" onclick={() => chooseSuspect(suspect.id)}><span class="text-xs text-festival-muted">{selectedSuspect === suspect.id ? `● ${t('selectedLabel')}` : `○ ${t('selectLabel')}`}</span><h3 class="heading-three mb-0 mt-2">{suspect.name}</h3></button>{/each}</div></section><aside class="panel"><div class="section-heading"><h2 class="heading-two mb-0">{t('decisiveEvidence')}</h2><span class="tag gold">{accusation.length} / 3</span></div><p class="muted my-4">{t('chooseThreeEvidence')}</p><div class="grid max-h-[390px] gap-2 overflow-auto">{#each found as id}<Button class="secondary mt-0" onclick={() => toggleAccusation(id)} variant="secondary"><span>{accusation.includes(id) ? '☑' : '☐'} {evidence[id].icon} {evidence[id].name}</span><span>{accusation.includes(id) ? t('selectedLabel') : ''}</span></Button>{/each}</div></aside></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><Button class="text-button" onclick={showHint} variant="text">{t('hint')}</Button><div class="flex gap-3"><Button class="secondary mt-0 w-auto" onclick={() => { phase = 'cross'; selectedSuspect = ''; }} variant="secondary">{t('reviewEvidence')}</Button><Button class="primary mt-0 w-auto min-w-[190px]" disabled={!selectedSuspect || accusation.length !== 3} onclick={arrest} variant="primary">{t('arrest')} <span>→</span></Button></div></div>
   </section>
 {:else if phase === 'win'}
-  <section class="mx-auto max-w-[760px] border border-festival-gold-border bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('allCaught')}</p><h1 class="heading-one page-title">{t('success')}</h1><p class="muted">{t('successDescription')}</p>{#if resolutionCues.length}<div class="mt-8"><StoryCuePlayer cues={resolutionCues} onComplete={() => {}} /></div>{/if}<StoryRating {runId} /><button class="primary mt-7" onclick={startOver}>{t('replay')} <span>↻</span></button><button class="mt-4 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>{t('backToPlatform')}</button></section>
+  <section class="mx-auto max-w-[760px] border border-festival-gold-border bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('allCaught')}</p><h1 class="heading-one page-title">{t('success')}</h1><p class="muted">{t('successDescription')}</p>{#if resolutionCues.length}<div class="mt-8"><StoryCuePlayer cues={resolutionCues} onComplete={() => {}} /></div>{/if}<StoryRating {runId} /><Button class="primary mt-7" onclick={startOver} variant="primary">{t('replay')} <span>↻</span></Button><button class="mt-4 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>{t('backToPlatform')}</button></section>
 {:else}
-  <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('caseUnresolved')}</p><span class="text-5xl text-festival-gold" aria-hidden="true">…</span><h1 class="heading-one page-title mt-5">{t('unresolved')}</h1><p class="narrative">{resultMessage}</p><StoryRating {runId} /><div class="mt-7 grid gap-3 sm:grid-cols-2"><button class="primary mt-0" onclick={startOver}>{t('restart')} <span>↻</span></button><button class="secondary mt-0" onclick={onExit}>{t('backToPlatform')} <span>↗</span></button></div></section>
+  <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('caseUnresolved')}</p><span class="text-5xl text-festival-gold" aria-hidden="true">…</span><h1 class="heading-one page-title mt-5">{t('unresolved')}</h1><p class="narrative">{resultMessage}</p><StoryRating {runId} /><div class="mt-7 grid gap-3 sm:grid-cols-2"><Button class="primary mt-0" onclick={startOver} variant="primary">{t('restart')} <span>↻</span></Button><Button class="secondary mt-0" onclick={onExit} variant="secondary">{t('backToPlatform')} <span>↗</span></Button></div></section>
 {/if}

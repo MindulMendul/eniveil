@@ -1,7 +1,8 @@
 <script lang="ts">
-  let { class: className = "" }: { class?: string } = $props();
+  import type { Snippet } from "svelte";
+  let { children, class: className = "" }: { children?: Snippet; class?: string } = $props();
 </script>
 
 <section class={`panel ${className}`.trim()}>
-  <slot />
+  {@render children?.()}
 </section>

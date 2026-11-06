@@ -85,7 +85,16 @@ const viewportSizing = unoExtensions.viewportSizing as Record<string, string>;
 const typography = tokens.typography as DtcgNode;
 const typeScale = typography.size as DtcgNode;
 
+function cssVariables(node: DtcgNode, path: string[] = [], inheritedType = ""): string[] {
+  const type = typeof node.$type === "string" ? node.$type : inheritedType;
+  if ("$value" in node) return [`--${path.join("-")}:${tokenToCss(node.$value, type)}`];
+  return Object.entries(node).filter(([key]) => !key.startsWith("$")).flatMap(
+    ([key, child]) => cssVariables(child as DtcgNode, [...path, key], type),
+  );
+}
+
 export default defineConfig({
+  preflights: [{ getCSS: () => `:root{${cssVariables(tokens).join(";")}}` }],
   presets: [
     presetWind4({
       preflights: { reset: true },
@@ -98,6 +107,8 @@ export default defineConfig({
     // DTCG tokens are the source of truth; viewport-relative sizes are UnoCSS extensions.
     breakpoint: toThemeTokens(tokens.breakpoint as DtcgNode) as Record<string, string>,
     spacing: {
+      ...Object.fromEntries(Object.entries(toThemeTokens(tokens.spacing as DtcgNode) as Record<string, string>)
+        .map(([name, value]) => [name.replace("-", "."), value])),
       ...(toThemeTokens(tokens.layout as DtcgNode) as Record<string, string>),
       ...viewportSizing,
     },
@@ -106,6 +117,7 @@ export default defineConfig({
         ([name, fontSize]) => [name, { fontSize }],
       ),
     ),
+    fontWeight: toThemeTokens(typography.weight as DtcgNode) as Record<string, string>,
     leading: toThemeTokens(typography["line-height"] as DtcgNode) as Record<string, string>,
     tracking: toThemeTokens(typography["letter-spacing"] as DtcgNode) as Record<string, string>,
     radius: toThemeTokens(tokens.radius as DtcgNode) as Record<string, string>,

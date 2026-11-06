@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Button } from "../../shared/ui";
   import { onDestroy, onMount } from "svelte";
   import type { StoryCue } from "@festival/shared";
 
@@ -66,7 +67,7 @@
     <div class="my-8 border-y border-festival-line py-10">
       <p class="mx-auto my-3 max-w-[520px] font-serif text-[20px] leading-[2] text-festival-copy">{cue.text}</p>
     </div>
-    <button class="primary mx-auto max-w-[400px]" onclick={advance}>계속 <span>→</span></button>
+    <Button class="primary mx-auto max-w-[400px]" onclick={advance} variant="primary">계속 <span>→</span></Button>
   {:else if waiting}
     <p class="eyebrow">장면 전환</p>
     <div class="my-8 min-h-16 border-y border-festival-line py-5" style={`--cue-duration:${effectDurationMs}ms`} class:cue-fade={effect === "fade"} class:cue-dissolve={effect === "dissolve"}></div>
@@ -76,7 +77,7 @@
 
 <style>
   .cue-fade { animation: cue-fade var(--cue-duration, 700ms) ease-in-out infinite alternate; }
-  .cue-dissolve { animation: cue-fade var(--cue-duration, 700ms) ease-in-out infinite alternate; filter: blur(1px); }
+  .cue-dissolve { animation: cue-fade var(--cue-duration, 700ms) ease-in-out infinite alternate; filter: blur(var(--border-thin)); }
   @keyframes cue-fade { from { opacity: 0.2; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) {
     .cue-fade, .cue-dissolve { animation: none; }

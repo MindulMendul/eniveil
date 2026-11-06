@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { RoomSummary } from "@festival/shared";
-  import { Button } from "../../../shared/ui";
+  import { Button, Card } from "../../../shared/ui";
 
   let {
     room,
@@ -10,7 +10,7 @@
   }: { room: RoomSummary; busy: boolean; connected: boolean; onJoin: (code: string) => void } = $props();
 </script>
 
-<article class="room-card">
+<Card class="room-card">
   <div class="section-heading">
     <span class="eyebrow section-eyebrow">{room.status === "playing" ? "IN PROGRESS" : "WAITING"}</span>
     <span class="muted">{room.count} / {room.capacity}명</span>
@@ -24,4 +24,4 @@
   >
     {room.status === "playing" ? "게임 진행 중" : room.count >= room.capacity ? "정원 마감" : "참여하기 ↗"}
   </Button>
-</article>
+</Card>
