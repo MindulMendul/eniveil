@@ -11,10 +11,10 @@ permissions:
 jobs:
   branch-flow:
     name: branch-flow
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Enforce branch promotion flow
+        if: github.event_name == 'pull_request'
         env:
           PR_BASE: ${{ github.base_ref }}
           PR_HEAD: ${{ github.head_ref }}
@@ -46,8 +46,15 @@ jobs:
               ;;
           esac
   verify:
+    needs: branch-flow
+    if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Require branch-flow to pass
+        if: needs.branch-flow.result != 'success'
+        run: |
+          echo "The branch-flow check failed."
+          exit 1
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
