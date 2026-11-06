@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
   import { gameModes } from "./game-modes.js";
@@ -30,8 +30,7 @@
   let currentPath = $state(pagePath(location.pathname));
   let soloActive = $state(false);
   let loginDialog: HTMLDialogElement;
-  let pendingEditor = $state(false);
-  let pendingStoryId = $state<string | undefined>();
+  let pendingWorkshopAction: (() => void) | undefined;
   let editorPath = $derived(currentPath === "/workshop/editor");
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
@@ -153,21 +152,20 @@
   }
 
   function openEditor(id?: string) {
-    if (!snapshot) { requestWorkshopLogin(id); return; }
+    if (!snapshot) { requestWorkshopLogin(() => openEditor(id)); return; }
     editorId = id;
     currentPath = "/workshop/editor";
     history.pushState({}, "", `${localePath(locale, currentPath)}${id ? `?id=${encodeURIComponent(id)}` : ""}`);
   }
 
-  function requestWorkshopLogin(id?: string) {
-    pendingEditor = id !== undefined;
-    pendingStoryId = id;
+  function requestWorkshopLogin(resume?: () => void) {
+    pendingWorkshopAction = resume;
     loginDialog.showModal();
   }
 
   function createWorkshopStory() {
     if (snapshot) openEditor();
-    else { pendingEditor = true; pendingStoryId = undefined; loginDialog.showModal(); }
+    else requestWorkshopLogin(() => openEditor());
   }
 
   function savedWorkshopStory(id: string) {
@@ -186,14 +184,16 @@
   }
 
   async function login() {
+    const resume = loginDialog?.open ? pendingWorkshopAction : undefined;
+    pendingWorkshopAction = undefined;
     await action(async () => {
       await api("/platform/guest", { nickname });
       snapshot = await api("/lobby/state");
       connect();
       if (loginDialog?.open) {
         loginDialog.close();
-        if (pendingEditor) openEditor(pendingStoryId);
-        pendingEditor = false; pendingStoryId = undefined;
+        await tick();
+        resume?.();
       }
     });
   }
@@ -226,6 +226,7 @@
 
   onMount(() => {
     const syncLocale = () => {
+      if (loginDialog?.open) loginDialog.close();
       locale = getLocaleFromPath(location.pathname);
       currentPath = pagePath(location.pathname);
       editorId = new URLSearchParams(location.search).get("id") ?? undefined;
@@ -270,7 +271,7 @@
   {#if loading}
     <main class="main center"><p>{t("workshopLoading")}</p></main>
   {:else if currentPath === "/workshop"}
-    <WorkshopPage {locale} loggedIn={snapshot !== null} onLogin={() => requestWorkshopLogin()} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
+    <WorkshopPage {locale} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
   {:else if editorPath && snapshot}
     {#key editorId}<WorkshopEditor {locale} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
   {:else if !snapshot}
@@ -318,7 +319,7 @@
 />
 
 
-<dialog bind:this={loginDialog} class="workshop-login" aria-labelledby="workshop-login-title">
+<dialog bind:this={loginDialog} class="workshop-login" onclose={() => pendingWorkshopAction = undefined} aria-labelledby="workshop-login-title">
   <h2 id="workshop-login-title">{locale === "en" ? "Sign in to the workshop" : "창작마당 로그인"}</h2>
   <p>{locale === "en" ? "Sign in with a guest nickname to create stories and save favorites." : "닉네임으로 게스트 로그인하면 창작과 즐겨찾기를 이용할 수 있어요."}</p>
   <form onsubmit={(event) => { event.preventDefault(); void login(); }}>

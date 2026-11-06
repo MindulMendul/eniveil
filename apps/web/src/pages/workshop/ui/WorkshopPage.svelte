@@ -2,7 +2,7 @@
   import { onDestroy, tick, untrack } from 'svelte';
   import { workshopRequest, type WorkshopStory } from '../model/_story';
   let { locale, loggedIn = false, onLogin, onEdit }: {
-    locale: 'ko' | 'en'; loggedIn?: boolean; onLogin: () => void; onEdit: (id?: string) => void;
+    locale: 'ko' | 'en'; loggedIn?: boolean; onLogin: (resume?: () => void) => void; onEdit: (id?: string) => void;
   } = $props();
   const label = (ko: string, en: string) => locale === 'en' ? en : ko;
   let stories = $state<WorkshopStory[]>([]), total = $state(0), offset = $state(0);
@@ -49,12 +49,14 @@
   }
   function refresh() { clearTimeout(timer); pendingOffset = 0; request++; loading = true; queueMicrotask(() => void load(0)); }
   function chooseTab(next: typeof tabs[number]) {
-    if ((next.key === 'favorites' || next.key === 'mine') && !loggedIn) { onLogin(); return; }
+    if (disposed) return;
+    if ((next.key === 'favorites' || next.key === 'mine') && !loggedIn) { onLogin(() => chooseTab(next)); return; }
     tab = next.key; view = next.key === 'favorites' || next.key === 'mine' ? next.key : 'all'; sort = next.sort; refresh();
   }
   function edit(id?: string) { onEdit(id); }
   async function favorite(story: WorkshopStory) {
-    if (!loggedIn) { onLogin(); return; }
+    if (disposed) return;
+    if (!loggedIn) { onLogin(() => void favorite(story)); return; }
     if (favoriteBusy.includes(story.id)) return;
     favoriteBusy = [...favoriteBusy, story.id];
     const version = request;
