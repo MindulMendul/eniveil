@@ -151,6 +151,32 @@ export class SQLiteStoryRunStore implements StoryRunStore {
     );
   }
 
+  catalogMetrics() {
+    const rows = this.db.query(`
+      WITH plays AS (
+        SELECT story_id, COUNT(*) AS play_count FROM story_runs GROUP BY story_id
+      ), ratings AS (
+        SELECT story_id, COUNT(*) AS rating_count, AVG(rating) AS average_rating
+        FROM story_ratings GROUP BY story_id
+      ), ids AS (
+        SELECT story_id FROM plays UNION SELECT story_id FROM ratings
+      )
+      SELECT ids.story_id, COALESCE(plays.play_count, 0) AS play_count,
+        COALESCE(ratings.rating_count, 0) AS rating_count, ratings.average_rating
+      FROM ids LEFT JOIN plays USING (story_id) LEFT JOIN ratings USING (story_id)
+    `).all() as {
+      story_id: string;
+      play_count: number;
+      rating_count: number;
+      average_rating: number | null;
+    }[];
+    return new Map(rows.map((row) => [row.story_id, {
+      playCount: row.play_count,
+      ratingCount: row.rating_count,
+      averageRating: row.average_rating,
+    }]));
+  }
+
   metrics(storyId: string): StoryMetrics {
     const eventRow = this.db.query(`
       SELECT
