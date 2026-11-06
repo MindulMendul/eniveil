@@ -1,19 +1,20 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { workshopRequest, type WorkshopStory } from '../model/_story';
   let { locale, storyId, onBack, onSaved }: { locale: 'ko' | 'en'; storyId?: string; onBack: () => void; onSaved: (id: string) => void } = $props();
   const label = (ko: string, en: string) => locale === 'en' ? en : ko;
   let source = $state<object | null>(null), title = $state(''), error = $state(''), message = $state('');
   let loading = $state(false), saving = $state(false), validating = $state(false);
   let difficulty = $state(''), thumbnailUrl = $state(''), published = $state(false);
-  let fileRequest = 0, fileInput: HTMLInputElement;
+  let fileRequest = 0, disposed = false, fileInput: HTMLInputElement;
+  onDestroy(() => { disposed = true; fileRequest++; });
   function apply(item: WorkshopStory, storyPackage: object) {
     source = storyPackage; title = item.title; difficulty = item.difficulty ?? ''; thumbnailUrl = item.thumbnailUrl ?? ''; published = item.published;
   }
   onMount(() => {
     if (!storyId) return;
     loading = true;
-    void workshopRequest(`/drafts/${encodeURIComponent(storyId)}`).then(({item, package: storyPackage}) => apply(item, storyPackage)).catch(cause => error = cause.message).finally(() => loading = false);
+    void workshopRequest(`/drafts/${encodeURIComponent(storyId)}`).then(({item, package: storyPackage}) => { if (!disposed) apply(item, storyPackage); }).catch(cause => { if (!disposed) error = cause.message; }).finally(() => { if (!disposed) loading = false; });
   });
   async function importFile(event: Event) {
     const file = (event.currentTarget as HTMLInputElement).files?.[0];
@@ -26,12 +27,12 @@
       if (file.size > 900 * 1024) throw new Error(label('파일은 900 KB 이하여야 해요.', 'The file must be 900 KB or smaller.'));
       const candidate = JSON.parse(await file.text());
       const result = await workshopRequest('/stories/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(candidate) });
-      if (version !== fileRequest) return;
+      if (disposed || version !== fileRequest) return;
       if (!result.valid) throw new Error(label('스토리 형식을 확인해 주세요.', 'Check the story format.'));
       source = candidate; title = candidate.story.title;
       message = label('스토리 파일을 불러왔어요. 저장하면 내 창작 목록에 추가돼요.', 'Story imported. Save it to add it to your stories.');
-    } catch (cause) { if (version === fileRequest) error = cause instanceof Error ? cause.message : label('파일을 읽을 수 없어요.', 'Could not read this file.'); }
-    finally { if (version === fileRequest) validating = false; fileInput.value = ''; }
+    } catch (cause) { if (!disposed && version === fileRequest) error = cause instanceof Error ? cause.message : label('파일을 읽을 수 없어요.', 'Could not read this file.'); }
+    finally { if (!disposed && version === fileRequest) { validating = false; fileInput.value = ''; } }
   }
   async function save() {
     if (!source || saving || validating) return;
@@ -41,9 +42,10 @@
         method: storyId ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ package: source, difficulty: difficulty || null, thumbnailUrl: thumbnailUrl.trim() || null, published }),
       });
+      if (disposed) return;
       message = label('저장했어요.', 'Saved.'); onSaved(item.id);
-    } catch (cause) { error = cause instanceof Error ? cause.message : label('저장하지 못했어요.', 'Could not save.'); }
-    finally { saving = false; }
+    } catch (cause) { if (!disposed) error = cause instanceof Error ? cause.message : label('저장하지 못했어요.', 'Could not save.'); }
+    finally { if (!disposed) saving = false; }
   }
 </script>
 <main class="main editor">
@@ -56,8 +58,8 @@
     <label class="file-label">{label('.mstory 파일 불러오기', 'Import .mstory file')}<input bind:this={fileInput} type="file" accept=".mstory,application/json" disabled={loading || saving || validating} onchange={importFile} /><small class="muted">{label('최대 900 KB · 유효한 스토리 패키지', 'Up to 900 KB · Valid story package')}</small></label>
     {#if validating}<p role="status">{label('파일을 확인하는 중…', 'Validating file…')}</p>{/if}
     {#if source}<div class="source-summary"><h3 class="heading-three">{title}</h3><p class="muted">{label('스토리 파일을 불러왔어요. 공개 여부와 작품 정보를 설정해 주세요.', 'Story loaded. Choose its visibility and metadata.')}</p></div>
-      <div class="metadata"><label>{label('난이도', 'Difficulty')}<select class="input-field" bind:value={difficulty}><option value="">{label('미지정', 'Unspecified')}</option><option value="easy">{label('쉬움', 'Easy')}</option><option value="normal">{label('보통', 'Normal')}</option><option value="hard">{label('어려움', 'Hard')}</option></select></label><label>{label('썸네일 URL', 'Thumbnail URL')}<input class="input-field" type="url" maxlength="2048" bind:value={thumbnailUrl} placeholder="https://…" /></label></div>
-      <label class="visibility"><input type="checkbox" bind:checked={published} /> {label('창작마당에 공개하기', 'Publish in the workshop')}</label><p class="muted">{label('공개하지 않으면 내가 만든 목록에서만 볼 수 있어요. 원본 파일은 만든 이만 열 수 있어요.', 'Private drafts appear only in your stories. Only the creator can access the source file.')}</p>
+      <div class="metadata"><label>{label('난이도', 'Difficulty')}<select class="input-field" bind:value={difficulty} disabled={saving || validating || loading}><option value="">{label('미지정', 'Unspecified')}</option><option value="easy">{label('쉬움', 'Easy')}</option><option value="normal">{label('보통', 'Normal')}</option><option value="hard">{label('어려움', 'Hard')}</option></select></label><label>{label('썸네일 URL', 'Thumbnail URL')}<input class="input-field" type="url" maxlength="2048" disabled={saving || validating || loading} bind:value={thumbnailUrl} placeholder="https://…" /></label></div>
+      <label class="visibility"><input type="checkbox" disabled={saving || validating || loading} bind:checked={published} /> {label('창작마당에 공개하기', 'Publish in the workshop')}</label><p class="muted">{label('공개하지 않으면 내가 만든 목록에서만 볼 수 있어요. 원본 파일은 만든 이만 열 수 있어요.', 'Private drafts appear only in your stories. Only the creator can access the source file.')}</p>
       <button class="primary" disabled={saving || validating || loading} onclick={() => void save()}>{saving ? label('저장 중…', 'Saving…') : label('스토리 저장', 'Save story')}</button>
     {/if}
   </section>

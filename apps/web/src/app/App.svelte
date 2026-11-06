@@ -26,13 +26,13 @@
   let picker = $state(false);
   let copied = $state(false);
   let locale = $state<"ko" | "en">(getLocaleFromPath(location.pathname));
-  const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "") || "/";
+  const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "").replace(/\/+$/, "") || "/";
   let currentPath = $state(pagePath(location.pathname));
   let soloActive = $state(false);
   let loginDialog: HTMLDialogElement;
   let pendingEditor = $state(false);
   let pendingStoryId = $state<string | undefined>();
-  let editorPath = $derived(currentPath.startsWith("/workshop/editor"));
+  let editorPath = $derived(currentPath === "/workshop/editor");
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
