@@ -24,7 +24,8 @@
     { key: 'mine', ko: '내가 만든 목록', en: 'My stories', sort: 'latest' },
   ];
   let tab = $state('all');
-  const activeFilterCount = $derived([query.trim(), author.trim(), mode, difficulty, ratingMin, playsMin, favoritesMin, publishedAfter].filter(Boolean).length);
+  const filters = $derived({ q: query.trim(), author: author.trim(), mode, difficulty, ratingMin, playsMin, favoritesMin, publishedAfter });
+  const activeFilterCount = $derived(Object.values(filters).filter(Boolean).length);
   async function load(nextOffset = 0) {
     if (disposed) return;
     pendingOffset = nextOffset;
@@ -32,7 +33,7 @@
     loading = true; error = '';
     try {
       const params = new URLSearchParams({ view, sort, limit: String(pageSize), offset: String(nextOffset) });
-      for (const [key, value] of Object.entries({ q: query.trim(), author: author.trim(), mode, difficulty, ratingMin, playsMin, favoritesMin, publishedAfter })) {
+      for (const [key, value] of Object.entries(filters)) {
         if (value) params.set(key, value);
       }
       const data = await workshopRequest(`/stories?${params}`);
@@ -99,7 +100,7 @@
   </nav>
   <details class="filter-disclosure">
     <summary>
-      <span class="filter-title">{label('작품 필터', 'Story filters')}{#if activeFilterCount}<span class="filter-count">{activeFilterCount}</span>{/if}</span>
+      <span class="filter-title">{label('작품 필터', 'Story filters')}<span aria-live="polite" aria-atomic="true">{#if activeFilterCount}<span class="filter-count" aria-label={label(`적용 중인 필터 ${activeFilterCount}개`, `${activeFilterCount} active filters`)}>{activeFilterCount}</span>{/if}</span></span>
       <span class="filter-hint">{label('원하는 이야기를 찾아보세요', 'Find a story for you')} <span class="filter-chevron" aria-hidden="true">⌄</span></span>
     </summary>
   <FilterBar label={label('작품 필터', 'Story filters')} class="workshop-filters">
