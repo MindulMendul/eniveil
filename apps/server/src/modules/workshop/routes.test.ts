@@ -275,8 +275,11 @@ test("legacy databases backfill stored payload bytes without deleting packages",
   const f = fixture();
   const owner = f.guest("Owner");
   const item = await f.create(owner.cookie);
+  // Recreate the pre-quota schema without leaving newer triggers behind.
+  f.store.db.exec("DROP TRIGGER workshop_payload_insert; DROP TRIGGER workshop_payload_update;");
   f.store.db.exec("ALTER TABLE workshop_drafts DROP COLUMN payload_bytes");
   const migrated = new SQLiteWorkshopStore(f.store.db, { totalBytes: payloadBytes(f.source, owner.nickname) });
+  expect((f.store.db.query("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='trigger' AND name IN ('workshop_payload_insert', 'workshop_payload_update')").get() as { count: number }).count).toBe(2);
   expect((f.store.db.query("SELECT payload_bytes FROM workshop_drafts WHERE id=?").get(item.id) as { payload_bytes: number }).payload_bytes)
     .toBe(payloadBytes(f.source, owner.nickname));
   expect(migrated.source(item.id, owner.id)).toEqual(f.source);
