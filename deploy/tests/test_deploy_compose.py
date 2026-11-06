@@ -33,6 +33,7 @@ class ComposeDeploymentTests(unittest.TestCase):
     def test_failed_public_health_restores_previous_image_after_backup(self):
         import json
         import tempfile
+        from types import SimpleNamespace
         from unittest.mock import patch
         sha='a'*40
         calls=[]
@@ -41,6 +42,8 @@ class ComposeDeploymentTests(unittest.TestCase):
             calls.append(args)
             if 'rev-parse' in args:
                 return sha
+            if args[:2]==['docker','info']:
+                return '/var/lib/docker'
             if args[:2]==['docker','inspect']:
                 return json.dumps([{'Image':'sha256:previous-image','Config':{
                     'Env':['APP_ORIGIN=https://old.example.org'],
@@ -50,6 +53,7 @@ class ComposeDeploymentTests(unittest.TestCase):
             return ''
         with tempfile.TemporaryDirectory() as tmp, patch.object(deployment.Path,'home',return_value=Path(tmp)), \
              patch.object(deployment,'run',side_effect=fake_run), \
+             patch.object(deployment.shutil,'disk_usage',return_value=SimpleNamespace(free=8*1024**3)), \
              patch.object(deployment,'wait_https',side_effect=RuntimeError('HTTPS failed')):
             with self.assertRaisesRegex(RuntimeError,'HTTPS failed'):
                 deployment.deploy('production',sha)

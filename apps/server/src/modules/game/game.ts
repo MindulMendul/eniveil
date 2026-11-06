@@ -94,6 +94,82 @@ export class Game {
       room,
     };
   }
+  catalog(query: {
+    q?: string;
+    origin?: "original" | "demo";
+    difficulty?: "easy" | "normal" | "hard" | "unset";
+    players?: number;
+    sort: "latest" | "rating" | "popular";
+    limit: number;
+    offset: number;
+  }) {
+    const playsByStoryVersion = new Map<
+      string,
+      { started: number; completed: number; players: Set<string> }
+    >();
+    for (const session of Object.values(this.state.sessions)) {
+      const key = JSON.stringify([session.scenarioId, session.scenarioVersion]);
+      const plays = playsByStoryVersion.get(key) ?? {
+        started: 0,
+        completed: 0,
+        players: new Set<string>(),
+      };
+      plays.started++;
+      if (session.endedAt) {
+        plays.completed++;
+        for (const participant of session.participants) {
+          plays.players.add(participant.id);
+        }
+      }
+      playsByStoryVersion.set(key, plays);
+    }
+
+    const items = this.storyCatalog.list().map((story) => {
+      const plays = playsByStoryVersion.get(JSON.stringify([story.id, story.version]));
+      return {
+        ...story,
+        origin: story.kind,
+        difficulty: story.difficulty ?? null,
+        averageRating: null,
+        ratingCount: 0,
+        startedPlays: plays?.started ?? 0,
+        completedPlays: plays?.completed ?? 0,
+        uniquePlayers: plays?.players.size ?? 0,
+      };
+    }).filter((story) => {
+      if (query.origin && story.origin !== query.origin) return false;
+      if (query.difficulty && (
+        query.difficulty === "unset"
+          ? story.difficulty !== null
+          : story.difficulty !== query.difficulty
+      )) return false;
+      if (query.players && story.players !== query.players) return false;
+      const keyword = query.q?.trim().toLocaleLowerCase();
+      return !keyword ||
+        story.title.toLocaleLowerCase().includes(keyword) ||
+        story.subtitle.toLocaleLowerCase().includes(keyword);
+    });
+
+    items.sort((a, b) => {
+      if (query.sort === "rating") {
+        return (b.averageRating ?? -1) - (a.averageRating ?? -1) ||
+          b.version - a.version;
+      }
+      if (query.sort === "popular") {
+        return b.uniquePlayers - a.uniquePlayers ||
+          b.startedPlays - a.startedPlays ||
+          b.version - a.version;
+      }
+      return b.version - a.version || a.title.localeCompare(b.title);
+    });
+
+    return {
+      items: items.slice(query.offset, query.offset + query.limit),
+      total: items.length,
+      limit: query.limit,
+      offset: query.offset,
+    };
+  }
   create(me: Guest, scenarioId: string) {
     if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
     const scenario = this.storyCatalog

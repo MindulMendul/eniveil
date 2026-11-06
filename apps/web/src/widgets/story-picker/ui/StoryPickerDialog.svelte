@@ -14,6 +14,7 @@
     difficulty: "easy" | "normal" | "hard" | null;
     averageRating: number | null;
     ratingCount: number;
+    startedPlays: number;
     completedPlays: number;
     uniquePlayers: number;
   };
@@ -47,6 +48,7 @@
   let page = $state(1);
   let pages = $state(0);
   let retry = $state(0);
+  const pageSize = 6;
 
   function openDialog(node: HTMLDialogElement, initiallyOpen: boolean) {
     if (initiallyOpen && !node.open) node.showModal();
@@ -63,11 +65,11 @@
     retry;
 
     const params = new URLSearchParams({
-      page: String(page),
-      limit: "6",
+      limit: String(pageSize),
+      offset: String((page - 1) * pageSize),
       sort,
     });
-    if (search.trim()) params.set("search", search.trim());
+    if (search.trim()) params.set("q", search.trim());
     if (origin !== "all") params.set("origin", origin);
     if (difficulty !== "all") params.set("difficulty", difficulty);
     if (players !== "all") params.set("players", players);
@@ -76,17 +78,21 @@
     const timer = setTimeout(() => {
       loading = true;
       error = "";
-      void fetch(`/api/stories?${params}`, { signal: controller.signal })
+      void fetch(`/api/lobby/stories?${params}`, { signal: controller.signal })
         .then(async (response) => {
           if (!response.ok) throw new Error(t("workshopLoadFailed"));
           return response.json();
         })
-        .then((payload: { items?: CatalogStory[]; pages?: number }) => {
-          if (!Array.isArray(payload.items) || typeof payload.pages !== "number") {
+        .then((payload: { items?: CatalogStory[]; total?: number; limit?: number }) => {
+          if (
+            !Array.isArray(payload.items) ||
+            typeof payload.total !== "number" ||
+            typeof payload.limit !== "number"
+          ) {
             throw new Error(t("workshopLoadFailed"));
           }
           stories = payload.items;
-          pages = payload.pages;
+          pages = Math.ceil(payload.total / payload.limit);
         })
         .catch((cause) => {
           if (!controller.signal.aborted) {
@@ -155,8 +161,9 @@
             {t("workshopPlayers")}
             <select class="input-field" bind:value={players} onchange={resetPage}>
               <option value="all">{t("allPlayerCounts")}</option>
-              <option value="2">2</option>
-              <option value="4">4</option>
+              {#each Array.from({ length: 20 }, (_, index) => index + 1) as playerCount}
+                <option value={playerCount}>{playerCount}{t("playerUnit")}</option>
+              {/each}
             </select>
           </label>
           <label class="input-label">
@@ -191,6 +198,7 @@
                 <div><dt>{t("storyDifficulty")}</dt><dd>{story.difficulty ? t(`difficulty${story.difficulty[0].toUpperCase()}${story.difficulty.slice(1)}`) : t("difficultyUndetermined")}</dd></div>
                 <div><dt>{t("storyRating")}</dt><dd>{story.averageRating === null ? t("noRatingYet") : `${story.averageRating.toFixed(1)} / 5 (${story.ratingCount})`}</dd></div>
                 <div><dt>{t("storyUniquePlayers")}</dt><dd>{story.uniquePlayers}</dd></div>
+                <div><dt>{t("storyStartedPlays")}</dt><dd>{story.startedPlays}</dd></div>
                 <div><dt>{t("storyCompletedPlays")}</dt><dd>{story.completedPlays}</dd></div>
               </dl>
               <Button class="mt-4 w-full" disabled={!story.available || busy || !connected} onclick={() => onCreate(story.id)}>
