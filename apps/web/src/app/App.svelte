@@ -45,6 +45,7 @@
   let pendingGoogleAction: (() => void) | undefined;
   let editorPath = $derived(currentPath === "/workshop/editor");
   let entryHome = $derived(currentPath === "/" && snapshot === null);
+  let editorHasChanges = $state(false);
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
   $effect(() => { syncMetadata(localePath(locale, currentPath)); });
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
@@ -207,6 +208,7 @@
     }
   }
   function openAccount() {
+    if (editorPath && editorHasChanges && !window.confirm(locale === 'en' ? 'Discard unsaved changes?' : '저장하지 않은 변경을 버리고 나갈까요?')) return;
     if (!snapshot) { requestWorkshopLogin(openAccount, { page: "account" }); return; }
     currentPath = "/mypage";
     history.pushState({}, "", localePath(locale, currentPath));
@@ -354,7 +356,7 @@
   {:else if currentPath === "/workshop"}
     <WorkshopPage {locale} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
   {:else if editorPath && snapshot}
-    {#key editorId}<WorkshopEditor {locale} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
+    {#key editorId}<WorkshopEditor {locale} onDirtyChange={(dirty) => { editorHasChanges = dirty; }} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
   {:else if soloActive}
