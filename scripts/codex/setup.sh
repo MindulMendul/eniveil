@@ -6,5 +6,5 @@ if ! command -v bun >/dev/null || [[ "$(bun --version)" != "$required" ]]; then
   echo "Install Bun $required in the cloud environment, then rerun bash scripts/codex/setup.sh." >&2
   exit 1
 fi
-bun install --frozen-lockfile
+bun install --frozen-lockfile --ignore-scripts
 printf 'Cloud dependencies ready. Run bash scripts/codex/verify.sh before publishing.\n'

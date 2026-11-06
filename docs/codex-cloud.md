@@ -10,7 +10,7 @@ GitHub 이슈 하나를 Codex Goal 하나로 처리한다. 에이전트가 구�
 
 1. 웹 또는 데스크톱의 `Work in > Cloud > Select environment > Create environment`에서 MindulMendul/murder-parker를 선택한다. 환경 이름은 murder-parker-dev, 기준 브랜치는 dev로 설정한다. GitHub 연결이 필요하면 연결한다.
 2. Bun 1.4.4와 Python 3, Git을 준비하도록 요청한다. GitHub 작업은 연결된 GitHub 도구를 사용한다. CLI를 사용할 경우 gh와 유효한 인증이 별도로 필요하다. 저장소에 토큰을 넣지 않는다. 개발·테스트에는 운영 SSH 키나 DB 인증이 필요 없다.
-3. Install script에는 저장소 루트에서 `bash scripts/codex/setup.sh`를 실행하도록 지정한다. 설치 도메인 접근이 필요하다. 이 스크립트는 런타임 버전을 확인하고 lockfile대로 의존성을 설치한다. 런타임 설치 자체는 환경 준비 단계에서 수행한다.
+3. Install script에는 저장소 루트에서 `bash scripts/codex/setup.sh`를 실행하도록 지정한다. 설치 도메인 접근이 필요하다. 이 스크립트는 런타임 버전을 확인하고 lockfile대로 의존성을 설치하고 의존성 lifecycle 스크립트는 실행하지 않는다. 런타임 설치 자체는 환경 준비 단계에서 수행한다.
 4. 시작 지침에는 “작업 전 AGENTS.md와 docs/codex-cloud.md를 읽고 현재 브랜치·변경·기존 PR을 확인한다. 서버가 필요한 작업은 테스트 전용 DB를 사용하며 종료 시 정리한다”를 기록한다. 일반 개발서버를 자동으로 영구 실행할 필요는 없다.
 5. `bash scripts/codex/verify.sh`를 실제 실행해 준비 결과를 확인하고 환경을 Publish한다. 실패하면 원인을 해결한 뒤 게시한다. 기본 검증 외 Docker/Trivy 등 CI 전용 검사도 PR에서 확인한다.
 6. 새 작업에서 저장소 파일과 명령이 준비됐는지 확인한다. 스크립트·의존성이 바뀌면 환경을 Edit 후 Republish한다. 기존 작업의 상태와 새 작업의 환경은 다르다.
