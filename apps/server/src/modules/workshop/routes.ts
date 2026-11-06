@@ -129,12 +129,8 @@ export function createWorkshopRoutes(deps: {
     await next();
   });
 
-  function catalog(guest: Guest | null): WorkshopItem[] {
-    const latest = new Map<string, ReturnType<FileStoryCatalog["list"]>[number]>();
-    for (const story of deps.stories.list()) {
-      if ((latest.get(story.id)?.version ?? 0) < story.version) latest.set(story.id, story);
-    }
-    const files: WorkshopStory[] = [...latest.values()].map((story) => ({
+  function fileMetadata(story: WorkshopStory["story"]): WorkshopStory {
+    return {
       id: story.id,
       story,
       author: { id: null, name: "Murder Parker" },
@@ -143,10 +139,30 @@ export function createWorkshopRoutes(deps: {
       published: true,
       publishedAt: null,
       updatedAt: new Date(0).toISOString(),
-    }));
-    const favorites = deps.workshop.favorites(guest?.id);
-    const metrics = deps.runs.catalogMetrics();
-    return [...files, ...deps.workshop.list(guest?.id)].map((entry) => {
+    };
+  }
+
+  function findStory(id: string, guest: Guest | null): WorkshopStory | undefined {
+    const draft = deps.workshop.get(id);
+    if (draft) return draft.published || draft.author.id === guest?.id ? draft : undefined;
+    const file = deps.stories.get(id);
+    return file ? fileMetadata(file.story) : undefined;
+  }
+
+  function catalogMetadata(ownerId?: string): WorkshopStory[] {
+    if (ownerId) return deps.workshop.list(ownerId);
+    const latest = new Map<string, ReturnType<FileStoryCatalog["list"]>[number]>();
+    for (const story of deps.stories.list()) {
+      if ((latest.get(story.id)?.version ?? 0) < story.version) latest.set(story.id, story);
+    }
+    return [...latest.values()].map(fileMetadata).concat(deps.workshop.list());
+  }
+
+  function enrich(entries: WorkshopStory[], guest: Guest | null): WorkshopItem[] {
+    const ids = entries.map((entry) => entry.id);
+    const favorites = deps.workshop.favorites(ids, guest?.id);
+    const metrics = deps.runs.catalogMetrics(ids);
+    return entries.map((entry) => {
       const story = entry.story;
       const favorite = favorites.get(entry.id);
       return {
@@ -181,15 +197,17 @@ export function createWorkshopRoutes(deps: {
     }
     const guest = authenticate(c);
     if (query.view !== "all" && !guest) return c.json({ error: loginRequired }, 401);
-    const filtered = catalog(guest)
-      .filter((story) => query.view === "mine" ? story.canEdit : story.published)
-      .filter((story) => query.view !== "favorites" || story.isFavorite)
-      .filter((story) => !query.mode || story.mode === query.mode)
-      .filter((story) => !query.locale || story.locale === query.locale)
-      .filter((story) => !query.publishedAfter || (!!story.publishedAt && story.publishedAt >= query.publishedAfter))
-      .filter((story) => !query.difficulty || (story.difficulty ?? "unset") === query.difficulty)
-      .filter((story) => !query.q || `${story.title}\n${story.subtitle}`.toLocaleLowerCase().includes(query.q))
-      .filter((story) => !query.author || story.author.name.toLocaleLowerCase().includes(query.author))
+    const favorites = query.view === "favorites" ? deps.workshop.favoriteIds(guest!.id) : undefined;
+    const candidates = catalogMetadata(query.view === "mine" ? guest!.id : undefined)
+      .filter((entry) => !favorites || favorites.has(entry.id))
+      .filter(({ story }) => !query.mode || story.mode === query.mode)
+      .filter(({ story }) => !query.locale || story.locale === query.locale)
+      .filter((entry) => !query.publishedAfter || (!!entry.publishedAt && entry.publishedAt >= query.publishedAfter))
+      .filter((entry) => !query.difficulty || (entry.difficulty ?? "unset") === query.difficulty)
+      .filter(({ story }) => !query.q || `${story.title}\n${story.subtitle}`.toLocaleLowerCase().includes(query.q))
+      .filter((entry) => !query.author || entry.author.name.toLocaleLowerCase().includes(query.author));
+    // Aggregate all matching candidates before statistical filters, sorting and pagination.
+    const filtered = enrich(candidates, guest)
       .filter((story) => !query.ratingMin || (story.averageRating ?? 0) >= query.ratingMin)
       .filter((story) => story.playCount >= query.playsMin && story.favoriteCount >= query.favoritesMin)
       .sort((a, b) => compareStories(query.sort, a, b));
@@ -202,26 +220,27 @@ export function createWorkshopRoutes(deps: {
   });
 
   app.get("/stories/:id", (c) => {
-    const item = catalog(authenticate(c)).find((story) => story.id === c.req.param("id"));
-    return item ? c.json({ item }) : c.json({ error: notFound }, 404);
+    const guest = authenticate(c);
+    const entry = findStory(c.req.param("id"), guest);
+    return entry ? c.json({ item: enrich([entry], guest)[0] }) : c.json({ error: notFound }, 404);
   });
 
   app.put("/stories/:id/favorite", (c) => {
     const guest = authenticate(c);
     if (!guest) return c.json({ error: loginRequired }, 401);
-    const item = catalog(guest).find((story) => story.id === c.req.param("id") && story.published);
-    if (!item) return c.json({ error: notFound }, 404);
-    deps.workshop.favorite(item.id, guest.id, true);
-    return c.json({ item: catalog(guest).find((story) => story.id === item.id)! });
+    const entry = findStory(c.req.param("id"), guest);
+    if (!entry?.published) return c.json({ error: notFound }, 404);
+    deps.workshop.favorite(entry.id, guest.id, true);
+    return c.json({ item: enrich([entry], guest)[0] });
   });
 
   app.delete("/stories/:id/favorite", (c) => {
     const guest = authenticate(c);
     if (!guest) return c.json({ error: loginRequired }, 401);
-    const item = catalog(guest).find((story) => story.id === c.req.param("id"));
-    if (!item) return c.json({ error: notFound }, 404);
-    deps.workshop.favorite(item.id, guest.id, false);
-    return c.json({ item: catalog(guest).find((story) => story.id === item.id)! });
+    const entry = findStory(c.req.param("id"), guest);
+    if (!entry) return c.json({ error: notFound }, 404);
+    deps.workshop.favorite(entry.id, guest.id, false);
+    return c.json({ item: enrich([entry], guest)[0] });
   });
 
   app.get("/drafts/:id", (c) => {
@@ -229,8 +248,8 @@ export function createWorkshopRoutes(deps: {
     if (!guest) return c.json({ error: loginRequired }, 401);
     const source = deps.workshop.source(c.req.param("id"), guest.id);
     if (!source) return c.json({ error: notFound }, 404);
-    const item = catalog(guest).find((story) => story.id === c.req.param("id"))!;
-    return c.json({ item, package: source });
+    const entry = deps.workshop.get(c.req.param("id"))!;
+    return c.json({ item: enrich([entry], guest)[0], package: source });
   });
 
   app.post("/drafts", async (c) => {
@@ -239,7 +258,7 @@ export function createWorkshopRoutes(deps: {
     const result = parseDraft(await c.req.json());
     if (!result.success) return c.json({ error: result.error, issues: result.issues }, result.status);
     const saved = deps.workshop.create(guest, result.draft);
-    return c.json({ item: catalog(guest).find((story) => story.id === saved.id)! }, 201);
+    return c.json({ item: enrich([saved], guest)[0] }, 201);
   });
 
   app.put("/drafts/:id", async (c) => {
@@ -251,7 +270,7 @@ export function createWorkshopRoutes(deps: {
     if (!result.success) return c.json({ error: result.error, issues: result.issues }, result.status);
     const saved = deps.workshop.update(id, guest, result.draft);
     if (!saved) return c.json({ error: notFound }, 404);
-    return c.json({ item: catalog(guest).find((story) => story.id === saved.id)! });
+    return c.json({ item: enrich([saved], guest)[0] });
   });
 
   app.post("/stories/validate", async (c) => {

@@ -31,7 +31,7 @@
       if (!result.valid) throw new Error(label('스토리 형식을 확인해 주세요.', 'Check the story format.'));
       source = candidate; title = candidate.story.title;
       message = label('스토리 파일을 불러왔어요. 저장하면 내 창작 목록에 추가돼요.', 'Story imported. Save it to add it to your stories.');
-    } catch (cause) { if (!disposed && version === fileRequest) error = cause instanceof Error ? cause.message : label('파일을 읽을 수 없어요.', 'Could not read this file.'); }
+    } catch (cause) { if (!disposed && version === fileRequest) error = (cause as {status?: number})?.status === 422 ? label('스토리 형식을 확인해 주세요. 유효한 .mstory 패키지가 필요해요.', 'Invalid story format. Choose a valid .mstory package.') : cause instanceof Error ? cause.message : label('파일을 읽을 수 없어요.', 'Could not read this file.'); }
     finally { if (!disposed && version === fileRequest) { validating = false; fileInput.value = ''; } }
   }
   async function save() {

@@ -6,6 +6,7 @@ import type { StoryCatalog } from "./ports/story-catalog";
 /** Loads versioned story source packages from the server-owned stories directory. */
 export class FileStoryCatalog implements StoryCatalog {
   private readonly packages = new Map<string, StoryPackage>();
+  private readonly latestPackages = new Map<string, StoryPackage>();
 
   constructor(directory = resolve(import.meta.dir, "../../../../stories")) {
     for (const file of readdirSync(directory).filter((name) => name.endsWith(".mstory"))) {
@@ -26,14 +27,14 @@ export class FileStoryCatalog implements StoryCatalog {
         throw new Error(`Duplicate story version ${key} in ${file}`);
       }
       this.packages.set(key, story);
+      if ((this.latestPackages.get(story.story.id)?.story.version ?? 0) < story.story.version)
+        this.latestPackages.set(story.story.id, story);
     }
   }
 
   get(id: string, version?: number) {
     if (version !== undefined) return this.packages.get(this.key(id, version));
-    return [...this.packages.values()]
-      .filter((story) => story.story.id === id)
-      .sort((a, b) => b.story.version - a.story.version)[0];
+    return this.latestPackages.get(id);
   }
 
   list() {

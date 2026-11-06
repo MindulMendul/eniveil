@@ -45,12 +45,12 @@ export class SQLiteWorkshopStore {
     `);
   }
 
-  list(guestId?: string): WorkshopStory[] {
+  list(ownerId?: string): WorkshopStory[] {
     const rows = this.db.query(`
       SELECT id, owner_id, author_name, story_json, thumbnail_url, difficulty,
         published, published_at, updated_at
-      FROM workshop_drafts WHERE published=1 OR owner_id=?
-    `).all(guestId ?? "") as DraftRow[];
+      FROM workshop_drafts WHERE ${ownerId === undefined ? "published=1" : "owner_id=?"}
+    `).all(...(ownerId === undefined ? [] : [ownerId])) as DraftRow[];
     return rows.map((row) => this.metadata(row));
   }
 
@@ -91,12 +91,14 @@ export class SQLiteWorkshopStore {
     const result = this.db.query(`
       UPDATE workshop_drafts SET author_name=?, story_json=?, package_json=?,
         thumbnail_url=?, difficulty=?, published=?,
-        published_at=CASE WHEN ?=1 THEN COALESCE(published_at, ?) ELSE published_at END,
+        published_at=CASE WHEN ?=1 THEN
+          CASE WHEN published=1 THEN COALESCE(published_at, ?) ELSE ? END
+          ELSE NULL END,
         updated_at=? WHERE id=? AND owner_id=?
     `).run(
       owner.nickname, JSON.stringify(draft.package.story), JSON.stringify(draft.package),
       draft.thumbnailUrl, draft.difficulty, Number(draft.published),
-      Number(draft.published), now, now, id, owner.id,
+      Number(draft.published), now, now, now, id, owner.id,
     );
     return result.changes ? this.get(id) : undefined;
   }
@@ -113,16 +115,27 @@ export class SQLiteWorkshopStore {
     }
   }
 
-  favorites(guestId?: string) {
-    const rows = this.db.query(`
-      SELECT story_id, COUNT(*) AS count,
-        MAX(CASE WHEN guest_id=? THEN 1 ELSE 0 END) AS selected
-      FROM workshop_favorites GROUP BY story_id
-    `).all(guestId ?? "") as { story_id: string; count: number; selected: number }[];
-    return new Map(rows.map((row) => [row.story_id, {
-      count: row.count,
-      selected: row.selected === 1,
-    }]));
+  favoriteIds(guestId: string) {
+    const rows = this.db.query("SELECT story_id FROM workshop_favorites WHERE guest_id=?")
+      .all(guestId) as { story_id: string }[];
+    return new Set(rows.map((row) => row.story_id));
+  }
+
+  favorites(storyIds: readonly string[], guestId?: string) {
+    const result = new Map<string, { count: number; selected: boolean }>();
+    const ids = [...new Set(storyIds)];
+    // Bound the number of SQLite parameters even for large filtered catalogs.
+    for (let offset = 0; offset < ids.length; offset += 400) {
+      const batch = ids.slice(offset, offset + 400);
+      const rows = this.db.query(`
+        SELECT story_id, COUNT(*) AS count,
+          MAX(CASE WHEN guest_id=? THEN 1 ELSE 0 END) AS selected
+        FROM workshop_favorites WHERE story_id IN (${batch.map(() => "?").join(",")})
+        GROUP BY story_id
+      `).all(guestId ?? "", ...batch) as { story_id: string; count: number; selected: number }[];
+      for (const row of rows) result.set(row.story_id, { count: row.count, selected: row.selected === 1 });
+    }
+    return result;
   }
 
   private metadata(row: DraftRow): WorkshopStory {

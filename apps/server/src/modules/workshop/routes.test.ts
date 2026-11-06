@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, setSystemTime, spyOn, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +13,7 @@ import { createWorkshopRoutes } from "./routes";
 import type { WorkshopItem } from "./model";
 
 const cleanups: (() => void)[] = [];
-afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); });
+afterEach(() => { setSystemTime(); for (const cleanup of cleanups.splice(0)) cleanup(); });
 
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), "festival-workshop-"));
@@ -62,7 +62,7 @@ function fixture() {
     expect(response.status).toBe(200);
     return await response.json() as { items: WorkshopItem[]; total: number; offset: number; limit: number };
   };
-  return { source, store, runs, workshop, guest, request, create, list };
+  return { source, store, runs, workshop, stories, guest, request, create, list };
 }
 
 test("anonymous catalog exposes only the latest version and public metadata", async () => {
@@ -150,7 +150,117 @@ test("favorites are persistent, idempotent and selected separately for each gues
   expect((await f.list("/stories?view=favorites", owner.cookie)).total).toBe(0);
   expect((await f.request("/stories/unknown/favorite", { method: "PUT", cookie: owner.cookie })).status).toBe(404);
   // A fresh adapter over the existing database keeps the other guest's selection.
-  expect(new SQLiteWorkshopStore(f.store.db).favorites(other.id).get("first-story")).toEqual({ count: 1, selected: true });
+  expect(new SQLiteWorkshopStore(f.store.db).favorites(["first-story"], other.id).get("first-story")).toEqual({ count: 1, selected: true });
+});
+
+test("unpublishing clears publication time and republishing updates latest/date filters", async () => {
+  const f = fixture();
+  const owner = f.guest("Owner");
+  setSystemTime(new Date("2026-11-06T01:00:00.000Z"));
+  const first = await f.create(owner.cookie, true);
+  expect(first.publishedAt).toBe("2026-11-06T01:00:00.000Z");
+  setSystemTime(new Date("2026-11-06T02:00:00.000Z"));
+  const second = await f.create(owner.cookie, true);
+  const save = async (published: boolean) => {
+    const response = await f.request(`/drafts/${first.id}`, {
+      method: "PUT", cookie: owner.cookie, body: { package: f.source, published },
+    });
+    expect(response.status).toBe(200);
+    return (await response.json() as { item: WorkshopItem }).item;
+  };
+  expect((await f.list("/stories?sort=latest")).items[0].id).toBe(second.id);
+  setSystemTime(new Date("2026-11-06T03:00:00.000Z"));
+  expect((await save(false)).publishedAt).toBeNull();
+  expect((await f.list("/stories?view=mine&publishedAfter=2026-11-06", owner.cookie)).items.map((item) => item.id)).toEqual([second.id]);
+  // Private rows created before this fix may still hold an obsolete publication date.
+  f.store.db.query("UPDATE workshop_drafts SET published_at=? WHERE id=?")
+    .run(first.publishedAt, first.id);
+  setSystemTime(new Date("2026-11-07T01:00:00.000Z"));
+  expect((await save(true)).publishedAt).toBe("2026-11-07T01:00:00.000Z");
+  expect((await f.list("/stories?sort=latest")).items[0].id).toBe(first.id);
+  expect((await f.list("/stories?publishedAfter=2026-11-07")).items.map((item) => item.id)).toEqual([first.id]);
+  setSystemTime(new Date("2026-11-08T01:00:00.000Z"));
+  expect((await save(true)).publishedAt).toBe("2026-11-07T01:00:00.000Z");
+});
+
+test("detail, favorite and draft responses read only the requested story's metadata and statistics", async () => {
+  const f = fixture();
+  const owner = f.guest("Owner");
+  const draft = await f.create(owner.cookie, true);
+  seedPlay(f, "unrelated-history", 5);
+  f.workshop.favorite("unrelated-history", owner.id, true);
+  const metadataList = spyOn(f.workshop, "list");
+  const fileList = spyOn(f.stories, "list");
+  const metrics = spyOn(f.runs, "catalogMetrics");
+  const favorites = spyOn(f.workshop, "favorites");
+  for (const [path, method, id] of [
+    ["/stories/first-story", "GET", "first-story"],
+    ["/stories/first-story/favorite", "PUT", "first-story"],
+    ["/stories/first-story/favorite", "DELETE", "first-story"],
+    [`/drafts/${draft.id}`, "GET", draft.id],
+    [`/drafts/${draft.id}`, "PUT", draft.id],
+    ["/drafts", "POST", undefined],
+  ]) {
+    const response = await f.request(path!, {
+      method, cookie: owner.cookie,
+      body: method === "POST" || (method === "PUT" && path!.startsWith("/drafts")) ? { package: f.source } : undefined,
+    });
+    expect(response.status).toBe(method === "POST" ? 201 : 200);
+    const { item } = await response.json() as { item: WorkshopItem };
+    expect(metrics.mock.calls.map(([ids]) => ids)).toEqual([[id ?? item.id]]);
+    expect(favorites.mock.calls.map(([ids]) => ids)).toEqual([[id ?? item.id]]);
+    expect(metadataList).not.toHaveBeenCalled();
+    expect(fileList).not.toHaveBeenCalled();
+    metrics.mockClear(); favorites.mockClear();
+  }
+});
+
+test("catalog aggregates only metadata-filtered candidates and preserves statistical pagination", async () => {
+  const f = fixture();
+  const owner = f.guest("Owner");
+  const draft = await f.create(owner.cookie, true, { difficulty: "hard" });
+  const other = f.guest("Other");
+  await f.create(other.cookie, true, { difficulty: "easy" });
+  seedPlay(f, "first-story", 5);
+  seedPlay(f, "unrelated-history", 1);
+  f.workshop.favorite("first-story", owner.id, true);
+  f.workshop.favorite("unrelated-history", owner.id, true);
+  const metrics = spyOn(f.runs, "catalogMetrics");
+  const favorites = spyOn(f.workshop, "favorites");
+  for (const [query, ids] of [
+    ["q=latest%20alpha&ratingMin=5&limit=1", ["first-story"]],
+    ["view=favorites", ["first-story"]],
+    ["view=mine", [draft.id]],
+    ["difficulty=hard&author=Owner", [draft.id]],
+    ["q=unmatched", []],
+  ] as const) {
+    await f.list(`/stories?${query}`, owner.cookie);
+    expect(metrics.mock.calls.map(([candidates]) => candidates)).toEqual([ids]);
+    expect(favorites.mock.calls.map(([candidates]) => candidates)).toEqual([ids]);
+    metrics.mockClear(); favorites.mockClear();
+  }
+  expect([...f.runs.catalogMetrics(["first-story"]).keys()]).toEqual(["first-story"]);
+  expect([...f.workshop.favorites(["first-story"], owner.id).keys()]).toEqual(["first-story"]);
+});
+
+test("scoped catalog aggregates handle more candidates than one SQLite batch", () => {
+  const f = fixture();
+  const owner = f.guest("Owner");
+  const ids = Array.from({ length: 405 }, (_, index) => `batch-story-${index}`);
+  for (const id of ids) {
+    seedPlay(f, id, 4);
+    f.workshop.favorite(id, owner.id, true);
+  }
+  seedPlay(f, "unrelated-history", 1);
+  f.workshop.favorite("unrelated-history", owner.id, true);
+  const metrics = f.runs.catalogMetrics(ids);
+  const favorites = f.workshop.favorites(ids, owner.id);
+  expect(metrics.size).toBe(405);
+  expect(favorites.size).toBe(405);
+  for (const id of [ids[0], ids[404]]) {
+    expect(metrics.get(id)).toEqual({ playCount: 1, ratingCount: 1, averageRating: 4 });
+    expect(favorites.get(id)).toEqual({ count: 1, selected: true });
+  }
 });
 
 function seedPlay(f: ReturnType<typeof fixture>, storyId: string, rating?: number) {

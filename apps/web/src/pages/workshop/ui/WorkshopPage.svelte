@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy, onMount, tick } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
   import { workshopRequest, type WorkshopStory } from '../model/_story';
   let { locale, loggedIn = false, onLogin, onEdit }: {
     locale: 'ko' | 'en'; loggedIn?: boolean; onLogin: () => void; onEdit: (id?: string) => void;
@@ -11,6 +11,7 @@
   let ratingMin = $state(''), playsMin = $state(''), favoritesMin = $state(''), publishedAfter = $state('');
   let selected = $state<WorkshopStory | null>(null), dialog: HTMLDialogElement;
   let favoriteBusy = $state<string[]>([]);
+  let disposed = false;
   let request = 0, pendingOffset = 0, timer: ReturnType<typeof setTimeout> | undefined;
   const pageSize = 24;
   const tabs = [
@@ -22,6 +23,7 @@
   ];
   let tab = $state('all');
   async function load(nextOffset = 0) {
+    if (disposed) return;
     pendingOffset = nextOffset;
     const version = ++request;
     loading = true; error = '';
@@ -32,16 +34,20 @@
       }
       const data = await workshopRequest(`/stories?${params}`);
       if (version !== request) return;
+      if (nextOffset > 0 && nextOffset >= data.total) {
+        await load(data.total ? Math.floor((data.total - 1) / pageSize) * pageSize : 0);
+        return;
+      }
       stories = data.items; total = data.total; offset = nextOffset;
     } catch (cause) {
-      if (version === request) error = cause instanceof Error ? cause.message : label('목록을 불러오지 못했어요.', 'Could not load stories.');
+      if (!disposed && version === request) error = cause instanceof Error ? cause.message : label('목록을 불러오지 못했어요.', 'Could not load stories.');
     } finally { if (version === request) loading = false; }
   }
   function schedule() {
-    clearTimeout(timer); request++; loading = true; error = '';
+    clearTimeout(timer); pendingOffset = 0; request++; loading = true; error = '';
     timer = setTimeout(() => void load(0), 250);
   }
-  function refresh() { clearTimeout(timer); request++; loading = true; queueMicrotask(() => void load(0)); }
+  function refresh() { clearTimeout(timer); pendingOffset = 0; request++; loading = true; queueMicrotask(() => void load(0)); }
   function chooseTab(next: typeof tabs[number]) {
     if ((next.key === 'favorites' || next.key === 'mine') && !loggedIn) { onLogin(); return; }
     tab = next.key; view = next.key === 'favorites' || next.key === 'mine' ? next.key : 'all'; sort = next.sort; refresh();
@@ -51,21 +57,30 @@
     if (!loggedIn) { onLogin(); return; }
     if (favoriteBusy.includes(story.id)) return;
     favoriteBusy = [...favoriteBusy, story.id];
+    const version = request;
     error = '';
     try {
       const { item } = await workshopRequest(`/stories/${encodeURIComponent(story.id)}/favorite`, { method: story.isFavorite ? 'DELETE' : 'PUT' });
+      if (disposed) return;
       if (selected?.id === item.id) selected = item;
-      await load(offset);
-    } catch (cause) { error = cause instanceof Error ? cause.message : label('즐겨찾기를 저장하지 못했어요.', 'Could not save favorite.'); }
-    finally { favoriteBusy = favoriteBusy.filter(id => id !== story.id); }
+      clearTimeout(timer);
+      await load(loading ? pendingOffset : offset);
+    } catch (cause) { if (!disposed && version === request) error = cause instanceof Error ? cause.message : label('즐겨찾기를 저장하지 못했어요.', 'Could not save favorite.'); }
+    finally { if (!disposed) favoriteBusy = favoriteBusy.filter(id => id !== story.id); }
   }
   async function details(story: WorkshopStory) { selected = story; await tick(); dialog.showModal(); }
   function reset() {
     query = ''; author = ''; mode = ''; difficulty = ''; ratingMin = ''; playsMin = ''; favoritesMin = ''; publishedAfter = ''; refresh();
   }
   const difficultyLabel = (value: WorkshopStory['difficulty']) => value === 'easy' ? label('쉬움', 'Easy') : value === 'normal' ? label('보통', 'Normal') : value === 'hard' ? label('어려움', 'Hard') : label('미지정', 'Unspecified');
-  onMount(() => { void load(); });
-  onDestroy(() => { clearTimeout(timer); request++; });
+  $effect(() => {
+    const authenticated = loggedIn;
+    untrack(() => {
+      if (!authenticated && view !== 'all') { view = 'all'; tab = 'all'; }
+      clearTimeout(timer); void load(0);
+    });
+  });
+  onDestroy(() => { disposed = true; clearTimeout(timer); request++; });
 </script>
 
 <main class="main workshop">
