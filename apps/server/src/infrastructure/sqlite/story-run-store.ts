@@ -14,8 +14,13 @@ type Row = {
   package_json: string | null;
 };
 
+export class StoryRunQuotaError extends Error {}
+
 export class SQLiteStoryRunStore implements StoryRunStore {
-  constructor(private readonly db: Database) {
+  private readonly pinnedBytes: number;
+  constructor(private readonly db: Database, limits: { pinnedBytes?: number } = {}) {
+    this.pinnedBytes = limits.pinnedBytes ?? 64 * 1024 * 1024;
+    if (!Number.isSafeInteger(this.pinnedBytes) || this.pinnedBytes < 0) throw new Error("Invalid pinned play storage budget");
     db.exec(`
       CREATE TABLE IF NOT EXISTS story_runs (
         id TEXT PRIMARY KEY,
@@ -63,26 +68,33 @@ export class SQLiteStoryRunStore implements StoryRunStore {
     `);
     const columns = db.query("PRAGMA table_info(story_runs)").all() as { name: string }[];
     if (!columns.some(column => column.name === "package_json")) db.exec("ALTER TABLE story_runs ADD COLUMN package_json TEXT");
+    db.exec("UPDATE story_runs SET package_json=NULL WHERE ended_at IS NOT NULL AND package_json IS NOT NULL; CREATE INDEX IF NOT EXISTS story_runs_pinned_idx ON story_runs(id) WHERE package_json IS NOT NULL");
   }
 
   create(run: StoryRun) {
-    this.db.query(`
-      INSERT INTO story_runs (
-        id, story_id, story_version, current_scene_id, started_at,
-        last_active_at, ended_at, outcome, found_evidence_json, package_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      run.id,
-      run.storyId,
-      run.storyVersion,
-      run.currentSceneId,
-      run.startedAt,
-      run.lastActiveAt,
-      run.endedAt,
-      run.outcome,
-      JSON.stringify(run.foundEvidenceIds),
-      run.storyPackage ? JSON.stringify(run.storyPackage) : null,
-    );
+    const source = run.storyPackage ? JSON.stringify(run.storyPackage) : null;
+    this.db.transaction(() => {
+      const retained = this.db.query("SELECT COALESCE(SUM(length(CAST(package_json AS BLOB))), 0) AS bytes FROM story_runs WHERE package_json IS NOT NULL").get() as { bytes: number };
+      if (retained.bytes + (source ? Buffer.byteLength(source) : 0) > this.pinnedBytes)
+        throw new StoryRunQuotaError("진행 중인 플레이 보관 공간이 가득 찼어. 플레이가 끝난 뒤 다시 시도해 줘.");
+      this.db.query(`
+        INSERT INTO story_runs (
+          id, story_id, story_version, current_scene_id, started_at,
+          last_active_at, ended_at, outcome, found_evidence_json, package_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        run.id,
+        run.storyId,
+        run.storyVersion,
+        run.currentSceneId,
+        run.startedAt,
+        run.lastActiveAt,
+        run.endedAt,
+        run.outcome,
+        JSON.stringify(run.foundEvidenceIds),
+        source,
+      );
+    }).immediate();
   }
 
   get(id: string) {
@@ -105,13 +117,14 @@ export class SQLiteStoryRunStore implements StoryRunStore {
   save(run: StoryRun) {
     this.db.query(`
       UPDATE story_runs SET current_scene_id=?, last_active_at=?, ended_at=?,
-        outcome=?, found_evidence_json=? WHERE id=?
+        outcome=?, found_evidence_json=?, package_json=CASE WHEN ? IS NULL THEN package_json ELSE NULL END WHERE id=?
     `).run(
       run.currentSceneId,
       run.lastActiveAt,
       run.endedAt,
       run.outcome,
       JSON.stringify(run.foundEvidenceIds),
+      run.endedAt,
       run.id,
     );
   }

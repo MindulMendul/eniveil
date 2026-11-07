@@ -18,5 +18,8 @@
   },
   "privateFieldsAbsent": true,
   "unsupportedFormatExplainedInBrowser": true,
+  "failedReplayRetainsRating": true,
+  "backForwardRefreshSelection": true,
+  "roomMembershipUrlGuard": true,
   "pageErrors": []
 }

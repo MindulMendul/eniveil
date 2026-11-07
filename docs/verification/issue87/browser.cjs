@@ -43,8 +43,6 @@ async function completeInvestigation(page, mechanics) {
   });
   await page.getByRole('button', { name: '체포한다', exact: false }).click();
   await page.getByRole('heading', { name: '사건 종결', exact: true }).waitFor();
-  await page.getByRole('button', { name: '5점', exact: true }).click();
-  await page.getByText('평점을 저장했어. 고마워!', { exact: true }).waitFor();
 }
 
 async function verifyPinnedDesktop(page, author, source, id, suffix) {
@@ -71,6 +69,12 @@ async function verifyPinnedDesktop(page, author, source, id, suffix) {
   await page.getByRole('button', { name: '장면 건너뛰기', exact: false }).click();
   await page.getByRole('button', { name: '현장 조사', exact: false }).click();
   await completeInvestigation(page, source.content.mechanics);
+  const rejectedReplay = page.waitForResponse(item => item.url() === base + '/api/game/sessions' && item.request().method() === 'POST');
+  await page.getByRole('button', { name: '다시 플레이하기', exact: false }).click();
+  assert.equal((await rejectedReplay).status(), 400);
+  await page.getByRole('heading', { name: '사건 종결', exact: true }).waitFor();
+  await page.getByRole('button', { name: '5점', exact: true }).click();
+  await page.getByText('평점을 저장했어. 고마워!', { exact: true }).waitFor();
   assert.equal((await author.request.put(base + '/api/workshop/drafts/' + id, { data: draft(source, true) })).status(), 200);
   await page.getByRole('button', { name: '창작마당으로 돌아가기', exact: true }).click();
   const meta = await (await page.request.get(base + '/api/workshop/stories/' + id)).json();
@@ -79,6 +83,25 @@ async function verifyPinnedDesktop(page, author, source, id, suffix) {
   assert.equal(meta.item.averageRating, 5);
   const official = await (await page.request.get(base + '/api/workshop/stories/deokil-trading-murder')).json();
   assert.equal(official.item.playCount, 0);
+}
+
+async function verifyNavigation(page, source, id) {
+  await openStory(page, source.story.title);
+  assert.equal(new URL(page.url()).searchParams.get('play'), id);
+  await page.getByRole('button', { name: '사건 시작하기', exact: false }).click();
+  await page.getByText('버전 2의 새 장면', { exact: true }).waitFor();
+  await page.goBack();
+  await page.getByRole('heading', { name: '창작마당', exact: true }).waitFor();
+  assert.equal(new URL(page.url()).searchParams.get('play'), null);
+  await page.goForward();
+  await page.getByRole('heading', { name: source.story.title, exact: true }).waitFor();
+  assert.equal(new URL(page.url()).searchParams.get('play'), id);
+  await page.getByRole('button', { name: '사건 시작하기', exact: false }).click();
+  await page.getByText('버전 2의 새 장면', { exact: true }).waitFor();
+  await page.reload();
+  await page.getByRole('heading', { name: source.story.title, exact: true }).waitFor();
+  assert.equal(new URL(page.url()).searchParams.get('play'), id);
+  assert(await page.getByRole('button', { name: '사건 시작하기', exact: false }).isEnabled());
 }
 
 async function verifyMobile(page, source) {
@@ -105,6 +128,20 @@ async function verifyUnsupported(page, author, source, suffix) {
   assert(await page.getByRole('button', { name: '사건 시작하기', exact: false }).isDisabled());
 }
 
+async function verifyRoomGuard(browser, storyId, suffix) {
+  const context = await browser.newContext({ extraHTTPHeaders: { Origin: base } });
+  try {
+    const login = await context.request.post(base + '/api/platform/guest', { data: { nickname: '방검증' + String(suffix).slice(-6) } });
+    assert.equal(login.status(), 201);
+    const room = await context.request.post(base + '/api/lobby/rooms', { data: { scenarioId: 'rehearsal' } });
+    assert.equal(room.status(), 201);
+    const page = await context.newPage();
+    await page.goto(base + '/workshop?play=' + encodeURIComponent(storyId));
+    await page.getByRole('status').filter({ hasText: '참가 중인 방에서 나온 뒤' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '사건 시작하기', exact: false }).count(), 0);
+  } finally { await context.close(); }
+}
+
 async function main() {
   fs.mkdirSync(output, { recursive: true });
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, headless: true, args: ['--no-sandbox'] });
@@ -122,11 +159,13 @@ async function main() {
     const desktop = await player.newPage();
     desktop.on('pageerror', error => errors.push(error.message));
     await verifyPinnedDesktop(desktop, author, source, id, suffix);
+    await verifyNavigation(desktop, source, id);
     const mobile = await browser.newContext({ viewport: { width: 320, height: 780 } });
     const smallPage = await mobile.newPage();
     smallPage.on('pageerror', error => errors.push(error.message));
     await verifyMobile(smallPage, source);
     await verifyUnsupported(smallPage, author, source, suffix);
+    await verifyRoomGuard(browser, id, suffix);
     await mobile.close();
     await player.close();
     await author.close();
@@ -134,7 +173,7 @@ async function main() {
     fs.writeFileSync(path.join(output, 'browser-results.json'), JSON.stringify({
       desktop: { width: 1280, playFromPublicCard: true, pinnedDuringEditAndUnpublish: true, newPlayOfPrivateRejected: true, investigation: true, completed: true, rating: true, canonicalMetrics: true },
       mobile: { width: 320, locale: 'en', updatedVersionOpening: true, investigation: true, noOverflow: true },
-      privateFieldsAbsent: true, unsupportedFormatExplainedInBrowser: true, pageErrors: errors,
+      privateFieldsAbsent: true, unsupportedFormatExplainedInBrowser: true, failedReplayRetainsRating: true, backForwardRefreshSelection: true, roomMembershipUrlGuard: true, pageErrors: errors,
     }, null, 2));
     console.log('Browser workshop play assertions passed');
   } finally {

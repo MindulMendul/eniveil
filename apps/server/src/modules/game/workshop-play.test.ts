@@ -37,7 +37,7 @@ function fixture() {
   cleanups.push(() => { store.close(); rmSync(dir, { recursive: true, force: true }); });
   const draft = (packageSource = source, published = true) => ({ package: packageSource, published, thumbnailUrl: null, difficulty: null });
   const create = (packageSource = source, published = true) => services.workshop.create(author, draft(packageSource, published));
-  return { ...services, source, author, draft, create, restart: () => { store.close(); return build(); } };
+  return { ...services, source, author, draft, create, databasePath: join(dir, "test.sqlite"), restart: () => { store.close(); return build(); } };
 }
 async function request(app: Hono, path: string, body?: unknown) {
   const response = await app.request(`http://localhost/api/game${path}`, {
@@ -117,6 +117,13 @@ test("private, absent, malformed, multiplayer and unsupported branching packages
   const unsupported = f.create(branching);
   expect((await request(f.app, `/stories/${unsupported.id}`)).response.status).toBe(422);
   expect(() => f.sessions.start(unsupported.id)).toThrow();
+  const choices = structuredClone(f.source);
+  choices.content.scenes[0]!.choices = [{ id: "skip", label: "Skip ahead", targetSceneId: "resolution", visibleWhen: { type: "always" } }];
+  expect(() => f.sessions.start(f.create(choices).id)).toThrow();
+  const duplicateLocations = structuredClone(f.source);
+  if (duplicateLocations.content.mechanics.type !== "solo-investigation") throw Error("fixture");
+  duplicateLocations.content.mechanics.locations[1]!.id = duplicateLocations.content.mechanics.locations[0]!.id;
+  expect(() => f.sessions.start(f.create(duplicateLocations).id)).toThrow();
   const impossible = structuredClone(f.source);
   if (impossible.content.mechanics.type !== "solo-investigation") throw Error("fixture");
   impossible.content.mechanics.solution.requiredEvidenceIds = Array(3).fill(impossible.content.mechanics.evidence[0]!.id);
@@ -141,3 +148,50 @@ test("canonical community IDs isolate embedded source IDs, versions, plays and r
   expect(official.story.id).toBe(f.source.story.id);
   expect(f.runs.metrics(f.source.story.id).playsStarted).toBe(1);
  });
+
+
+test("anonymous repeated starts share a UTF-8 snapshot budget across connections and release only ended source", async () => {
+  const f = fixture();
+  const item = f.create();
+  const bytes = Buffer.byteLength(JSON.stringify(f.catalog.get(item.id)));
+  const tooSmall = new StorySessionService(f.catalog, new SQLiteStoryRunStore(f.store.db, { pinnedBytes: bytes - 1 }));
+  expect(() => tooSmall.start(item.id)).toThrow();
+  expect(f.runs.metrics(item.id).playsStarted).toBe(0);
+  const boundedRuns = new SQLiteStoryRunStore(f.store.db, { pinnedBytes: bytes });
+  const bounded = new StorySessionService(f.catalog, boundedRuns);
+  const app = createGameRoutes({ stories: f.catalog, runs: boundedRuns, sessions: bounded });
+  const otherStore = new Store(f.databasePath);
+  try {
+    const otherRuns = new SQLiteStoryRunStore(otherStore.db, { pinnedBytes: bytes });
+    const other = new StorySessionService(f.catalog, otherRuns);
+    const otherApp = createGameRoutes({ stories: f.catalog, runs: otherRuns, sessions: other });
+    const responses = await Promise.all(Array.from({ length: 40 }, (_, index) =>
+      (index % 2 ? app : otherApp).request("http://localhost/sessions", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storyId: item.id }),
+      })));
+    expect(responses.filter(response => response.status === 201)).toHaveLength(1);
+    expect(responses.filter(response => response.status === 429)).toHaveLength(39);
+    const started = await responses.find(response => response.status === 201)!.json() as { runId: string };
+    const retained = f.store.db.query("SELECT SUM(length(CAST(package_json AS BLOB))) AS bytes FROM story_runs").get() as { bytes: number };
+    expect(retained.bytes).toBe(bytes);
+    expect(bounded.current(started.runId).story.id).toBe(item.id);
+    expect(other.current(started.runId).story.id).toBe(item.id);
+    expect(f.runs.metrics(item.id).playsStarted).toBe(1);
+    bounded.abandon(started.runId);
+    expect(boundedRuns.get(started.runId)?.storyPackage).toBeUndefined();
+    expect(f.runs.metrics(item.id).playsAbandoned).toBe(1);
+    const next = other.start(item.id);
+    other.advance(next.runId);
+    const mechanics = f.source.content.mechanics;
+    if (mechanics.type !== "solo-investigation") throw new Error("fixture");
+    for (const evidence of mechanics.evidence) other.inspectEvidence(next.runId, evidence.id);
+    other.accuse(next.runId, mechanics.solution.culpritId, mechanics.solution.requiredEvidenceIds.slice(0, 3));
+    expect(otherRuns.get(next.runId)?.storyPackage).toBeUndefined();
+    expect(otherRuns.get(next.runId)?.storyVersion).toBe(f.source.story.version);
+    other.rate(next.runId, 4);
+    expect(f.runs.metrics(item.id).averageRating).toBe(4);
+    expect(f.runs.metrics(item.id).playsStarted).toBe(2);
+    expect(f.runs.metrics(item.id).playsCompleted).toBe(1);
+    expect(bounded.start(item.id).story.id).toBe(item.id);
+  } finally { otherStore.close(); }
+});

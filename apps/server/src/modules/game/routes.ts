@@ -4,7 +4,7 @@ import {
   inspectStoryEvidenceSchema,
   startStorySessionSchema,
 } from "@festival/shared";
-import type { SQLiteStoryRunStore } from "../../infrastructure/sqlite/story-run-store";
+import { StoryRunQuotaError, type SQLiteStoryRunStore } from "../../infrastructure/sqlite/story-run-store";
 import type { StoryCatalog } from "../platform/stories/ports/story-catalog";
 import { supportsSoloStory } from "./solo-story";
 import type { StorySessionService } from "./story-session-service";
@@ -36,7 +36,12 @@ export function createGameRoutes(deps: {
 
   app.post("/sessions", async (c) => {
     const { storyId } = startStorySessionSchema.parse(await c.req.json());
-    const session = deps.sessions.start(storyId);
+    let session;
+    try { session = deps.sessions.start(storyId); }
+    catch (error) {
+      if (error instanceof StoryRunQuotaError) return c.json({ error: error.message }, 429);
+      throw error;
+    }
     deps.runs.record({
       id: crypto.randomUUID(),
       runId: session.runId,

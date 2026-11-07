@@ -115,9 +115,7 @@
 
   async function startOver() {
     if (!storyPackage) return;
-    runId = '';
     storyLoadError = '';
-    resolutionCues = [];
     try {
       const response = await fetch('/api/game/sessions', {
         method: 'POST',
@@ -128,6 +126,7 @@
       if (!response.ok) throw new Error(data.error ?? '플레이를 시작하지 못했어.');
       storyPackage = data.package;
       runId = data.runId;
+      resolutionCues = [];
       openingCues = data.scene.cues;
       startedAt = Date.parse(data.progress.startedAt);
     } catch (error) {
