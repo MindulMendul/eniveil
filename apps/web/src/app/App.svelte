@@ -8,7 +8,6 @@
   import { onMount, tick } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
-  import { gameModes } from "./game-modes.js";
   import { clearSoloExit, matchesSoloExit, pendingSoloExit, type SoloExit } from "../shared/lib/solo-lifecycle";
   import { getLocaleFromPath, localePath, translate } from "../shared/lib";
 
@@ -335,6 +334,7 @@
       if (loginDialog?.open) loginDialog.close();
       locale = getLocaleFromPath(location.pathname);
       currentPath = pagePath(location.pathname);
+      code = new URLSearchParams(location.search).get("room") ?? "";
       editorId = new URLSearchParams(location.search).get("id") ?? undefined;
       document.documentElement.lang = locale;
     };
@@ -407,8 +407,8 @@
       {busy}
       {connected}
       {t}
-      modes={gameModes}
       onSelectMode={selectGameMode}
+      onCreate={create}
       onJoin={join}
     />
   {:else if !session}
