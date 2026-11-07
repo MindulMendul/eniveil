@@ -19,9 +19,22 @@ export function supportsSoloStory(source: StoryPackage) {
 
 export function soloStoryView(source: StoryPackage): SoloStoryView {
   if (source.content.mechanics.type !== "solo-investigation") throw Error("지원하지 않는 플레이 방식이야.");
-  const { solution: _solution, reactions, ...mechanics } = source.content.mechanics;
+  const mechanics = source.content.mechanics;
   return {
     story: source.story,
-    content: { mechanics: { ...mechanics, reactions: reactions.map(({ revealsTruth: _truth, ...reaction }) => reaction) } },
+    content: {
+      mechanics: {
+        type: mechanics.type,
+        victim: mechanics.victim,
+        suspects: mechanics.suspects,
+        evidence: mechanics.evidence,
+        locations: mechanics.locations,
+        alibis: mechanics.alibis,
+        hints: mechanics.hints,
+        reactions: mechanics.reactions.map(reaction => ({
+          suspectId: reaction.suspectId, evidenceId: reaction.evidenceId, lines: reaction.lines,
+        })),
+      },
+    },
   };
 }
