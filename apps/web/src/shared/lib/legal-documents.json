@@ -71,7 +71,7 @@
         {
           "title": "4. 보관과 삭제",
           "paragraphs": [
-            "로그인 인증의 유효기간은 30일입니다. 게스트가 앱에서 로그아웃하면 해당 닉네임·작품·즐겨찾기와 모든 인증 세션을 삭제합니다. Google 계정의 로그아웃은 모든 인증 세션을 삭제하지만 subject와 계정 ID의 연결, 닉네임·작품·즐겨찾기는 다음 로그인을 위해 보관합니다. 현재 앱에는 Google 계정 연결 및 계정·게임·창작마당 기록 전체에 대한 자동 삭제 기한이 구현되어 있지 않아 쿠키 만료 후에도 서버에 남을 수 있습니다. 운영자에게 열람·정정·삭제 또는 처리 정지를 요청할 수 있으며 본인 확인과 다른 이용자의 권리를 검토해 처리합니다.",
+            "로그인 인증의 유효기간은 30일입니다. 게스트가 앱에서 로그아웃하면 해당 닉네임·작품·즐겨찾기와 모든 인증 세션을 삭제합니다. Google 계정의 로그아웃은 모든 인증 세션을 삭제하지만 subject와 계정 ID의 연결, 닉네임·작품·즐겨찾기는 다음 로그인을 위해 보관합니다. 계정 설정에서 회원탈퇴를 확인하면 닉네임, Google 연결, 만든 작품, 즐겨찾기와 인증 세션을 삭제합니다. Google 계정 자체는 삭제되지 않으며 완료된 게임 기록과 익명 집계 통계는 남을 수 있습니다. 로그아웃이나 쿠키 만료만으로 Google 계정 및 계정·게임 기록 전체가 삭제되지는 않습니다. 운영자에게 열람·정정·삭제 또는 처리 정지를 요청할 수 있으며 본인 확인과 다른 이용자의 권리를 검토해 처리합니다.",
             "처리 목적이 끝났거나 유효한 삭제 요청을 처리할 때에는 해당 정보를 삭제 또는 익명화합니다. 법령상 보존이 필요한 경우에는 그 사유와 범위를 안내합니다. 외부 분석·호스팅 시스템의 보관 기간은 각 서비스 설정과 정책에 따릅니다."
           ]
         },
@@ -164,7 +164,7 @@
         {
           "title": "4. Retention and deletion",
           "paragraphs": [
-            "Sign-in credentials are valid for 30 days. Signing out of a guest account in the app deletes its nickname, stories, favorites and all authentication sessions. Signing out of a Google account deletes all authentication sessions but retains the subject-to-account link, nickname, stories and favorites for the next sign-in. The app currently has no automatic deletion deadline for Google account links or all account, game and workshop records, so these may remain on the server after cookie expiry. You can request access, correction, deletion or restriction of processing; the operator will review identity verification and other users' rights when handling requests.",
+            "Sign-in credentials are valid for 30 days. Signing out of a guest account in the app deletes its nickname, stories, favorites and all authentication sessions. Signing out of a Google account deletes all authentication sessions but retains the subject-to-account link, nickname, stories and favorites for the next sign-in. Confirming account deletion in account settings deletes the nickname, Google link, created stories, favorites and authentication sessions. It does not delete the Google account itself; completed game records and anonymous aggregate statistics may remain. Signing out or cookie expiry alone does not delete the Google account link or all account and game records. You can also request access, correction, deletion or restriction of processing; the operator will review identity verification and other users' rights when handling requests.",
             "When the purpose ends or a valid deletion request is processed, the relevant information is deleted or anonymized. Where legal retention is required, its reason and scope will be explained. Retention in external analytics and hosting systems depends on their settings and policies."
           ]
         },
