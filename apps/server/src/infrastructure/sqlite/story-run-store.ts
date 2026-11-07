@@ -11,6 +11,7 @@ type Row = {
   ended_at: string | null;
   outcome: StoryRun["outcome"];
   found_evidence_json: string;
+  package_json: string | null;
 };
 
 export class SQLiteStoryRunStore implements StoryRunStore {
@@ -60,14 +61,16 @@ export class SQLiteStoryRunStore implements StoryRunStore {
       CREATE INDEX IF NOT EXISTS story_rum_vitals_story_metric_idx
         ON story_rum_vitals(story_id, metric_name, occurred_at);
     `);
+    const columns = db.query("PRAGMA table_info(story_runs)").all() as { name: string }[];
+    if (!columns.some(column => column.name === "package_json")) db.exec("ALTER TABLE story_runs ADD COLUMN package_json TEXT");
   }
 
   create(run: StoryRun) {
     this.db.query(`
       INSERT INTO story_runs (
         id, story_id, story_version, current_scene_id, started_at,
-        last_active_at, ended_at, outcome, found_evidence_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        last_active_at, ended_at, outcome, found_evidence_json, package_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       run.id,
       run.storyId,
@@ -78,6 +81,7 @@ export class SQLiteStoryRunStore implements StoryRunStore {
       run.endedAt,
       run.outcome,
       JSON.stringify(run.foundEvidenceIds),
+      run.storyPackage ? JSON.stringify(run.storyPackage) : null,
     );
   }
 
@@ -88,6 +92,7 @@ export class SQLiteStoryRunStore implements StoryRunStore {
       id: row.id,
       storyId: row.story_id,
       storyVersion: row.story_version,
+      storyPackage: row.package_json ? JSON.parse(row.package_json) : undefined,
       currentSceneId: row.current_scene_id,
       startedAt: row.started_at,
       lastActiveAt: row.last_active_at,

@@ -1,0 +1,22 @@
+{
+  "desktop": {
+    "width": 1280,
+    "playFromPublicCard": true,
+    "pinnedDuringEditAndUnpublish": true,
+    "newPlayOfPrivateRejected": true,
+    "investigation": true,
+    "completed": true,
+    "rating": true,
+    "canonicalMetrics": true
+  },
+  "mobile": {
+    "width": 320,
+    "locale": "en",
+    "updatedVersionOpening": true,
+    "investigation": true,
+    "noOverflow": true
+  },
+  "privateFieldsAbsent": true,
+  "unsupportedFormatExplainedInBrowser": true,
+  "pageErrors": []
+}
