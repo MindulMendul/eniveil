@@ -121,15 +121,21 @@ export class Store {
     this.reserveNickname(nickname, me.id);
   }
   logout(me: Guest) {
+    this.endAccount(me, this.accountType(me.id) === "guest");
+  }
+  deleteAccount(me: Guest) {
+    this.endAccount(me, true);
+  }
+  private endAccount(me: Guest, remove: boolean) {
     try {
       this.db.transaction(() => {
         this.db.query("DELETE FROM credentials WHERE guest_id=?").run(me.id);
-        if (this.accountType(me.id) === "guest") {
-          // Published guest work must not remain under an irrecoverable identity.
+        if (remove) {
           if (this.db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='workshop_drafts'").get()) {
             this.db.query("DELETE FROM workshop_favorites WHERE guest_id=? OR story_id IN (SELECT id FROM workshop_drafts WHERE owner_id=?)").run(me.id, me.id);
             this.db.query("DELETE FROM workshop_drafts WHERE owner_id=?").run(me.id);
           }
+          this.db.query("DELETE FROM google_accounts WHERE guest_id=?").run(me.id);
           delete this.state.guests[me.id];
           this.save();
         }
