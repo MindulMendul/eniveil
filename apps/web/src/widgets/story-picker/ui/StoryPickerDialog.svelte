@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Select, TextInput, Button, Modal, StateMessage, Card, Badge } from "../../../shared/ui";
+  import { Select, TextInput, Button, Modal, StateMessage, Badge } from "../../../shared/ui";
 
   type CatalogStory = {
     id: string;
@@ -201,25 +201,33 @@
       {:else}
         <div class="story-picker-grid">
           {#each stories as story (story.id + ":" + story.version)}
-            <Card class="flex flex-col">
-              <div class="section-heading">
-                <span class="eyebrow section-eyebrow">{story.origin === "original" ? t("storyOriginal") : t("storyDemo")}</span>
-                <Badge>{story.available ? t("storyAvailable") : t("storyComingSoon")}</Badge>
+            <article class="flex min-w-0 flex-col overflow-hidden border border-festival-line bg-festival-panel" aria-labelledby={`picker-story-${story.id}`}>
+              <div class="relative aspect-video overflow-hidden border-b border-festival-line bg-festival-bg">
+                <img src="/images/story-invitation.svg" alt="" width="640" height="360" class="h-full w-full object-cover" loading="lazy" />
+                <div class="absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-3">
+                  <Badge class="bg-festival-panel">{story.origin === "original" ? t("storyOriginal") : t("storyDemo")}</Badge>
+                  <Badge tone={story.available ? "gold" : "default"} class="bg-festival-panel">{story.available ? t("storyAvailable") : t("storyComingSoon")}</Badge>
+                </div>
               </div>
-              <h3 class="heading-three mt-3">{story.title}</h3>
-              <p class="muted grow">{story.subtitle}</p>
-              <dl class="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-festival-line pt-3 text-xs text-festival-muted">
-                <div><dt>{t("workshopPlayers")}</dt><dd>{story.players}{t("playerUnit")}</dd></div>
-                <div><dt>{t("storyDifficulty")}</dt><dd>{story.difficulty ? t(`difficulty${story.difficulty[0].toUpperCase()}${story.difficulty.slice(1)}`) : t("difficultyUndetermined")}</dd></div>
-                <div><dt>{t("storyRating")}</dt><dd>{story.averageRating === null ? t("noRatingYet") : `${story.averageRating.toFixed(1)} / 5 (${story.ratingCount})`}</dd></div>
-                <div><dt>{t("storyUniquePlayers")}</dt><dd>{story.uniquePlayers}</dd></div>
-                <div><dt>{t("storyStartedPlays")}</dt><dd>{story.startedPlays}</dd></div>
-                <div><dt>{t("storyCompletedPlays")}</dt><dd>{story.completedPlays}</dd></div>
-              </dl>
-              <Button class="mt-4 w-full" disabled={!story.available || busy || !connected} onclick={() => onCreate(story.id)}>
-                {story.available ? t("createRoom") : t("storyComingSoon")}
-              </Button>
-            </Card>
+              <div class="flex grow flex-col p-4">
+                <h3 class="mb-2 font-serif text-title-sm leading-title text-festival-text" id={`picker-story-${story.id}`}>{story.title}</h3>
+                <p class="muted grow">{story.subtitle}</p>
+                <dl class="mt-4 grid grid-cols-2 gap-3 border-y border-festival-line py-3">
+                  <div><dt class="text-caption text-festival-muted">{t("workshopPlayers")}</dt><dd class="mt-1 text-sm text-festival-text">{story.available ? `${story.players}${t("playerUnit")}` : t("difficultyUndetermined")}</dd></div>
+                  <div><dt class="text-caption text-festival-muted">{t("storyDuration")}</dt><dd class="mt-1 text-sm text-festival-text">{story.available ? `${story.minutes}${t("storyMinuteUnit")}` : t("difficultyUndetermined")}</dd></div>
+                  <div><dt class="text-caption text-festival-muted">{t("storyDifficulty")}</dt><dd class="mt-1 text-sm text-festival-text">{story.difficulty ? t(`difficulty${story.difficulty[0].toUpperCase()}${story.difficulty.slice(1)}`) : t("difficultyUndetermined")}</dd></div>
+                  <div><dt class="text-caption text-festival-muted">{t("storyRating")}</dt><dd class="mt-1 text-sm text-festival-gold">{story.averageRating === null ? t("noRatingYet") : `★ ${story.averageRating.toFixed(1)} / 5`}<span class="block text-caption text-festival-muted">{story.ratingCount} {t("storyRatingCount")}</span></dd></div>
+                </dl>
+                <dl class="mt-3 grid grid-cols-3 gap-2 text-caption text-festival-muted" aria-label={t("storyActivity")}>
+                  <div><dt>{t("storyUniquePlayers")}</dt><dd class="mt-1 text-sm">{story.uniquePlayers}</dd></div>
+                  <div><dt>{t("storyStartedPlays")}</dt><dd class="mt-1 text-sm">{story.startedPlays}</dd></div>
+                  <div><dt>{t("storyCompletedPlays")}</dt><dd class="mt-1 text-sm">{story.completedPlays}</dd></div>
+                </dl>
+                <Button class="mt-4 w-full" disabled={!story.available || busy || !connected} onclick={() => onCreate(story.id)}>
+                  {story.available ? t("createRoom") : t("storyComingSoon")}<span aria-hidden="true">{story.available ? "↗" : "…"}</span>
+                </Button>
+              </div>
+            </article>
           {/each}
         </div>
       {/if}
