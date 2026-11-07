@@ -81,6 +81,7 @@ export function createAccountRoutes(deps: {
     deps.onLogout?.(me.id);
     deleteCookie(c, "festival_guest", cookieOptions);
     deleteCookie(c, "festival_google_demo", cookieOptions);
+    deleteCookie(c, "festival_oauth_state", cookieOptions);
     return c.json({ ok: true });
   });
   app.post("/auth/google/demo", (c) => {

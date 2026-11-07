@@ -11,6 +11,7 @@
   let nickname = $state(untrack(() => me.nickname)), confirmLogout = $state(false), settings = $state(false), confirmDelete = $state(false);
   let items = $state<WorkshopStory[]>([]), total = $state(0), offset = $state(0), loading = $state(true), error = $state('');
   let deletion = $state<WorkshopStory | null>(null), deleting = $state(false), deleteError = $state('');
+  let settingsOpener = $state<HTMLButtonElement>();
   let disposed = false;
   onDestroy(() => { disposed = true; });
   const label = (ko: string, en: string) => locale === 'en' ? en : ko;
@@ -60,7 +61,7 @@
   </Panel>
   {#if settings}
     <Panel>
-      <div class="settings-heading"><h2 id="account-settings-title" tabindex="-1" class="heading-two">{label('계정 설정', 'Account settings')}</h2><Button variant="text" onclick={() => { settings = false; confirmLogout = false; confirmDelete = false; }}>{label('설정 닫기', 'Close settings')}</Button></div>
+      <div class="settings-heading"><h2 id="account-settings-title" tabindex="-1" class="heading-two">{label('계정 설정', 'Account settings')}</h2><Button variant="text" onclick={async () => { settings = false; confirmLogout = false; confirmDelete = false; await tick(); settingsOpener?.focus(); }}>{label('설정 닫기', 'Close settings')}</Button></div>
       <section aria-labelledby="sign-out-title">
         <h3 id="sign-out-title">{label('로그아웃', 'Sign out')}</h3>
         <p class="muted">{accountType === 'guest' ? label('게스트는 로그아웃하면 닉네임, 만든 작품과 즐겨찾기가 삭제되며 복구할 수 없어요.', 'Signing out deletes your guest nickname, stories and favorites permanently.') : label('다시 구글 로그인하면 내 작품과 닉네임이 유지돼요.', 'Your nickname and stories will be here when you sign in with Google again.')}</p>
@@ -75,7 +76,7 @@
       </section>
     </Panel>
   {:else}
-    <Button variant="text" onclick={async () => { settings = true; await tick(); document.getElementById('account-settings-title')?.focus(); }}>{label('계정 설정', 'Account settings')}</Button>
+    <button bind:this={settingsOpener} class="text-button" onclick={async () => { settings = true; await tick(); document.getElementById('account-settings-title')?.focus(); }}>{label('계정 설정', 'Account settings')}</button>
   {/if}
 </main>
 {#if deletion}
