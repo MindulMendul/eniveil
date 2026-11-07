@@ -212,7 +212,7 @@ export class Game {
     if (r.memberIds.includes(me.id)) return r;
     if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
     const error = this.joinError(r);
-    if (error) throw Error(error);
+    if (error) throw new Error(error);
     r.memberIds.push(me.id);
     this.store.save();
     return r;
