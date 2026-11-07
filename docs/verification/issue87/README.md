@@ -28,3 +28,28 @@
 4. 서버를 종료하고 테스트 DB·WAL·SHM 파일을 정리합니다.
 
 QA/main 승격과 운영 배포는 포함하지 않습니다. 최신 PR head의 CI·SonarCloud·Qodo와 필요한 사람 승인 확인 후 dev 병합 대상입니다.
+
+## Empty opening cue regression
+
+An accepted public solo story can have an empty opening cue list. The intro displays a localized **Begin investigation** action that calls the existing server-side advance endpoint and enters the suspects stage. The server regression uses a valid three-scene package, confirms the run advances from `opening` to `investigation`, and checks that the response does not include the solution, truth flag, or resolution scene.
+
+- Integrated `dev` through `5c8ebaf` before final verification.
+- `bash scripts/codex/verify.sh`: passed, 72 tests / 4,910 assertions.
+- `bash scripts/codex/verify.sh --browser`: the same checks passed; the wrapper then exited 1 because this repo has no `test:e2e` command. The independent browser run is recorded separately.
+- Actual Chromium/Playwright: Korean desktop 1440px and English mobile 375px. Each case published a test-only story with an empty opening, started play, used the fallback action, and reached the suspects stage. No horizontal overflow or page errors. See `empty-opening-browser-results.json` and screenshots.
+- Test server used port 3195 and `/tmp/issue87-review-final3.sqlite`, with no real account or production data.
+
+Reproduce with Bun 1.4.4, dependencies, and Playwright/Chromium available:
+
+```sh
+PORT=3195 HOST=127.0.0.1 APP_ORIGIN=http://127.0.0.1:3195 \\
+DATABASE_PATH=/tmp/issue87-review-final3.sqlite bun apps/server/src/index.ts
+
+BASE_URL=http://127.0.0.1:3195 \\
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright \\
+CHROMIUM_PATH=/absolute/path/to/chromium \\
+PLAYWRIGHT_NO_SANDBOX=1 \\
+node docs/verification/issue87/empty-opening-browser.cjs
+```
+
+The existing implementation also lets a started run continue from its pinned source after a story is unpublished. That policy question remains open for product approval; this fix does not change that behavior or claim the policy was approved.

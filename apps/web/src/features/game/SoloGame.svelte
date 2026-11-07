@@ -273,7 +273,14 @@
     <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={exitDisabled} onclick={onExit}>{exitLabel ?? t('backToPlatform')}</button>
   </section>
 {:else if phase === 'intro'}
-  {#if openingCues.length}<StoryCuePlayer cues={openingCues} onComplete={finishOpening} />{/if}
+  {#if openingCues.length}
+    <StoryCuePlayer cues={openingCues} onComplete={finishOpening} />
+  {:else}
+    <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center">
+      <p class="muted">{t('openingHasNoNarration')}</p>
+      <Button class="primary mx-auto max-w-[400px]" onclick={finishOpening} variant="primary">{t('beginInvestigation')} <span>→</span></Button>
+    </section>
+  {/if}
 {:else if phase === 'cast'}
   <section class="mx-auto max-w-[840px]">
     <p class="eyebrow">THE SUSPECTS</p><h1 class="heading-one page-title">{t('suspectsTitle')}</h1><p class="muted mb-7">{t('suspectDescription')}</p>

@@ -195,3 +195,27 @@ test("anonymous repeated starts share a UTF-8 snapshot budget across connections
     expect(bounded.start(item.id).story.id).toBe(item.id);
   } finally { otherStore.close(); }
 });
+
+test("a valid published story with no opening cues can advance into investigation", async () => {
+  const f = fixture();
+  const emptyOpening = structuredClone(f.source);
+  emptyOpening.content.scenes.find(scene => scene.id === emptyOpening.story.startSceneId)!.cues = [];
+  const item = f.create(emptyOpening);
+
+  const started = await request(f.app, "/sessions", { storyId: item.id });
+  expect(started.response.status).toBe(201);
+  expect(started.data.scene).toEqual({ id: "opening", cues: [] });
+  const startPayload = JSON.stringify(started.data);
+  expect(startPayload).not.toContain('"solution"');
+  expect(startPayload).not.toContain('"revealsTruth"');
+  expect(startPayload).not.toContain('"resolution"');
+
+  const advanced = await request(f.app, `/sessions/${started.data.runId}/advance`, {});
+  expect(advanced.response.status).toBe(200);
+  expect(advanced.data.scene.id).toBe("investigation");
+  const nextPayload = JSON.stringify(advanced.data);
+  expect(nextPayload).not.toContain('"solution"');
+  expect(nextPayload).not.toContain('"revealsTruth"');
+  expect(nextPayload).not.toContain('"resolution"');
+  expect(f.runs.get(started.data.runId)?.currentSceneId).toBe("investigation");
+});

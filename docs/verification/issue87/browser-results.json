@@ -21,5 +21,25 @@
   "failedReplayRetainsRating": true,
   "backForwardRefreshSelection": true,
   "roomMembershipUrlGuard": true,
-  "pageErrors": []
+  "pageErrors": [],
+  "emptyOpeningRegression": [
+    {
+      "locale": "ko",
+      "width": 1440,
+      "emptyCueMessage": true,
+      "canBeginInvestigation": true,
+      "reachedSuspects": true,
+      "noOverflow": true,
+      "pageErrors": []
+    },
+    {
+      "locale": "en",
+      "width": 375,
+      "emptyCueMessage": true,
+      "canBeginInvestigation": true,
+      "reachedSuspects": true,
+      "noOverflow": true,
+      "pageErrors": []
+    }
+  ]
 }
