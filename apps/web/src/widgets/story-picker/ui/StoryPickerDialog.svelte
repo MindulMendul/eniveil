@@ -216,7 +216,7 @@
                   <div><dt class="text-caption text-festival-muted">{t("workshopPlayers")}</dt><dd class="mt-1 text-sm text-festival-text">{story.available ? `${story.players}${t("playerUnit")}` : t("difficultyUndetermined")}</dd></div>
                   <div><dt class="text-caption text-festival-muted">{t("storyDuration")}</dt><dd class="mt-1 text-sm text-festival-text">{story.available ? `${story.minutes}${t("storyMinuteUnit")}` : t("difficultyUndetermined")}</dd></div>
                   <div><dt class="text-caption text-festival-muted">{t("storyDifficulty")}</dt><dd class="mt-1 text-sm text-festival-text">{story.difficulty ? t(`difficulty${story.difficulty[0].toUpperCase()}${story.difficulty.slice(1)}`) : t("difficultyUndetermined")}</dd></div>
-                  <div><dt class="text-caption text-festival-muted">{t("storyRating")}</dt><dd class="mt-1 text-sm text-festival-gold">{story.averageRating === null ? t("noRatingYet") : `★ ${story.averageRating.toFixed(1)} / 5`}<span class="block text-caption text-festival-muted">{story.ratingCount} {t("storyRatingCount")}</span></dd></div>
+                  <div><dt class="text-caption text-festival-muted">{t("storyRating")}</dt><dd class="mt-1 text-sm text-festival-gold">{story.averageRating === null ? t("noRatingYet") : `★ ${story.averageRating.toFixed(1)} / 5`}{#if story.averageRating !== null}<span class="block text-caption text-festival-muted">{story.ratingCount} {t("storyRatingCount")}</span>{/if}</dd></div>
                 </dl>
                 <dl class="mt-3 grid grid-cols-3 gap-2 text-caption text-festival-muted" aria-label={t("storyActivity")}>
                   <div><dt>{t("storyUniquePlayers")}</dt><dd class="mt-1 text-sm">{story.uniquePlayers}</dd></div>

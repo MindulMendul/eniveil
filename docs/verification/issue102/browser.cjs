@@ -1,9 +1,12 @@
-const { chromium } = require('/opt/codex/cua_node/lib/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const base = 'http://127.0.0.1:3212';
+const path = require('node:path');
+const base = (process.env.BASE_URL || 'http://127.0.0.1:3212').replace(/\/$/, '');
+const resultsDir = process.env.RESULTS_DIR || __dirname;
+fs.mkdirSync(resultsDir, { recursive: true });
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}), headless: true, args: ['--no-sandbox'] });
   const results = [];
   try {
     const context = await browser.newContext();
@@ -29,13 +32,15 @@ const base = 'http://127.0.0.1:3212';
       assert((await available.innerText()).includes(locale === 'en' ? '2 players' : '2명'));
       assert((await available.innerText()).includes(locale === 'en' ? '5 min' : '5분'));
       assert((await cards.first().innerText()).includes(locale === 'en' ? 'Not rated' : '평가 없음'));
-      await page.screenshot({ path: `docs/verification/issue102/after-${locale}-${width}.png`, fullPage: true });
+      assert(!(await cards.first().innerText()).includes(locale === 'en' ? '0 ratings' : '0 개 평가'));
+      await page.screenshot({ path: path.join(resultsDir, `after-${locale}-${width}.png`), fullPage: true });
       results.push({ locale, width, cards: 4, loadedThumbnails: 4, selectableCards: 1, disabledCards: 3, noOverflow: true });
       await page.keyboard.press('Escape');
     }
     // Exercise unusually long public catalog text without adding fake production records.
     await page.route('**/api/lobby/stories?*', async route => {
       const response = await route.fetch(); const data = await response.json();
+      data.items[0].averageRating = 4.5; data.items[0].ratingCount = 12;
       data.items[0].title = '아주 긴 작품 제목과 줄바꿈 검증 '.repeat(8);
       data.items[0].subtitle = '소개 문구가 길어도 카드와 선택 버튼이 영역을 벗어나지 않아야 합니다. '.repeat(15);
       await route.fulfill({ response, json: data });
@@ -44,6 +49,8 @@ const base = 'http://127.0.0.1:3212';
     await page.getByRole('button', { name: '방 만들기', exact: false }).first().click();
     await page.locator('.story-picker-grid h3').first().filter({ hasText: '아주 긴 작품' }).waitFor();
     assert(await page.evaluate(() => { const d = document.querySelector('dialog'); return d.scrollWidth <= d.clientWidth; }));
+    assert((await page.locator('.story-picker-grid article').first().innerText()).includes('★ 4.5 / 5'));
+    assert((await page.locator('.story-picker-grid article').first().innerText()).includes('12 개 평가'));
     await page.unroute('**/api/lobby/stories?*');
     await page.keyboard.press('Escape'); await page.goto(base);
     await page.getByRole('button', { name: '방 만들기', exact: false }).first().click();
@@ -52,8 +59,8 @@ const base = 'http://127.0.0.1:3212';
     const state = await (await context.request.get(`${base}/api/lobby/state`)).json(); assert.equal(state.room.scenario.id, 'rehearsal');
     await page.getByRole('button', { name: '방 나가기', exact: false }).click();
     assert.deepEqual(errors, []);
-    results.push({ longTitleAndDescriptionAt320: true, createdRealRoom: true, leftRoom: true, pageErrors: errors });
-    fs.writeFileSync('docs/verification/issue102/browser-results.json', JSON.stringify(results, null, 2));
+    results.push({ longTitleAndDescriptionAt320: true, ratedAndUnratedCountDisplay: true, createdRealRoom: true, leftRoom: true, pageErrors: errors });
+    fs.writeFileSync(path.join(resultsDir, 'browser-results.json'), JSON.stringify(results, null, 2));
     console.log(JSON.stringify(results)); await context.close();
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

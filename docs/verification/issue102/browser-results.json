@@ -73,6 +73,7 @@
   },
   {
     "longTitleAndDescriptionAt320": true,
+    "ratedAndUnratedCountDisplay": true,
     "createdRealRoom": true,
     "leftRoom": true,
     "pageErrors": []
