@@ -8,7 +8,7 @@ PR #104 hides sign-out and account deletion inside account settings. The account
 - Server tests cover account deletion of owned content while preserving another owner's data, guest session revocation, active-room denial, rollback retaining account data and nickname reservation, successful nickname release after deletion, pending OAuth state invalidation, and Google logout retaining the account link and authored work.
 - Test server used port 3183 and `/tmp/issue98-review.sqlite`; no real Google credentials or account were used.
 
-The verification script creates a guest session and tests account deletion, so run it only against a local server you started with `DATABASE_PATH=:memory:`. It rejects non-loopback `BASE_URL` values and requires `DISPOSABLE_TEST_SERVER=1`; it never cleans up data from another server. Stop the test server after the run to discard its in-memory database.
+The verification script creates a guest session and tests account deletion, so run it only against a local server you started with `DATABASE_PATH=:memory:`. It rejects non-loopback `BASE_URL` values and requires `DISPOSABLE_TEST_SERVER=1`; it never cleans up data from another server. Requests to another origin and all redirects are blocked. Stop the test server after the run to discard its in-memory database. See the [shared browser verification safety rules](../README.md).
 
 Reproduce with Bun 1.4.4 and installed Playwright/Chromium:
 

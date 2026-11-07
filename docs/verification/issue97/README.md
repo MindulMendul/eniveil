@@ -23,7 +23,7 @@
 자동 test:e2e 명령은 없으므로 wrapper는 예상대로 exit 1을 반환했으며,
 이 문서의 실제 브라우저 근거로 보완했다. 통과하지 않은 명령을 통과로 표시하지 않는다.
 
-실제 브라우저 시나리오는 [`browser.cjs`](browser.cjs)에서 재현할 수 있다. Playwright를 설치하고 Chromium 브라우저를 설치한 뒤, `DATABASE_PATH=:memory:`로 본인이 시작한 테스트 서버와 스크립트를 별도 터미널에서 실행한다. 브라우저를 열거나 요청하기 전에 정확한 loopback origin과 `DISPOSABLE_TEST_SERVER=1`을 확인한다. 기본값은 Playwright가 설치한 Chromium과 기본 샌드박스를 사용한다.
+실제 브라우저 시나리오는 [`browser.cjs`](browser.cjs)에서 재현할 수 있다. Playwright를 설치하고 Chromium 브라우저를 설치한 뒤, `DATABASE_PATH=:memory:`로 본인이 시작한 테스트 서버와 스크립트를 별도 터미널에서 실행한다. 브라우저를 열거나 요청하기 전에 정확한 loopback origin과 `DISPOSABLE_TEST_SERVER=1`을 확인한다. 다른 origin 요청과 redirect는 차단된다. 기본값은 Playwright가 설치한 Chromium과 기본 샌드박스를 사용한다. [공통 브라우저 검증 안전 규칙](../README.md)도 참고한다.
 
 ```sh
 PORT=33723 DATABASE_PATH=:memory: APP_ORIGIN=http://127.0.0.1:33723 bun apps/server/src/index.ts

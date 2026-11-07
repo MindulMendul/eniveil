@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { assertDisposableTestTarget } = require('../test-target-guard.cjs');
+const { assertDisposableTestTarget, getSameOriginRequestUrl } = require('../test-target-guard.cjs');
 
 test('permits only explicitly disposable exact loopback origins', () => {
   for (const origin of ['http://localhost:3000', 'https://127.0.0.1:8443', 'http://[::1]:3000']) {
@@ -36,4 +36,11 @@ test('requires explicit disposable-server acknowledgment for loopback targets', 
   for (const flag of [undefined, '0', 'true']) {
     assert.throws(() => assertDisposableTestTarget('http://127.0.0.1:3000', { DISPOSABLE_TEST_SERVER: flag }), /DISPOSABLE_TEST_SERVER=1/);
   }
+});
+
+test('normalizes same-origin WebSockets and rejects request URL origin changes', () => {
+  assert.equal(getSameOriginRequestUrl('ws://127.0.0.1:3000/lobby', 'http://127.0.0.1:3000').origin, 'http://127.0.0.1:3000');
+  assert.equal(getSameOriginRequestUrl('wss://127.0.0.1:3000/lobby', 'https://127.0.0.1:3000').origin, 'https://127.0.0.1:3000');
+  assert.equal(getSameOriginRequestUrl('http://127.0.0.1:3001/api', 'http://127.0.0.1:3000'), null);
+  assert.equal(getSameOriginRequestUrl('http://guest@127.0.0.1:3000/api', 'http://127.0.0.1:3000'), null);
 });

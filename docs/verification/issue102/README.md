@@ -21,7 +21,7 @@
 
 `browser.cjs`는 테스트 서버 `http://127.0.0.1:3212`와 전용 `/tmp/ready-102.sqlite` DB, 사전 설치된 Playwright/Chromium을 사용했습니다. QA/main 승격·배포·운영 데이터 접근은 없습니다.
 
-브라우저 스크립트는 게스트 계정과 방을 만듭니다. 직접 실행할 때는 `DATABASE_PATH=:memory:`로 본인이 시작한 로컬 테스트 서버만 사용하세요. 스크립트는 정확한 loopback origin만 허용하며 `DISPOSABLE_TEST_SERVER=1` 확인 값이 없으면 브라우저나 API 요청을 시작하지 않습니다. 종료 후 서버를 멈추면 in-memory DB도 사라집니다.
+브라우저 스크립트는 게스트 계정과 방을 만듭니다. 직접 실행할 때는 `DATABASE_PATH=:memory:`로 본인이 시작한 로컬 테스트 서버만 사용하세요. 스크립트는 정확한 loopback origin만 허용하며 `DISPOSABLE_TEST_SERVER=1` 확인 값이 없으면 브라우저나 API 요청을 시작하지 않습니다. 다른 origin 요청과 redirect는 차단됩니다. 종료 후 서버를 멈추면 in-memory DB도 사라집니다. 자세한 내용은 [공통 브라우저 검증 안전 규칙](../README.md)을 참고하세요.
 
 ## 다른 환경에서 재현
 

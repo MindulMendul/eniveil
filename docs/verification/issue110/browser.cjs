@@ -2,7 +2,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { assertDisposableTestTarget } = require('../test-target-guard.cjs');
+const { assertDisposableTestTarget, installBrowserRequestGuard } = require('../test-target-guard.cjs');
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3210').replace(/\/$/, '');
 const resultsPath = process.env.RESULTS_PATH || '.codex-results/issue110-browser';
@@ -72,7 +72,8 @@ async function checkRoomControls(page, scenarios, label) {
 }
 
 async function checkLayout(browser, locale, width) {
-  const context = await browser.newContext({ viewport: { width, height: 900 } });
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width, height: 900 } });
+  await installBrowserRequestGuard(context, baseUrl);
   try {
     const page = await context.newPage();
     const errors = [];
@@ -129,8 +130,12 @@ async function checkInviteHistory(guest, code) {
 }
 
 async function checkInviteJoin(browser) {
-  const contexts = await Promise.all([browser.newContext(), browser.newContext()]);
+  const contexts = await Promise.all([
+    browser.newContext({ serviceWorkers: 'block' }),
+    browser.newContext({ serviceWorkers: 'block' }),
+  ]);
   try {
+    await Promise.all(contexts.map(context => installBrowserRequestGuard(context, baseUrl)));
     const [host, guest] = await Promise.all(contexts.map(context => context.newPage()));
     await Promise.all([signIn(host), signIn(guest)]);
     const snapshot = await state(host);

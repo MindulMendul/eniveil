@@ -36,4 +36,4 @@ RESULTS_PATH=.codex-results/issue110-browser \
 node docs/verification/issue110/browser.cjs
 ```
 
-`BASE_URL`은 본인이 `DATABASE_PATH=:memory:`로 시작한 테스트 전용 서버를 가리켜야 합니다. 스크립트는 정확한 loopback origin과 `DISPOSABLE_TEST_SERVER=1`을 확인하기 전에는 Chromium이나 API 요청을 시작하지 않으며, 실제 게스트 계정과 방을 만듭니다. `RESULTS_PATH`에 화면과 JSON 결과를 저장하며 기본값은 `.codex-results/issue110-browser`입니다. 테스트 후 서버를 중지하면 in-memory DB가 사라집니다. QA/main 승격·운영 배포는 수행하지 않았습니다.
+`BASE_URL`은 본인이 `DATABASE_PATH=:memory:`로 시작한 테스트 전용 서버를 가리켜야 합니다. 스크립트는 정확한 loopback origin과 `DISPOSABLE_TEST_SERVER=1`을 확인하기 전에는 Chromium이나 API 요청을 시작하지 않으며, 실제 게스트 계정과 방을 만듭니다. 다른 origin 요청과 redirect는 차단됩니다. `RESULTS_PATH`에 화면과 JSON 결과를 저장하며 기본값은 `.codex-results/issue110-browser`입니다. 테스트 후 서버를 중지하면 in-memory DB가 사라집니다. QA/main 승격·운영 배포는 수행하지 않았습니다. [공통 브라우저 검증 안전 규칙](../README.md).
