@@ -334,6 +334,7 @@
       if (loginDialog?.open) loginDialog.close();
       locale = getLocaleFromPath(location.pathname);
       currentPath = pagePath(location.pathname);
+      code = new URLSearchParams(location.search).get("room") ?? "";
       editorId = new URLSearchParams(location.search).get("id") ?? undefined;
       document.documentElement.lang = locale;
     };

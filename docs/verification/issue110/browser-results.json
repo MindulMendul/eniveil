@@ -9,6 +9,7 @@
     "cardRoomCreateAndLeave": true,
     "unavailableDisabled": true,
     "codeValidation": true,
+    "clearedCodeKeepsFormAndFocus": true,
     "noOverflow": true,
     "pageErrors": []
   },
@@ -22,6 +23,7 @@
     "cardRoomCreateAndLeave": true,
     "unavailableDisabled": true,
     "codeValidation": true,
+    "clearedCodeKeepsFormAndFocus": true,
     "noOverflow": true,
     "pageErrors": []
   },
@@ -35,6 +37,7 @@
     "cardRoomCreateAndLeave": true,
     "unavailableDisabled": true,
     "codeValidation": true,
+    "clearedCodeKeepsFormAndFocus": true,
     "noOverflow": true,
     "pageErrors": []
   },
@@ -48,6 +51,7 @@
     "cardRoomCreateAndLeave": true,
     "unavailableDisabled": true,
     "codeValidation": true,
+    "clearedCodeKeepsFormAndFocus": true,
     "noOverflow": true,
     "pageErrors": []
   },
@@ -61,6 +65,7 @@
     "cardRoomCreateAndLeave": true,
     "unavailableDisabled": true,
     "codeValidation": true,
+    "clearedCodeKeepsFormAndFocus": true,
     "noOverflow": true,
     "pageErrors": []
   },
@@ -74,6 +79,7 @@
     "cardRoomCreateAndLeave": true,
     "unavailableDisabled": true,
     "codeValidation": true,
+    "clearedCodeKeepsFormAndFocus": true,
     "noOverflow": true,
     "pageErrors": []
   },
@@ -87,6 +93,7 @@
     "cardRoomCreateAndLeave": true,
     "unavailableDisabled": true,
     "codeValidation": true,
+    "clearedCodeKeepsFormAndFocus": true,
     "noOverflow": true,
     "pageErrors": []
   },
@@ -100,11 +107,13 @@
     "cardRoomCreateAndLeave": true,
     "unavailableDisabled": true,
     "codeValidation": true,
+    "clearedCodeKeepsFormAndFocus": true,
     "noOverflow": true,
     "pageErrors": []
   },
   {
     "inviteCodeJoin": true,
+    "inviteHistoryRestoresCodeAndForm": true,
     "twoActualGuests": true
   }
 ]

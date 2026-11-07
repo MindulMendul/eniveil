@@ -10,9 +10,30 @@
 
 - Bun 1.4.4, `bash scripts/codex/verify.sh`: 타입 검사·빌드·61 tests / 4,800 assertions 통과.
 - `bash scripts/codex/verify.sh --browser`: 같은 check/build/test 통과 후 기존 test:e2e 미구성으로 exit 1. 자동 브라우저 단계 통과로 보고하지 않습니다.
-- 실제 Playwright/Chromium: 한국어·영어, 1440/768/375/320px에서 실제 작품 수·제목과 카드 일치, 카드의 빠른 노출(데스크톱 y214 / 320px y286), 작은 방 만들기 버튼, 기존 모달 열기·닫기, 작품 선택→방 생성→퇴장, 준비 중 버튼 비활성화, 코드 길이 검증, 가로 넘침 없음, pageerror 0을 확인했습니다.
-- 독립된 실제 게스트 두 명: 방 생성→초대 URL 진입→코드 자동 입력·입장 폼 자동 펼침→같은 방 입장(2명)→퇴장 성공.
+- 실제 Playwright/Chromium: 한국어·영어, 1440/768/375/320px에서 실제 작품 수·제목과 카드 일치, 카드의 빠른 노출(데스크톱 y214 / 320px y286), 작은 방 만들기 버튼, 기존 모달 열기·닫기, 작품 선택→방 생성→퇴장, 준비 중 버튼 비활성화, 코드 길이 검증, 입력 코드 전체 삭제 후에도 폼·키보드 포커스 유지, 가로 넘침 없음, pageerror 0을 확인했습니다.
+- 독립된 실제 게스트 두 명: 방 생성→초대 URL 진입→코드 자동 입력·입장 폼 자동 펼침→같은 방 입장(2명)→퇴장 성공. 이후 작품 선택 모달에서 창작마당으로 이동했다가 브라우저 뒤로가기로 초대 URL에 돌아오면 코드와 입장 폼이 복원되는 회귀도 확인했습니다.
 - `before-1440.png`, `before-320.png`은 변경 전, `after-ko-1440.png`, `after-ko-320.png`은 변경 후 실제 화면입니다. 상세 결과는 `browser-results.json`, 재현 스크립트는 `browser.cjs`입니다.
 - `git diff --check` 통과. 기존 Astro pages 디렉터리/Svelte unused CSS 경고가 남아 있습니다.
 
-로컬 테스트 전용 DB `/tmp/ready-110.sqlite`, 포트 3210을 사용했습니다. `browser.cjs`는 해당 서버와 환경의 Playwright(`/opt/codex/cua_node/lib/node_modules/playwright`), Chromium(`/usr/bin/chromium`)을 사용합니다. QA/main 승격·운영 배포는 수행하지 않았습니다.
+## 재현 환경
+
+검증에는 로컬 테스트 전용 DB와 포트 3210을 사용했습니다. 운영 DB를 연결하지 않습니다. Bun 1.4.4에서 저장소 루트 기준으로 다음을 실행합니다.
+
+```sh
+bun install --frozen-lockfile --ignore-scripts
+bun run build
+task_dir=$(mktemp -d)
+PORT=3210 DATABASE_PATH="$task_dir/festival.sqlite" bun apps/server/src/index.ts
+```
+
+다른 터미널에서 Playwright와 Chromium을 설치한 경로를 지정해 실행합니다. `playwright`가 일반 모듈 경로에 설치돼 있으면 `PLAYWRIGHT_MODULE`은 생략할 수 있습니다. Chromium 기본 Playwright 설치를 쓰면 `CHROMIUM_PATH`도 생략할 수 있습니다.
+
+```sh
+BASE_URL=http://127.0.0.1:3210 \
+PLAYWRIGHT_MODULE=/absolute/path/to/node_modules/playwright \
+CHROMIUM_PATH=/absolute/path/to/chromium \
+RESULTS_PATH=.codex-results/issue110-browser \
+node docs/verification/issue110/browser.cjs
+```
+
+`BASE_URL`은 테스트 전용 서버를 가리켜야 합니다. 스크립트는 실제 게스트 계정과 방을 생성하고 종료합니다. `RESULTS_PATH`에 화면과 JSON 결과를 저장하며 기본값은 `.codex-results/issue110-browser`입니다. 테스트 후 서버를 중지하고 임시 DB 디렉터리를 정리합니다. QA/main 승격·운영 배포는 수행하지 않았습니다.

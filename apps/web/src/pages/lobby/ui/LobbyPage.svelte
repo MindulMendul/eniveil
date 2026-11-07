@@ -23,6 +23,11 @@
     onCreate: (scenarioId: string) => void;
     onJoin: (code?: string) => void;
   } = $props();
+
+  let joinOpen = $state(false);
+  $effect(() => {
+    if (code.trim()) joinOpen = true;
+  });
 </script>
 
 <main class="main !pt-5 max-mobile:!pt-4">
@@ -35,7 +40,7 @@
     >
       <span aria-hidden="true">＋</span> {t("createRoom")}
     </Button>
-    <details class="min-w-0 max-w-full" open={code.trim().length > 0}>
+    <details class="min-w-0 max-w-full" bind:open={joinOpen}>
       <summary class="min-h-11 cursor-pointer py-3 text-body-sm text-festival-muted hover:text-festival-gold">{t("joinByCode")}</summary>
       <div class="mt-2 border border-festival-line bg-festival-panel p-4">
         <JoinRoomForm bind:code {busy} {connected} {t} onSubmit={() => onJoin()} />
