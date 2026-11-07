@@ -94,13 +94,18 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
       (await req("/api/lobby/rooms", a.cookie, { scenarioId: "rehearsal" })).status,
     ).toBe(201);
     await wait(() => !!aa.latest.room);
+    const roomId = aa.latest.room!.id;
+    await wait(() => bb.latest.rooms.some((room) => room.id === roomId));
+    const listed = await req("/api/lobby/state", b.cookie);
+    expect(((await listed.json()) as Snapshot).rooms.map((room) => room.id)).toContain(roomId);
     expect(
       (await req("/api/lobby/rooms/join", b.cookie, { code: aa.latest.room!.code }))
         .status,
     ).toBe(200);
     await wait(() => aa.latest.room?.count === 2);
+    await wait(() => !bb.latest.rooms.some((room) => room.id === roomId));
+    expect(((await (await req("/api/lobby/state", b.cookie)).json()) as Snapshot).rooms).toEqual([]);
     const exitPath = "/api/lobby/rooms/solo-exit";
-    const roomId = aa.latest.room!.id;
     expect((await req(exitPath, "", { roomId, soloPlayId: null })).status).toBe(401);
     expect((await req(exitPath, b.cookie, { roomId, soloPlayId: null })).status).toBe(400);
     expect((await req(exitPath, a.cookie, { roomId, soloPlayId: null }, "https://evil.invalid")).status).toBe(403);
@@ -158,6 +163,8 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     expect((await req(exitPath, a.cookie, { roomId, soloPlayId: newAttempt })).status).toBe(200);
     await wait(() => aa.latest.room?.status === "waiting");
     await send(aa, "leave");
+    await wait(() => !reconnected.latest.rooms.some((room) => room.id === roomId));
+    expect(((await (await req("/api/lobby/state", b.cookie)).json()) as Snapshot).rooms.map((room) => room.id)).not.toContain(roomId);
     let closed = false;
     aa.ws.addEventListener("close", () => { closed = true; });
     expect((await req("/api/platform/account/logout", a.cookie, {})).status).toBe(200);
