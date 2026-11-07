@@ -23,9 +23,15 @@
 자동 test:e2e 명령은 없으므로 wrapper는 예상대로 exit 1을 반환했으며,
 이 문서의 실제 브라우저 근거로 보완했다. 통과하지 않은 명령을 통과로 표시하지 않는다.
 
-실제 브라우저 시나리오는 [`browser.cjs`](browser.cjs)에서 재현할 수 있다. 테스트 서버를 실행한 뒤 아래처럼 Playwright와 Chromium 경로를 환경 변수로 전달한다. 샌드박스 해제는 현재 관리형 환경에서만 `CHROMIUM_NO_SANDBOX=1`로 명시했다.
+실제 브라우저 시나리오는 [`browser.cjs`](browser.cjs)에서 재현할 수 있다. Playwright를 설치하고 Chromium 브라우저를 설치한 뒤, 테스트 서버와 스크립트를 별도 터미널에서 실행한다. 기본값은 Playwright가 설치한 Chromium과 기본 샌드박스를 사용한다.
 
 ```sh
-PORT=33723 DATABASE_PATH=/tmp/issue97-browser.sqlite APP_ORIGIN=http://127.0.0.1:33723 bun apps/server/src/index.ts
-BASE_URL=http://127.0.0.1:33723 PLAYWRIGHT_MODULE=playwright CHROMIUM_PATH=/usr/bin/chromium CHROMIUM_NO_SANDBOX=1 TESTED_BASE_COMMIT=5c8ebaf4230166c9d7b57c9cde8a51c7862bd163 TESTED_CODE_COMMIT=77e750ec377607d39f3f1eb8432306284f242f34 node docs/verification/issue97/browser.cjs
+PORT=33723 DATABASE_PATH=./issue97-browser.sqlite APP_ORIGIN=http://127.0.0.1:33723 bun apps/server/src/index.ts
+BASE_URL=http://127.0.0.1:33723 node docs/verification/issue97/browser.cjs
+```
+
+관리형 컨테이너에서만 시스템 Chromium 경로와 샌드박스 설정이 필요할 수 있다. 이 변경을 검증한 컨테이너 명령은 아래와 같으며, 이 경로와 샌드박스 opt-in은 일반 개발 환경 기본값이 아니다.
+
+```sh
+BASE_URL=http://127.0.0.1:33723 PLAYWRIGHT_MODULE=playwright CHROMIUM_PATH=/usr/bin/chromium CHROMIUM_NO_SANDBOX=1 TESTED_BASE_COMMIT=5c8ebaf4230166c9d7b57c9cde8a51c7862bd163 TESTED_CODE_COMMIT=f2acd6b925e06b9b2baa58d4a68e13738faeb1e node docs/verification/issue97/browser.cjs
 ```

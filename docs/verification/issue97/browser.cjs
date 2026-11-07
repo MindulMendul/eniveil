@@ -10,6 +10,25 @@ const nickname = `${Date.now().toString(36).slice(-6)}${'N'.repeat(14)}`;
 const resultsDir = path.resolve(process.env.RESULTS_DIR || 'docs/verification/issue97');
 const selectors = ['.header-navigation a', '#language', '.identity .dot', '.identity-name', '.identity-tag'];
 
+async function waitForStableHeader(page) {
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForFunction((required) => {
+    const signature = required.map((selector) => {
+      const node = document.querySelector(selector);
+      if (!node) return null;
+      const rect = node.getBoundingClientRect();
+      return [rect.left, rect.top, rect.width, rect.height].map((value) => value.toFixed(2)).join(',');
+    });
+    if (signature.some((box) => box === null)) return false;
+    const serialized = JSON.stringify(signature);
+    const state = window.__issue97StableHeader || { signature: null, frames: 0 };
+    state.frames = serialized === state.signature ? state.frames + 1 : 0;
+    state.signature = serialized;
+    window.__issue97StableHeader = state;
+    return state.frames >= 2;
+  }, selectors, { polling: 'raf', timeout: 5000 });
+}
+
 (async () => {
   const browser = await chromium.launch({
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
@@ -40,7 +59,7 @@ const selectors = ['.header-navigation a', '#language', '.identity .dot', '.iden
         await page.setViewportSize({ width, height: 900 });
         await page.goto(new URL(pathForLocale, baseUrl).toString(), { waitUntil: 'domcontentloaded' });
         await page.locator('.identity-name').waitFor();
-        await page.waitForTimeout(50);
+        await waitForStableHeader(page);
         const measured = await page.evaluate((required) => {
           const boxes = Object.fromEntries(required.map((selector) => {
             const node = document.querySelector(selector);
@@ -88,10 +107,12 @@ const selectors = ['.header-navigation a', '#language', '.identity .dot', '.iden
       const alternate = locale === 'en' ? 'ko' : 'en';
       await functionalPage.locator('#language').selectOption(alternate);
       await functionalPage.waitForFunction((value) => document.documentElement.lang === value, alternate);
+      await waitForStableHeader(functionalPage);
       const alternateHref = await functionalPage.locator('.header-navigation a').getAttribute('href');
       assert.ok(alternateHref.includes(alternate === 'en' ? '/en/workshop' : '/workshop'));
       await functionalPage.locator('#language').selectOption(locale);
       await functionalPage.waitForFunction((value) => document.documentElement.lang === value, locale);
+      await waitForStableHeader(functionalPage);
       await functionalPage.locator('.header-navigation a').click();
       await functionalPage.waitForFunction((value) => location.pathname.replace(/\/$/, '') === value, locale === 'en' ? '/en/workshop' : '/workshop');
       await Promise.all(pageRuns.map(({ page }) => page.close()));
