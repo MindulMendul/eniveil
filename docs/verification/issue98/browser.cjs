@@ -2,6 +2,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { assertDisposableTestTarget, installBrowserRequestGuard } = require('../test-target-guard.cjs');
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3183').replace(/\/$/, '');
 const resultsPath = process.env.RESULTS_PATH || 'docs/verification/issue98/browser-results.json';
@@ -26,7 +27,8 @@ async function signIn(page, locale) {
 }
 
 async function checkSettings(browser, locale, width, deleteAccount) {
-  const context = await browser.newContext({ viewport: { width, height: 900 } });
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width, height: 900 } });
+  await installBrowserRequestGuard(context, baseUrl);
   try {
     const page = await context.newPage();
     const errors = [];
@@ -94,6 +96,7 @@ async function checkSettings(browser, locale, width, deleteAccount) {
 }
 
 async function main() {
+  assertDisposableTestTarget(baseUrl);
   fs.mkdirSync(imagePath, { recursive: true });
   const browser = await chromium.launch(launchOptions);
   try {

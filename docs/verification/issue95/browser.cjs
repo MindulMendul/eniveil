@@ -1,10 +1,12 @@
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
+const { assertDisposableTestTarget, installBrowserRequestGuard } = require('../test-target-guard.cjs');
 
 const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:3215';
 const browserArgs = process.env.CHROMIUM_NO_SANDBOX === '1' ? ['--no-sandbox'] : [];
 
 (async () => {
+  assertDisposableTestTarget(baseUrl);
   const browser = await chromium.launch({
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
     headless: true,
@@ -16,7 +18,8 @@ const browserArgs = process.env.CHROMIUM_NO_SANDBOX === '1' ? ['--no-sandbox'] :
   try {
     const sessions = await Promise.all(
       Array.from({ length: 3 }, async (_, index) => {
-        const context = await browser.newContext();
+        const context = await browser.newContext({ serviceWorkers: 'block' });
+        await installBrowserRequestGuard(context, baseUrl);
         const page = await context.newPage();
         page.on('pageerror', (error) => errors.push(String(error)));
         await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });

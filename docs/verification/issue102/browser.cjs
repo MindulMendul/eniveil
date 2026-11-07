@@ -2,15 +2,18 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { assertDisposableTestTarget, fetchRouteWithoutRedirects, installBrowserRequestGuard, requestWithoutRedirects } = require('../test-target-guard.cjs');
 const base = (process.env.BASE_URL || 'http://127.0.0.1:3212').replace(/\/$/, '');
 const resultsDir = process.env.RESULTS_DIR || __dirname;
+assertDisposableTestTarget(base);
 fs.mkdirSync(resultsDir, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}), headless: true, args: ['--no-sandbox'] });
   const results = [];
   try {
-    const context = await browser.newContext();
-    const login = await context.request.post(`${base}/api/platform/guest`, { headers: { Origin: base }, data: { nickname: `카드${Date.now().toString().slice(-6)}` } });
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    await installBrowserRequestGuard(context, base);
+    const login = await requestWithoutRedirects(context.request, 'post', `${base}/api/platform/guest`, base, { headers: { Origin: base }, data: { nickname: `카드${Date.now().toString().slice(-6)}` } });
     assert.equal(login.status(), 201);
     const page = await context.newPage();
     const errors = []; page.on('pageerror', error => errors.push(error.message));
@@ -39,7 +42,7 @@ fs.mkdirSync(resultsDir, { recursive: true });
     }
     // Exercise unusually long public catalog text without adding fake production records.
     await page.route('**/api/lobby/stories?*', async route => {
-      const response = await route.fetch(); const data = await response.json();
+      const response = await fetchRouteWithoutRedirects(route, base); const data = await response.json();
       data.items[0].averageRating = 4.5; data.items[0].ratingCount = 12;
       data.items[0].title = '아주 긴 작품 제목과 줄바꿈 검증 '.repeat(8);
       data.items[0].subtitle = '소개 문구가 길어도 카드와 선택 버튼이 영역을 벗어나지 않아야 합니다. '.repeat(15);
@@ -56,7 +59,7 @@ fs.mkdirSync(resultsDir, { recursive: true });
     await page.getByRole('button', { name: '방 만들기', exact: false }).first().click();
     const available = page.locator('.story-picker-grid article').filter({ has: page.getByRole('heading', { name: '사라진 축제 초대장' }) });
     await available.getByRole('button').click(); await page.getByText('초대 코드', { exact: true }).waitFor();
-    const state = await (await context.request.get(`${base}/api/lobby/state`)).json(); assert.equal(state.room.scenario.id, 'rehearsal');
+    const state = await (await requestWithoutRedirects(context.request, 'get', `${base}/api/lobby/state`, base)).json(); assert.equal(state.room.scenario.id, 'rehearsal');
     await page.getByRole('button', { name: '방 나가기', exact: false }).click();
     assert.deepEqual(errors, []);
     results.push({ longTitleAndDescriptionAt320: true, ratedAndUnratedCountDisplay: true, createdRealRoom: true, leftRoom: true, pageErrors: errors });

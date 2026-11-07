@@ -2,6 +2,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { assertDisposableTestTarget, installBrowserRequestGuard } = require('../test-target-guard.cjs');
 
 const baseUrl = process.env.BASE_URL || 'http://127.0.0.1:33723';
 const browserArgs = process.env.CHROMIUM_NO_SANDBOX === '1' ? ['--no-sandbox'] : [];
@@ -30,6 +31,7 @@ async function waitForStableHeader(page) {
 }
 
 (async () => {
+  assertDisposableTestTarget(baseUrl);
   const browser = await chromium.launch({
     ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
     headless: true,
@@ -37,7 +39,8 @@ async function waitForStableHeader(page) {
   });
   const pageErrors = [];
   try {
-    const context = await browser.newContext();
+    const context = await browser.newContext({ serviceWorkers: 'block' });
+    await installBrowserRequestGuard(context, baseUrl);
     const loginPage = await context.newPage();
     await loginPage.goto(baseUrl, { waitUntil: 'domcontentloaded' });
     const login = await loginPage.evaluate(async (name) => {
