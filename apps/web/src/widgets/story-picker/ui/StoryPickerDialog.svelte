@@ -48,7 +48,16 @@
   let page = $state(1);
   let pages = $state(0);
   let retry = $state(0);
+  let filtersOpen = $state(false);
+  let activeFilterCount = $derived(
+    [search.trim() !== "", origin !== "all", difficulty !== "all", players !== "all", sort !== "latest"]
+      .filter(Boolean).length,
+  );
   const pageSize = 6;
+
+  $effect(() => {
+    if (!open) filtersOpen = false;
+  });
 
   $effect(() => {
     if (!open) return;
@@ -106,7 +115,7 @@
 </script>
 
 {#if open}
-  <Modal {open} {onClose} labelledby="picker-title">
+  <Modal {open} {onClose} labelledby="picker-title" class="story-picker-modal">
       <div class="section-heading">
         <p class="eyebrow section-eyebrow">CHOOSE YOUR STORY</p>
         <Button variant="dismiss" ariaLabel={t("closeStoryPicker")} onclick={onClose}>×</Button>
@@ -117,52 +126,69 @@
         <Button variant="tab" class="tab" onclick={onWorkshop}>{t("workshopNav")} ↗</Button>
       </div>
 
-      <section class="panel mb-4 mt-4">
-        <label class="input-label" for="story-catalog-search">{t("workshopSearchPlaceholder")}</label>
-        <TextInput
-          id="story-catalog-search"
-          type="search"
-          maxlength={100}
-          bind:value={search}
-          oninput={resetPage}
-          placeholder={t("workshopSearchPlaceholder")}
-         />
-        <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label class="input-label">
-            {t("storyOrigin")}
-            <Select bind:value={origin} onchange={resetPage}>
-              <option value="all">{t("workshopFilterAll")}</option>
-              <option value="original">{t("storyOriginal")}</option>
-              <option value="demo">{t("storyDemo")}</option>
-            </Select>
-          </label>
-          <label class="input-label">
-            {t("storyDifficulty")}
-            <Select bind:value={difficulty} onchange={resetPage}>
-              <option value="all">{t("workshopFilterAll")}</option>
-              <option value="easy">{t("difficultyEasy")}</option>
-              <option value="normal">{t("difficultyNormal")}</option>
-              <option value="hard">{t("difficultyHard")}</option>
-              <option value="unset">{t("difficultyUndetermined")}</option>
-            </Select>
-          </label>
-          <label class="input-label">
-            {t("workshopPlayers")}
-            <Select bind:value={players} onchange={resetPage}>
-              <option value="all">{t("allPlayerCounts")}</option>
-              {#each Array.from({ length: 20 }, (_, index) => index + 1) as playerCount}
-                <option value={playerCount}>{playerCount}{t("playerUnit")}</option>
-              {/each}
-            </Select>
-          </label>
-          <label class="input-label">
-            {t("storySort")}
-            <Select bind:value={sort} onchange={resetPage}>
-              <option value="latest">{t("sortLatest")}</option>
-              <option value="rating">{t("sortRating")}</option>
-              <option value="popular">{t("sortPopular")}</option>
-            </Select>
-          </label>
+      <section class="story-picker-filters mb-4 mt-4">
+        <Button
+          variant="secondary"
+          class="story-picker-filter-toggle"
+          aria-expanded={filtersOpen}
+          aria-controls="story-picker-filter-fields"
+          onclick={() => (filtersOpen = !filtersOpen)}
+        >
+          <span class="flex min-w-0 items-center gap-2">
+            <span>{t(filtersOpen ? "hideStoryFilters" : "showStoryFilters")}</span>
+            {#if activeFilterCount > 0}
+              <Badge tone="gold" aria-label={`${t("activeStoryFilters")}: ${activeFilterCount}`}>{activeFilterCount}</Badge>
+            {/if}
+          </span>
+          <span aria-hidden="true">{filtersOpen ? "−" : "+"}</span>
+        </Button>
+        <div id="story-picker-filter-fields" class="story-picker-filter-fields" hidden={!filtersOpen}>
+          <label class="input-label" for="story-catalog-search">{t("workshopSearchPlaceholder")}</label>
+          <TextInput
+            id="story-catalog-search"
+            type="search"
+            maxlength={100}
+            bind:value={search}
+            oninput={resetPage}
+            placeholder={t("workshopSearchPlaceholder")}
+           />
+          <div class="story-picker-filter-grid">
+            <label class="input-label">
+              {t("storyOrigin")}
+              <Select bind:value={origin} onchange={resetPage}>
+                <option value="all">{t("workshopFilterAll")}</option>
+                <option value="original">{t("storyOriginal")}</option>
+                <option value="demo">{t("storyDemo")}</option>
+              </Select>
+            </label>
+            <label class="input-label">
+              {t("storyDifficulty")}
+              <Select bind:value={difficulty} onchange={resetPage}>
+                <option value="all">{t("workshopFilterAll")}</option>
+                <option value="easy">{t("difficultyEasy")}</option>
+                <option value="normal">{t("difficultyNormal")}</option>
+                <option value="hard">{t("difficultyHard")}</option>
+                <option value="unset">{t("difficultyUndetermined")}</option>
+              </Select>
+            </label>
+            <label class="input-label">
+              {t("workshopPlayers")}
+              <Select bind:value={players} onchange={resetPage}>
+                <option value="all">{t("allPlayerCounts")}</option>
+                {#each Array.from({ length: 20 }, (_, index) => index + 1) as playerCount}
+                  <option value={playerCount}>{playerCount}{t("playerUnit")}</option>
+                {/each}
+              </Select>
+            </label>
+            <label class="input-label">
+              {t("storySort")}
+              <Select bind:value={sort} onchange={resetPage}>
+                <option value="latest">{t("sortLatest")}</option>
+                <option value="rating">{t("sortRating")}</option>
+                <option value="popular">{t("sortPopular")}</option>
+              </Select>
+            </label>
+          </div>
         </div>
       </section>
 
@@ -173,7 +199,7 @@
       {:else if !stories.length}
         <div class="empty"><span class="empty-symbol">✧</span><h3 class="heading-three">{t("workshopNoMatches")}</h3></div>
       {:else}
-        <div class="grid gap-3 md:grid-cols-2">
+        <div class="story-picker-grid">
           {#each stories as story (story.id + ":" + story.version)}
             <Card class="flex flex-col">
               <div class="section-heading">
@@ -198,10 +224,51 @@
         </div>
       {/if}
 
-      <footer class="mt-4 flex items-center justify-between border-t border-festival-line pt-4">
+      <footer class="mt-4 flex items-center justify-between gap-3 border-t border-festival-line pt-4">
         <Button variant="secondary" disabled={page <= 1 || loading} onclick={() => (page -= 1)}>{t("previous")} ←</Button>
-        <span class="muted text-sm">{page} / {Math.max(pages, 1)}</span>
+        <span class="muted whitespace-nowrap text-sm">{page} / {Math.max(pages, 1)}</span>
         <Button variant="secondary" disabled={page >= pages || loading} onclick={() => (page += 1)}>{t("next")} →</Button>
       </footer>
   </Modal>
 {/if}
+
+<style>
+  :global(.story-picker-modal) {
+    width: min(var(--layout-content), calc(100% - var(--spacing-6)));
+    max-width: var(--layout-content);
+  }
+
+  :global(.story-picker-filter-toggle) {
+    margin-top: 0;
+  }
+
+  .story-picker-filter-fields {
+    padding: var(--spacing-4);
+    border: var(--border-thin) solid var(--color-festival-line);
+    border-top: 0;
+  }
+
+  .story-picker-filter-fields .input-label {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+  }
+
+  .story-picker-filter-fields > .input-label {
+    margin-bottom: var(--spacing-2);
+  }
+
+  .story-picker-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--layout-filter-min)), 1fr));
+    gap: var(--spacing-3);
+    margin-top: var(--spacing-3);
+  }
+
+  .story-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--layout-card-min)), 1fr));
+    gap: var(--spacing-3);
+  }
+</style>
