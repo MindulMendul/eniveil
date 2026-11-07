@@ -8,7 +8,6 @@
   import { onMount, tick } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
   import { SoloGame } from "../pages/solo";
-  import { gameModes } from "./game-modes.js";
   import { clearSoloExit, matchesSoloExit, pendingSoloExit, type SoloExit } from "../shared/lib/solo-lifecycle";
   import { getLocaleFromPath, localePath, translate } from "../shared/lib";
 
@@ -407,8 +406,8 @@
       {busy}
       {connected}
       {t}
-      modes={gameModes}
       onSelectMode={selectGameMode}
+      onCreate={create}
       onJoin={join}
     />
   {:else if !session}
