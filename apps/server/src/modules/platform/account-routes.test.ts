@@ -228,6 +228,69 @@ test("OAuth initiation has no shared pending capacity; cookie tampering cannot c
   expect(f.store.db.query("SELECT * FROM oauth_consumed").all()).toHaveLength(0);
 });
 
+test("account deletion revokes every session, removes Google identity and owned content only", async () => {
+  const f = fixture();
+  const response = await f.req("/auth/google/demo", "", {});
+  const cookie = sessionCookie(response), demoCookie = sessionCookie(response, "festival_google_demo");
+  const { me } = await read(await f.req("/account/nickname", cookie, { nickname: "DeleteGoogle" }));
+  const secondToken = f.store.issue(me.id);
+  const other = await f.guest("OtherOwner");
+  const own = f.workshop.create(me, { package: source, published: true, thumbnailUrl: null, difficulty: null });
+  const retained = f.workshop.create(other.me, { package: source, published: true, thumbnailUrl: null, difficulty: null });
+  f.workshop.favorite(own.id, other.me.id, true);
+  f.workshop.favorite(retained.id, me.id, true);
+  expect((await f.req("/account/delete", "", {})).status).toBe(401);
+  const deletion = await f.req("/account/delete", cookie, {});
+  expect(deletion.status).toBe(200);
+  expect(deletion.headers.getSetCookie().some(value => value.startsWith("festival_guest=;") && value.includes("Max-Age=0"))).toBe(true);
+  expect(f.store.authenticate(secondToken)).toBeNull();
+  expect(f.store.nicknameAvailable(me.nickname)).toBe(true);
+  expect(f.workshop.get(own.id)).toBeUndefined();
+  expect(f.workshop.get(retained.id)).toBeDefined();
+  expect(f.store.db.query("SELECT * FROM workshop_favorites").all()).toHaveLength(0);
+  expect(f.store.db.query("SELECT * FROM google_accounts WHERE guest_id=?").all(me.id)).toHaveLength(0);
+  const next = await read(await f.req("/auth/google/demo", demoCookie, {}));
+  expect(next.me.id).not.toBe(me.id);
+  expect(next.needsNickname).toBe(true);
+});
+
+test("account deletion rejects active room members and rolls back failed persistence", async () => {
+  const f = fixture();
+  const a = await f.guest("KeepAccount");
+  f.store.state.rooms.test = { id: "test", code: "ABCDEF", hostId: a.me.id, scenarioId: "rehearsal", memberIds: [a.me.id], sessionId: null };
+  expect((await f.req("/account/delete", a.cookie, {})).status).toBe(409);
+  delete f.store.state.rooms.test;
+  const draft = f.workshop.create(a.me, { package: source, published: false, thumbnailUrl: null, difficulty: null });
+  const save = spyOn(f.store, "save").mockImplementation(() => { throw Error("disk failure"); });
+  try {
+    expect(() => f.store.deleteAccount(a.me)).toThrow("disk failure");
+    expect(f.store.authenticate(a.cookie.split("=")[1])?.id).toBe(a.me.id);
+    expect(f.workshop.get(draft.id)).toBeDefined();
+    expect(f.store.nicknameAvailable(a.me.nickname)).toBe(false);
+  } finally { save.mockRestore(); }
+});
+
+test("account deletion clears a pending Google login without deleting retained OAuth identity data", async () => {
+  let upstreamCalls = 0;
+  const f = fixture({
+    google: { clientId: "client", clientSecret: "secret", origin: "http://localhost" },
+    fetch: async () => { upstreamCalls++; return Response.json({ sub: "must-not-be-created" }); },
+  });
+  const pending = await f.req("/auth/google?locale=en");
+  const state = new URL(pending.headers.get("location")!).searchParams.get("state")!;
+  const pendingCookie = sessionCookie(pending, "festival_oauth_state");
+  const login = await f.req("/auth/google/demo", "", {});
+  const deletion = await f.req("/account/delete", sessionCookie(login), {});
+  expect(deletion.status).toBe(200);
+  expect(deletion.headers.getSetCookie().some((value) => value.startsWith("festival_oauth_state=;") && value.includes("Max-Age=0"))).toBe(true);
+  // The browser's shared cookie jar applies the deletion response to the other tab too.
+  const callback = await f.req(`/auth/google/callback?state=${state}&code=stale`, "");
+  expect(callback.headers.get("location")).toBe("/?auth=failed");
+  expect(upstreamCalls).toBe(0);
+  expect(f.store.db.query("SELECT * FROM google_accounts").all()).toHaveLength(0);
+  expect(pendingCookie).toContain("festival_oauth_state=");
+});
+
 test("OAuth invalid state returns to a fixed localized app URL without contacting Google or issuing credentials", async () => {
   let calls = 0;
   const f = fixture({ google: { clientId: "client", clientSecret: "secret", origin: "http://localhost" }, fetch: async () => { calls++; throw Error("must not fetch"); } });
