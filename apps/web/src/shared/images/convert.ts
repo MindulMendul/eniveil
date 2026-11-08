@@ -1,8 +1,9 @@
-export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+import { IMAGE_MAX_BYTES, WEBP_QUALITY } from '@festival/shared/images';
+export const MAX_IMAGE_BYTES = IMAGE_MAX_BYTES;
 import { checkDimensions, imageDimensions, jpegDimensions } from './headers';
 
 /** Converts locally; verifies actual encoder output rather than renaming a PNG fallback. */
-export async function convertToWebp(file: File): Promise<Blob> {
+export async function convertToWebp(file: Blob): Promise<Blob> {
   if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) throw Error('format');
   if (!file.size || file.size > MAX_IMAGE_BYTES) throw Error('size');
   const dimensions = file.type === 'image/jpeg' ? await jpegDimensions(file)
@@ -16,7 +17,7 @@ export async function convertToWebp(file: File): Promise<Blob> {
     const context = canvas.getContext('2d');
     if (!context) throw Error('unsupported');
     context.drawImage(bitmap, 0, 0);
-    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(Error('encode')), 'image/webp', 0.82));
+    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(Error('encode')), 'image/webp', WEBP_QUALITY / 100));
     if (blob.type !== 'image/webp') throw Error('unsupported');
     return blob;
   } finally { bitmap.close(); }

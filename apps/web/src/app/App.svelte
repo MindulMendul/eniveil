@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { WORKSHOP_AUTHORING_ENABLED } from "@festival/shared/features";
   import { shouldRecoverFocus } from "../shared/lib/focus-policy";
   import FriendsDrawer from '../features/friends/FriendsDrawer.svelte';
   import MyPage from "../pages/account/_MyPage.svelte";
@@ -42,7 +43,10 @@
   let picker = $state(false);
   let copied = $state(false);
   let locale = $state<"ko" | "en">(getLocaleFromPath(location.pathname));
-  const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "").replace(/\/+$/, "") || "/";
+  const pagePath = (pathname: string) => {
+    const path = pathname.replace(/^\/en(?=\/|$)/, "").replace(/\/+$/, "") || "/";
+    return !WORKSHOP_AUTHORING_ENABLED && path === "/workshop/editor" ? "/workshop" : path;
+  };
   let currentPath = $state(pagePath(location.pathname));
   const selectedWorkshopStory = () => {
     const id = new URLSearchParams(location.search).get("play");
@@ -54,7 +58,7 @@
   type AuthDestination = { page: "workshop" | "editor" | "account"; id?: string };
   let pendingAuthDestination: AuthDestination | undefined;
   let pendingGoogleAction: (() => void) | undefined;
-  let editorPath = $derived(currentPath === "/workshop/editor");
+  let editorPath = $derived(WORKSHOP_AUTHORING_ENABLED && currentPath === "/workshop/editor");
   let entryHome = $derived(currentPath === "/" && snapshot === null);
   let editorHasChanges = $state(false);
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
@@ -270,6 +274,7 @@
   }
 
   function openEditor(id?: string) {
+    if (!WORKSHOP_AUTHORING_ENABLED) { openWorkshop(); return; }
     if (!snapshot) { requestWorkshopLogin(() => openEditor(id), { page: "editor", id }); return; }
     editorId = id;
     currentPath = "/workshop/editor";
@@ -283,6 +288,7 @@
   }
 
   function createWorkshopStory() {
+    if (!WORKSHOP_AUTHORING_ENABLED) { openWorkshop(); return; }
     if (snapshot) openEditor();
     else requestWorkshopLogin(() => openEditor(), { page: "editor" });
   }

@@ -1,6 +1,6 @@
 import { expect, spyOn, test } from 'bun:test';
-import { checkDimensions, imageDimensions, jpegDimensions, webpFilename } from '../src/features/image-converter/headers';
-import { convertToWebp, MAX_IMAGE_BYTES } from '../src/features/image-converter/convert';
+import { checkDimensions, imageDimensions, jpegDimensions, webpFilename } from '../src/shared/images/headers';
+import { convertToWebp, MAX_IMAGE_BYTES } from '../src/shared/images/convert';
 
 test('oversized metadata rejects before decoding; wrong headers reject safely', async () => {
   const bytes = new Uint8Array(24);

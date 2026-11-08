@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ManagedImage from "../../../shared/ui/ManagedImage.svelte";
+  import { MANAGED_IMAGES } from "@festival/shared/images";
   import { Select, TextInput, Button, Modal, StateMessage, Badge } from "../../../shared/ui";
 
   type CatalogStory = {
@@ -203,7 +205,7 @@
           {#each stories as story (story.id + ":" + story.version)}
             <article class="flex min-w-0 flex-col overflow-hidden border border-festival-line bg-festival-panel" aria-labelledby={`picker-story-${story.id}`}>
               <div class="relative aspect-video overflow-hidden border-b border-festival-line bg-festival-bg">
-                <img src="/images/story-invitation.svg" alt="" width="640" height="360" class="h-full w-full object-cover" loading="lazy" />
+                <ManagedImage src={MANAGED_IMAGES.invitation} alt="" width="640" height="360" class="h-full w-full object-cover" loading="lazy" />
                 <div class="absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-3">
                   <Badge class="bg-festival-panel">{story.origin === "original" ? t("storyOriginal") : t("storyDemo")}</Badge>
                   <Badge tone={story.available ? "gold" : "default"} class="bg-festival-panel">{story.available ? t("storyAvailable") : t("storyComingSoon")}</Badge>

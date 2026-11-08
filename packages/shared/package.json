@@ -2,7 +2,11 @@
   "name": "@festival/shared",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./images": "./src/images.ts",
+    "./features": "./src/features.ts"
+  },
   "dependencies": {
     "zod": "^4.1.0"
   }

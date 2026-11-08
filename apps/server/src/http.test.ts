@@ -26,6 +26,17 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
       await Bun.sleep(30);
     }
     expect(ready).toBe(true);
+    for (const prefix of ['', '/en']) for (const suffix of ['', '/']) {
+      const response = await fetch(origin + prefix + '/workshop/editor' + suffix + '?id=old-draft', {redirect:'manual'});
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toBe(prefix + '/workshop/');
+    }
+    for (const [legacy, target] of [['/favicon.ico','/favicon.webp'],['/images/story-invitation.svg','/images/story-invitation.webp'],['/og/story-archive-ko-v1.png','/og/story-archive-ko-v2.webp']]) {
+      const response = await fetch(origin + legacy,{redirect:'manual'});
+      expect(response.status).toBe(301);
+      expect(response.headers.get('location')).toBe(target);
+    }
+
     for (const path of ["/missing-page", "/en/missing-page/", "/workshop/unknown", "/missing.js"]) {
       const response = await fetch(origin + path);
       expect(response.status).toBe(404);

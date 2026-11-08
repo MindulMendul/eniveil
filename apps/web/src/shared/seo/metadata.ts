@@ -1,9 +1,10 @@
+import { MANAGED_IMAGES } from '@festival/shared/images';
 export const publicPaths = ['/', '/workshop/', '/terms/', '/privacy/', '/about/'];
 export function shareImage(en: boolean, origin: string) {
   return {
-    url: new URL(`/og/story-archive-${en ? 'en' : 'ko'}-v1.png`, origin).href,
-    alt: en ? 'Story Archive — discover, play and create interactive mystery stories.' : '스토리 아카이브 — 추리 이야기를 발견하고, 플레이하고, 창작하세요.',
-    width: '1200', height: '630', type: 'image/png',
+    url: new URL(en ? MANAGED_IMAGES.ogEn : MANAGED_IMAGES.ogKo, origin).href,
+    alt: en ? 'Story Archive — discover and play interactive mystery stories.' : '스토리 아카이브 — 추리 이야기를 발견하고 플레이하세요.',
+    width: '1200', height: '630', type: 'image/webp',
   };
 }
 export function siteOrigin(value?: string) {
@@ -16,17 +17,17 @@ export function pageMetadata(pathname: string) {
   const path = pathname.replace(/^\/en(?=\/|$)/, '').replace(/\/+$/, '') || '/';
   const brand = en ? 'Story Archive' : '스토리 아카이브';
   const pages: Record<string, [string, string]> = en ? {
-    '/about': ['About', 'Learn how to discover, play and create interactive mystery stories on Story Archive.'],
-    '/': ['Interactive Stories', 'Discover interactive mystery stories to enjoy alone or with friends. Explore community stories and create your own.'],
-    '/workshop': ['Workshop', 'Explore community mystery stories, save favorites and start creating your own story.'],
+    '/about': ['About', 'Learn how to discover and play interactive mystery stories on Story Archive.'],
+    '/': ['Interactive Stories', 'Discover interactive mystery stories to enjoy alone or with friends. Explore community stories.'],
+    '/workshop': ['Workshop', 'Explore community mystery stories and save your favorites.'],
     '/terms': ['Terms of Service', 'Read the terms for using Story Archive and its interactive story platform.'],
     '/privacy': ['Privacy Policy', 'Learn how Story Archive handles account information, guest sessions and service data.'],
     '/mypage': ['My page', 'Manage your account and stories.'],
     '/workshop/editor': ['Story editor', 'Create and edit your private story drafts.'],
   } : {
-    '/about': ['서비스 소개', '스토리 아카이브에서 인터랙티브 추리 작품을 찾고, 플레이하고, 창작하는 방법을 소개합니다.'],
-    '/': ['인터랙티브 작품', '혼자 또는 친구와 즐기는 인터랙티브 추리 이야기를 만나세요. 창작마당에서 작품을 찾고 나만의 이야기를 시작할 수 있습니다.'],
-    '/workshop': ['창작마당', '다른 제작자의 추리 작품을 둘러보고 즐겨찾기에 저장하세요. 나만의 이야기도 창작마당에서 시작할 수 있습니다.'],
+    '/about': ['서비스 소개', '스토리 아카이브에서 인터랙티브 추리 작품을 찾고 플레이하는 방법을 소개합니다.'],
+    '/': ['인터랙티브 작품', '혼자 또는 친구와 즐기는 인터랙티브 추리 이야기를 만나세요. 창작마당에서 다양한 작품을 찾을 수 있습니다.'],
+    '/workshop': ['창작마당', '다른 제작자의 추리 작품을 둘러보고 즐겨찾기에 저장하세요.'],
     '/terms': ['이용약관', '스토리 아카이브의 인터랙티브 작품과 서비스 이용에 관한 약관을 확인하세요.'],
     '/privacy': ['개인정보 처리방침', '스토리 아카이브의 계정 정보, 게스트 세션과 서비스 데이터 처리 방침을 확인하세요.'],
     '/mypage': ['마이페이지', '계정과 내가 만든 작품을 관리합니다.'],
@@ -60,10 +61,10 @@ export function serializeSchema(value: unknown) {
 export function crawlerGuide(origin: string) {
   return `# Story Archive · 스토리 아카이브
 
-> Interactive mystery stories to discover, play and create.
-> 인터랙티브 추리 작품을 탐색하고 플레이하며 창작하는 플랫폼입니다.
+> Interactive mystery stories to discover and play.
+> 인터랙티브 추리 작품을 탐색하고 플레이하는 플랫폼입니다.
 
-Public pages are available in Korean and English. Sign in to play or create.
+Public pages are available in Korean and English. Sign in to play.
 Private drafts, accounts and role secrets are not public content.
 
 ## 한국어

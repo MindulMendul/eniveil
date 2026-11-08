@@ -1,0 +1,181 @@
+{
+  "screens": [
+    {
+      "language": "ko",
+      "width": 1440,
+      "state": "anonymous workshop",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 1440,
+      "state": "owner workshop / stale external image rejected",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 1440,
+      "state": "owner story dialog",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 1440,
+      "state": "owner account",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 1440,
+      "state": "bookmarked editor redirected",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 1440,
+      "state": "room story picker uses WebP",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 320,
+      "state": "anonymous workshop",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 320,
+      "state": "owner workshop / stale external image rejected",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 320,
+      "state": "owner story dialog",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 320,
+      "state": "owner account",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 320,
+      "state": "bookmarked editor redirected",
+      "pass": true
+    },
+    {
+      "language": "ko",
+      "width": 320,
+      "state": "room story picker uses WebP",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 1440,
+      "state": "anonymous workshop",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 1440,
+      "state": "owner workshop / stale external image rejected",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 1440,
+      "state": "owner story dialog",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 1440,
+      "state": "owner account",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 1440,
+      "state": "bookmarked editor redirected",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 1440,
+      "state": "room story picker uses WebP",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 320,
+      "state": "anonymous workshop",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 320,
+      "state": "owner workshop / stale external image rejected",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 320,
+      "state": "owner story dialog",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 320,
+      "state": "owner account",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 320,
+      "state": "bookmarked editor redirected",
+      "pass": true
+    },
+    {
+      "language": "en",
+      "width": 320,
+      "state": "room story picker uses WebP",
+      "pass": true
+    }
+  ],
+  "conversion": {
+    "outputs": [
+      {
+        "type": "image/webp",
+        "signature": "WEBP",
+        "width": 80,
+        "height": 60
+      },
+      {
+        "type": "image/webp",
+        "signature": "WEBP",
+        "width": 80,
+        "height": 60
+      },
+      {
+        "type": "image/webp",
+        "signature": "WEBP",
+        "width": 80,
+        "height": 60
+      },
+      {
+        "type": "image/webp",
+        "signature": "WEBP",
+        "width": 1,
+        "height": 1
+      }
+    ],
+    "rejected": [
+      true,
+      true,
+      true
+    ]
+  }
+}

@@ -1,4 +1,5 @@
-export const MAX_IMAGE_PIXELS = 16_000_000;
+import { IMAGE_MAX_PIXELS } from '@festival/shared/images';
+export const MAX_IMAGE_PIXELS = IMAGE_MAX_PIXELS;
 const jpegFrames = new Set([192, 193, 194, 195, 197, 198, 199, 201, 202, 203, 205, 206, 207]);
 
 /** Skip JPEG segment payloads; at most 4096 small reads, never a full-file allocation. */

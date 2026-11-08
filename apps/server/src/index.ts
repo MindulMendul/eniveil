@@ -1,3 +1,4 @@
+import { MANAGED_IMAGES, WORKSHOP_AUTHORING_ENABLED } from '@festival/shared';
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import { bodyLimit } from "hono/body-limit";
@@ -125,6 +126,20 @@ app.onError((error, c) =>
   ),
 );
 app.notFound((c) => c.json({ error: "찾을 수 없는 경로야." }, 404));
+
+// Hide unfinished authoring even for direct/bookmarked URLs.
+if (!WORKSHOP_AUTHORING_ENABLED) {
+  for (const prefix of ['', '/en']) for (const suffix of ['', '/']) {
+    app.get(`${prefix}/workshop/editor${suffix}`, (c) => c.redirect(`${prefix}/workshop/`, 302));
+  }
+}
+// Old bookmarks and cached metadata resolve to the managed WebP assets.
+for (const [legacy, target] of Object.entries({
+  '/favicon.ico': MANAGED_IMAGES.favicon,
+  '/images/story-invitation.svg': MANAGED_IMAGES.invitation,
+  '/og/story-archive-ko-v1.png': MANAGED_IMAGES.ogKo,
+  '/og/story-archive-en-v1.png': MANAGED_IMAGES.ogEn,
+})) app.get(legacy, (c) => c.redirect(target, 301));
 
 const webRoot = resolve(import.meta.dir, "../../web/dist");
 app.use("*", serveStatic({ root: webRoot }));
