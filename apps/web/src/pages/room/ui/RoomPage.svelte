@@ -53,16 +53,16 @@
         <h2 class="heading-two section-title">참가자</h2>
         <span class="count">{room.count} / {room.capacity}</span>
       </div>
-      <div class="members">
+      <ul class="members m-0 list-none p-0" role="list">
         {#each room.members as member (member.id)}
-          <RoomMemberRow member={member} currentMemberId={snapshot.me.id} hostId={room.hostId} />
+          <li><RoomMemberRow member={member} currentMemberId={snapshot.me.id} hostId={room.hostId} /></li>
         {/each}
         {#each Array(room.capacity - room.count) as _}
-          <div class="member vacant">
+          <li class="member vacant">
             <span class="avatar vacant-avatar">＋</span><span>누군가의 입장을 기다리는 중</span>
-          </div>
+          </li>
         {/each}
-      </div>
+      </ul>
     </Panel>
 
     <aside class="sidebar">

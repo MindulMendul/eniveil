@@ -29,11 +29,11 @@
     <span class="tag">시나리오 v{session.scenarioVersion}</span>
   </div>
 
-  <nav class="steps" aria-label="게임 진행 단계">
+  <ol class="steps m-0 list-none p-0" aria-label="게임 진행 단계">
     {#each Object.entries(GAME_PHASE_LABELS) as [key, label], index (key)}
-      <span class:active={session.phase === key} class="step">{String(index + 1).padStart(2, "0")} {label}</span>
+      <li class:active={session.phase === key} class="step" aria-current={session.phase === key ? "step" : undefined}>{String(index + 1).padStart(2, "0")} {label}</li>
     {/each}
-  </nav>
+  </ol>
 
   <div class="lobby-grid">
     <Panel class="story">

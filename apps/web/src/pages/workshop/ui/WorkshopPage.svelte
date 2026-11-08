@@ -121,7 +121,7 @@
   {#if loading}<StateMessage kind="loading" message={label('이야기를 불러오는 중…', 'Loading stories…')} />
   {:else if !stories.length}<div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{label('아직 일치하는 이야기가 없어요.', 'No stories match yet.')}</h2><p class="muted">{label('필터를 바꾸거나 새로운 이야기를 만들어 보세요.', 'Try different filters or create a story.')}</p></div>
   {:else}
-    <div class="story-grid">{#each stories as story (story.id)}
+    <ul class="story-grid m-0 list-none p-0" role="list">{#each stories as story (story.id)}<li class="grid min-w-0">
       <article class="panel story-card">
         <div class="thumbnail">{#if story.thumbnailUrl}<img src={story.thumbnailUrl} alt={story.title} loading="lazy" referrerpolicy="no-referrer" />{:else}<span aria-hidden="true">✧</span><span class="thumbnail-caption">STORY ARCHIVE</span>{/if}<span class="mode-tag">{story.mode === 'solo' ? label('혼자 플레이', 'Solo') : label('함께 플레이', 'Multiplayer')}</span></div>
         <div class="card-content"><div class="card-heading"><span class="tag">{difficultyLabel(story.difficulty)}</span>{#if !story.published}<span class="tag">{label('비공개 초안', 'Private draft')}</span>{/if}</div>
@@ -129,8 +129,8 @@
         <div class="statistics"><span>★ {story.averageRating === null ? label('평가 전', 'Unrated') : story.averageRating.toFixed(1)} <small>({story.ratingCount})</small></span><span>▷ {story.playCount} {label('플레이', 'plays')}</span><span>♡ {story.favoriteCount}</span></div>
         <div class="card-actions"><Button class="secondary" onclick={() => details(story)} variant="secondary">{label('자세히 보기', 'Details')}</Button>{#if story.published}<button class="favorite" class:saved={story.isFavorite} aria-pressed={story.isFavorite} aria-label={`${story.title} ${label('즐겨찾기', 'favorite')}`} disabled={favoriteBusy.includes(story.id)} onclick={() => void favorite(story)}>{story.isFavorite ? '♥' : '♡'}</button>{/if}{#if story.canEdit}<Button class="text-button" onclick={() => edit(story.id)} variant="text">{label('수정하기', 'Edit')} ↗</Button>{/if}</div>
         </div>
-      </article>
-    {/each}</div>
+      </article></li>
+    {/each}</ul>
     {#if total > pageSize}<nav class="pagination" aria-label={label('작품 페이지', 'Story pages')}><Button class="secondary" disabled={loading || offset === 0} onclick={() => void load(Math.max(0, offset-pageSize))} variant="secondary">← {label('이전', 'Previous')}</Button><span class="muted">{offset+1}–{Math.min(offset+pageSize,total)} / {total}</span><Button class="secondary" disabled={loading || offset+pageSize >= total} onclick={() => void load(offset+pageSize)} variant="secondary">{label('다음', 'Next')} →</Button></nav>{/if}
   {/if}
 </main>
