@@ -1,0 +1,54 @@
+---
+const enabled = /^GTM-[A-Z0-9]+$/.test(import.meta.env.PUBLIC_GTM_CONTAINER_ID?.trim() ?? '');
+const en = Astro.url.pathname.startsWith('/en');
+---
+{enabled && <aside class="analytics-choice" aria-label={en ? 'Analytics and advertising settings' : '분석 및 광고 설정'}>
+  <button type="button" data-analytics-settings aria-controls="analytics-choice-panel" aria-expanded="false">{en ? 'Analytics and advertising settings' : '분석 및 광고 설정'}</button>
+  <div id="analytics-choice-panel" data-analytics-choice hidden>
+    <p data-analytics-message>{en ? 'Allow analytics and advertising tags?' : '분석 및 광고 태그 사용에 동의하시나요?'}</p>
+    <a data-analytics-privacy href={en ? '/en/privacy/' : '/privacy/'}>{en ? 'Privacy policy' : '개인정보 처리방침'}</a>
+    <button type="button" data-analytics-deny>{en ? 'Deny' : '거부'}</button>
+    <button type="button" data-analytics-allow>{en ? 'Allow' : '허용'}</button>
+    <p data-analytics-error role="alert" hidden></p>
+  </div>
+</aside>}
+<script>
+  import { analyticsConsent, initializeAnalytics, setAnalyticsConsent, trackPageView } from '../../analytics.js';
+  const choice = document.querySelector<HTMLElement>('[data-analytics-choice]');
+  if (choice) {
+    const button = (selector: string) => document.querySelector<HTMLButtonElement>(selector)!;
+    const settings = button('[data-analytics-settings]');
+    const allow = button('[data-analytics-allow]');
+    const deny = button('[data-analytics-deny]');
+    const message = document.querySelector<HTMLElement>('[data-analytics-message]')!;
+    const error = document.querySelector<HTMLElement>('[data-analytics-error]')!;
+    const privacy = document.querySelector<HTMLAnchorElement>('[data-analytics-privacy]')!;
+    const sync = () => {
+      const en = location.pathname === '/en' || location.pathname.startsWith('/en/');
+      settings.textContent = en ? 'Analytics and advertising settings' : '분석 및 광고 설정';
+      settings.closest('aside')?.setAttribute('aria-label', settings.textContent);
+      allow.textContent = en ? 'Allow' : '허용'; deny.textContent = en ? 'Deny' : '거부';
+      message.textContent = en ? 'Allow analytics and advertising tags?' : '분석 및 광고 태그 사용에 동의하시나요?';
+      privacy.textContent = en ? 'Privacy policy' : '개인정보 처리방침';
+      privacy.href = en ? '/en/privacy/' : '/privacy/';
+      error.textContent = en ? 'Your choice could not be saved. Close all site tabs, then clear the saved consent in browser site data before returning.' : '선택을 저장할 수 없습니다. 사이트의 모든 탭을 닫고 다시 방문하기 전에 브라우저 사이트 데이터에서 저장된 동의를 삭제해 주세요.';
+      trackPageView(en ? 'en' : 'ko');
+    };
+    choice.hidden = analyticsConsent() !== null;
+    settings.setAttribute('aria-expanded', String(!choice.hidden));
+    settings.onclick = () => { choice.hidden = false; settings.setAttribute('aria-expanded', 'true'); deny.focus(); };
+    const choose = (value: 'granted' | 'denied') => {
+      if (!setAnalyticsConsent(value)) { error.hidden = false; return; }
+      error.hidden = true; choice.hidden = true; settings.setAttribute('aria-expanded', 'false'); settings.focus();
+    };
+    allow.onclick = () => choose('granted'); deny.onclick = () => choose('denied');
+    window.addEventListener('site:navigation', sync);
+    initializeAnalytics(); sync();
+  }
+</script>
+<style>
+  .analytics-choice{padding:1rem;position:relative;z-index:1;border-top:1px solid currentColor;font:inherit}
+  button{font:inherit;min-height:44px;padding:.5rem .75rem;cursor:pointer;margin:.25rem}
+  p{margin:.5rem 0;line-height:1.6}
+  [hidden]{display:none}
+</style>
