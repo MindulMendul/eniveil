@@ -64,7 +64,7 @@
         {
           "title": "3. 분석·오류 및 성능 측정",
           "paragraphs": [
-            "GTM 컨테이너가 설정된 배포에서는 분석 허용을 선택한 뒤에만 Google Tag Manager를 로드합니다. Google Analytics가 페이지 경로·언어·체류 시간·작품 이용 이벤트와 브라우저 정보를 처리하고 분석용 쿠키를 사용할 수 있습니다. 앱은 방 초대 코드가 포함된 쿼리와 해시를 페이지 조회 주소에서 제외합니다. 화면의 분석 설정에서 허용 또는 거부를 변경할 수 있으며, 이 선택은 브라우저에 저장됩니다. 거부로 변경하면 페이지를 다시 열어 태그 실행을 중단합니다. Google의 개인정보처리방침과 Analytics 차단 도구를 아래에서 확인할 수 있습니다.",
+            "GTM 컨테이너가 설정된 배포에서는 분석 및 광고 태그 사용에 동의한 뒤에만 Google Tag Manager를 로드합니다. 운영자가 GTM에 설정한 Google Analytics 등 분석·광고 태그가 페이지 경로·언어·체류 시간·작품 이용 이벤트와 브라우저 정보를 처리하고 쿠키를 사용할 수 있습니다. 앱은 방 초대 코드가 포함된 쿼리와 해시를 페이지 조회 주소에서 제외합니다. 화면의 분석 및 광고 설정에서 허용 또는 거부를 변경할 수 있으며, 이 선택은 브라우저에 저장됩니다. 거부로 변경하면 페이지를 다시 열어 태그 실행을 중단합니다. Google의 개인정보처리방침과 Analytics 차단 도구를 아래에서 확인할 수 있습니다.",
             "운영·QA 도메인에서는 Grafana Faro로 오류·세션·성능·추적 정보를 수집합니다. 전송 전 사용자 메타데이터와 페이지 경로·쿼리를 제거합니다. 서버에는 작품별 성능 측정값과 탐색 ID가 저장될 수 있습니다. 접속·보안 운영 과정에서 서버나 호스팅 로그에 IP 주소, 요청 정보, 브라우저 정보가 남을 수 있습니다."
           ]
         },
@@ -157,7 +157,7 @@
         {
           "title": "3. Analytics, errors and performance",
           "paragraphs": [
-            "Deployments with a GTM container configured load Google Tag Manager only after you allow analytics. Google Analytics may then be used to process page paths, language, time spent, story interaction events and browser information, and may use analytics cookies. The app excludes queries and fragments containing room invitation codes from page-view URLs. Your choice is stored in this browser and can be changed through Analytics settings. Denying after allowing reloads the page to stop tags. Links to Google's privacy policy and Analytics opt-out tool appear below.",
+            "Deployments with a GTM container configured load Google Tag Manager only after you allow analytics and advertising tags. Operator-configured analytics and advertising tags, including Google Analytics, may process page paths, language, time spent, story interaction events and browser information and may use cookies. The app excludes queries and fragments containing room invitation codes from page-view URLs. Your choice is stored in this browser and can be changed through Analytics and advertising settings. Denying after allowing reloads the page to stop tags. Links to Google's privacy policy and Analytics opt-out tool appear below.",
             "Production and QA domains use Grafana Faro for errors, sessions, performance and tracing. User metadata and page paths and queries are removed before sending. Story performance measurements and navigation IDs may also be stored on the server. Server or hosting logs may contain IP addresses, request information and browser details for access and security operations."
           ]
         },
