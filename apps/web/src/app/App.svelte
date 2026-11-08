@@ -1,8 +1,9 @@
 <script lang="ts">
   import { WORKSHOP_AUTHORING_ENABLED } from "@festival/shared/features";
+  import SoloRoomLifecycle from "../features/game/SoloRoomLifecycle.svelte";
+  import LazyContent from "../shared/ui/LazyContent.svelte";
   import { shouldRecoverFocus } from "../shared/lib/focus-policy";
   import FriendsDrawer from '../features/friends/FriendsDrawer.svelte';
-  import MyPage from "../pages/account/_MyPage.svelte";
   import NicknameField from "../features/account/NicknameField.svelte";
   import type { Guest } from "@festival/shared";
   import { Modal, Button, Panel, PageState } from "../shared/ui";
@@ -10,21 +11,23 @@
   import { pageMetadata } from "../shared/seo/metadata";
   import { onMount, tick } from "svelte";
   import type { Command, ServerEvent, Snapshot } from "@festival/shared";
-  import { SoloGame } from "../pages/solo";
   import { clearSoloExit, matchesSoloExit, pendingSoloExit, type SoloExit } from "../shared/lib/solo-lifecycle";
   import { getLocaleFromPath, localePath, translate } from "../shared/lib";
 
   import { EntryPage } from "../pages/entry";
-  import { GamePage } from "../pages/game";
   import { LobbyPage } from "../pages/lobby";
-  import { WorkshopPage } from "../pages/workshop/_index";
-  import WorkshopEditor from "../pages/workshop/ui/WorkshopEditor.svelte";
   import { RoomPage } from "../pages/room";
   import { AppFooter } from "../widgets/app-footer";
   import LegalLinks from "../widgets/app-footer/ui/LegalLinks.svelte";
   import { AppHeader } from "../widgets/app-header";
   import { ErrorNotice } from "../widgets/error-notice";
   import { StoryPickerDialog } from "../widgets/story-picker";
+
+  const loadAccountPage = () => import("../pages/account/_MyPage.svelte");
+  const loadSoloGame = () => import("../pages/solo");
+  const loadGamePage = () => import("../pages/game");
+  const loadWorkshopPage = () => import("../pages/workshop/_index");
+  const loadWorkshopEditor = () => import("../pages/workshop/ui/WorkshopEditor.svelte");
 
   let snapshot = $state<Snapshot | null>(null);
   let account = $state<{ me: Guest | null; accountType: string | null; needsNickname: boolean }>({ me: null, accountType: null, needsNickname: false });
@@ -530,21 +533,41 @@
   {:else if account.needsNickname}
     <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
   {:else if currentPath === "/mypage" && snapshot}
-    <MyPage onAuthLost={handleAuthLost} me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />
+    <LazyContent load={loadAccountPage} {locale}>
+      {#snippet children({ default: MyPage })}
+        {#if snapshot}<MyPage onAuthLost={handleAuthLost} me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />{/if}
+      {/snippet}
+    </LazyContent>
   {:else if currentPath === "/workshop" && workshopPlayId && room}
     <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "Leave your room before starting a workshop story." : "참가 중인 방에서 나온 뒤 창작 작품을 시작해 줘."}</p><Button onclick={openWorkshop}>{locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"}</Button></Panel></main>
   {:else if currentPath === "/workshop" && workshopPlayId}
-    {#key workshopPlayId}<main id="main-content" tabindex="-1" class="main"><SoloGame {locale} storyId={workshopPlayId} onExit={openWorkshop} exitLabel={locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"} /></main>{/key}
+    {#key workshopPlayId}<main id="main-content" tabindex="-1" class="main"><LazyContent load={loadSoloGame} {locale} embedded>
+      {#snippet children({ SoloGame })}
+        {#if workshopPlayId}<SoloGame {locale} storyId={workshopPlayId} onExit={openWorkshop} exitLabel={locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"} />{/if}
+      {/snippet}
+    </LazyContent></main>{/key}
   {:else if currentPath === "/workshop"}
-    <WorkshopPage {locale} onPlay={playWorkshopStory} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
+    <LazyContent load={loadWorkshopPage} {locale}>
+      {#snippet children({ WorkshopPage })}
+        <WorkshopPage {locale} onPlay={playWorkshopStory} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
+      {/snippet}
+    </LazyContent>
   {:else if editorPath && snapshot}
-    {#key editorId}<WorkshopEditor {locale} onDirtyChange={(dirty) => { editorHasChanges = dirty; }} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
+    {#key editorId}<LazyContent load={loadWorkshopEditor} {locale}>
+      {#snippet children({ default: WorkshopEditor })}
+        <WorkshopEditor {locale} onDirtyChange={(dirty) => { editorHasChanges = dirty; }} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />
+      {/snippet}
+    </LazyContent>{/key}
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
   {:else if room?.soloStarted && ownedSoloPlayId !== room.soloPlayId}
     <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Investigation in progress" : "수사 진행 중"}</h1><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
   {:else if room?.soloStarted}
-    {#key room.soloPlayId}<main id="main-content" tabindex="-1" class="main"><SoloGame {locale} storyId={room.soloStory.id} roomLifecycle={{ roomId: room.id, soloPlayId: room.soloPlayId }} onLifecycleExit={soloPageExited} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>{/key}
+    {#key room.soloPlayId}<SoloRoomLifecycle exit={{ roomId: room.id, soloPlayId: room.soloPlayId }} onExit={soloPageExited}><main id="main-content" tabindex="-1" class="main"><LazyContent load={loadSoloGame} {locale} embedded>
+      {#snippet children({ SoloGame })}
+        <SoloGame {locale} storyId={room.soloStory.id} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} />
+      {/snippet}
+    </LazyContent></main></SoloRoomLifecycle>{/key}
   {:else if !room}
     <LobbyPage
       bind:code
@@ -569,7 +592,11 @@
       onCommand={command}
     />
   {:else}
-    <GamePage {room} {session} {host} {busy} {connected} onCommand={command} />
+    <LazyContent load={loadGamePage} {locale}>
+      {#snippet children({ GamePage })}
+        <GamePage {room} {session} {host} {busy} {connected} onCommand={command} />
+      {/snippet}
+    </LazyContent>
   {/if}
 
   {#if entryHome}
