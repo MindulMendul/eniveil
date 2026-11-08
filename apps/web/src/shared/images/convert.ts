@@ -1,5 +1,5 @@
-import { IMAGE_MAX_BYTES, WEBP_QUALITY, checkImageBytes } from '@festival/shared/images';
-export const MAX_IMAGE_BYTES = IMAGE_MAX_BYTES;
+import { WEBP_QUALITY, checkImageBytes } from '@festival/shared/images';
+export { IMAGE_MAX_BYTES as MAX_IMAGE_BYTES } from '@festival/shared/images';
 import { checkDimensions, imageDimensions, jpegDimensions } from './headers';
 
 /** Converts locally; verifies actual encoder output rather than renaming a PNG fallback. */

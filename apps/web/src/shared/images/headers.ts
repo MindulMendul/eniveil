@@ -1,5 +1,4 @@
-import { IMAGE_MAX_PIXELS, checkImageDimensions } from '@festival/shared/images';
-export const MAX_IMAGE_PIXELS = IMAGE_MAX_PIXELS;
+export { IMAGE_MAX_PIXELS as MAX_IMAGE_PIXELS, checkImageDimensions as checkDimensions } from '@festival/shared/images';
 const jpegFrames = new Set([192, 193, 194, 195, 197, 198, 199, 201, 202, 203, 205, 206, 207]);
 
 /** Skip JPEG segment payloads; at most 4096 small reads, never a full-file allocation. */
@@ -33,8 +32,6 @@ export function webpFilename(name: string): string {
   return `${name.replace(/\.[^.]*$/, '') || 'image'}.webp`;
 }
 
-
-export const checkDimensions = checkImageDimensions;
 
 /** Bounded metadata scan, before a decoder can allocate an oversized bitmap. */
 export function imageDimensions(bytes: Uint8Array, mime: string): { width: number; height: number } {
