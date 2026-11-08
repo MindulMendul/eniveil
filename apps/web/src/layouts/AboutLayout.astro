@@ -1,5 +1,6 @@
 ---
 import "../shared/styles/base.css";
+import AnalyticsConsent from "../shared/analytics/AnalyticsConsent.astro";
 import Metadata from '../shared/seo/Metadata.astro';
 const { locale = 'ko' } = Astro.props;
 const en = locale === 'en';
@@ -40,5 +41,6 @@ const prefix = en ? '/en' : '';
         <li><a href={`${prefix}/privacy/`}>{en ? 'Privacy policy' : '개인정보 처리방침'}</a></li>
       </ul>
     </main>
+    <AnalyticsConsent />
   </body>
 </html>

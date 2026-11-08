@@ -1,4 +1,5 @@
 ---
+import AnalyticsConsent from "../shared/analytics/AnalyticsConsent.astro";
 import "../shared/styles/base.css";
 import Metadata from "../shared/seo/Metadata.astro";
 import App from "../app/App.svelte";
@@ -24,5 +25,6 @@ const { locale = "ko" } = Astro.props;
       initRUM();
     </script>
     <App client:only="svelte" />
+    <AnalyticsConsent />
   </body>
 </html>

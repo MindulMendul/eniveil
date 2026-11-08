@@ -4,12 +4,12 @@ RUN apt-get update \
   && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' zlib1g)" ge '1:1.3.dfsg+really1.3.1-1+deb13u1' \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-ARG PUBLIC_GA_MEASUREMENT_ID=
+ARG PUBLIC_GTM_CONTAINER_ID=
 ARG APP_RELEASE=local
 ARG PUBLIC_SITE_URL=https://mindul-murder-mystery.duckdns.org
 ARG PUBLIC_FARO_COLLECTOR_URL=/telemetry/collect
 ENV PUBLIC_SITE_URL=$PUBLIC_SITE_URL \
-    PUBLIC_GA_MEASUREMENT_ID=$PUBLIC_GA_MEASUREMENT_ID \
+    PUBLIC_GTM_CONTAINER_ID=$PUBLIC_GTM_CONTAINER_ID \
     APP_RELEASE=$APP_RELEASE \
     PUBLIC_RELEASE=$APP_RELEASE \
     PUBLIC_FARO_COLLECTOR_URL=$PUBLIC_FARO_COLLECTOR_URL

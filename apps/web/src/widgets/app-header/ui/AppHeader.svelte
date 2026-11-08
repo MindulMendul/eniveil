@@ -26,7 +26,6 @@
   </a>
   <div class="header-actions">
     <nav class="header-navigation" aria-label={locale === "en" ? "Main navigation" : "주요 메뉴"}>
-      <a class="text-button" href={localePath(locale, "/workshop")}>{t("workshopNav")}</a>
       {#if snapshot}<button class="text-button" onclick={onAccount}>{locale === "en" ? "My page" : "마이페이지"}</button>{/if}
       <label class="sr-only" for="language">{t("language")}</label>
       <select
