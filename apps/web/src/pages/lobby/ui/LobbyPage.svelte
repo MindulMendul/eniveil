@@ -2,7 +2,7 @@
   import type { Snapshot } from "@festival/shared";
   import { RoomCard } from "../../../entities/room";
   import { JoinRoomForm } from "../../../features/room-join";
-  import { Badge, Button, Card } from "../../../shared/ui";
+  import { Button } from "../../../shared/ui";
 
   let {
     snapshot,
@@ -11,7 +11,6 @@
     t,
     code = $bindable(""),
     onSelectMode,
-    onCreate,
     onJoin,
   }: {
     snapshot: Snapshot;
@@ -20,7 +19,6 @@
     t: (key: string) => string;
     code?: string;
     onSelectMode: (modeId: string) => void;
-    onCreate: (scenarioId: string) => void;
     onJoin: (code?: string) => void;
   } = $props();
 
@@ -47,42 +45,6 @@
       </div>
     </details>
   </div>
-
-  <section aria-labelledby="lobby-stories-title">
-    <h2 id="lobby-stories-title" class="mb-3 text-body-sm font-medium text-festival-muted">{t("platformStories")}</h2>
-    {#if snapshot.scenarios.length}
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {#each snapshot.scenarios as story (story.id)}
-          <Card class="!p-4 flex flex-col gap-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-label tracking-label text-festival-gold">{t(story.kind === "demo" ? "storyDemo" : "storyOriginal")}</span>
-              <Badge>{t(story.available ? "storyAvailable" : "storyComingSoon")}</Badge>
-            </div>
-            <h3 class="heading-three !m-0">{story.title}</h3>
-            <p class="muted grow">{story.subtitle}</p>
-            {#if story.available}
-              <dl class="flex flex-wrap gap-4 border-t border-festival-line pt-3 text-xs text-festival-muted">
-                <div><dt>{t("workshopPlayers")}</dt><dd>{story.players}{t("playerUnit")}</dd></div>
-                <div><dt>{t("storyDifficulty")}</dt><dd>{story.difficulty ? t(`difficulty${story.difficulty[0].toUpperCase()}${story.difficulty.slice(1)}`) : t("difficultyUndetermined")}</dd></div>
-              </dl>
-            {/if}
-            <Button
-              variant="secondary"
-              class="!mt-0 !px-3 !py-2"
-              ariaLabel={`${t(story.available ? "createRoom" : "storyComingSoon")} · ${story.title}`}
-              disabled={!story.available || busy || !connected}
-              onclick={() => onCreate(story.id)}
-            >
-              {t(story.available ? "createRoom" : "storyComingSoon")}
-              {#if story.available}<span aria-hidden="true">↗</span>{/if}
-            </Button>
-          </Card>
-        {/each}
-      </div>
-    {:else}
-      <p class="muted py-4" role="status">{t("workshopEmpty")}</p>
-    {/if}
-  </section>
 
   <section class="mt-8 border-t border-festival-line pt-5" aria-labelledby="lobby-rooms-title">
     <div class="section-heading mb-4">

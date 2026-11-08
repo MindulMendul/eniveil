@@ -23,11 +23,9 @@
       <span class="emblem" aria-hidden="true">S</span>
       <p class="eyebrow mt-4">{t("brand")}</p>
       <h1 id="entry-title" class="heading-two text-festival-gold">{t("entryInvitation")}</h1>
-      <p class="muted">{t("entryWelcome")}</p>
     </div>
     <div class="border-t border-festival-line pt-2">
       <GuestLoginForm bind:nickname {busy} {t} {locale} onSubmit={onLogin} />
-      <p class="fine">{t("entryHint")}</p>
     </div>
     <div class="mt-6 border-t border-festival-line pt-1">
       <Button variant="secondary" disabled={busy} onclick={onGoogle}>

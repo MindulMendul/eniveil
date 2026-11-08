@@ -6,6 +6,7 @@
 </script>
 
 <nav class="legal-links" aria-label={translate(locale, "legalNavigation")}>
+  <a href={localePath(locale, "/about")}>{locale === 'en' ? 'About' : '서비스 소개'}</a>
   <a href={localePath(locale, "/terms")}>{translate(locale, "termsOfService")}</a>
   <a href={localePath(locale, "/privacy")}>{translate(locale, "privacyPolicy")}</a>
 </nav>
