@@ -16,7 +16,7 @@ REPOSITORY = 'https://github.com/MindulMendul/murder-parker.git'
 TARGETS = {
     'production': {'branch': 'main', 'project': 'deploy', 'service': 'festival',
                    'container': 'deploy-festival-1', 'volume': 'deploy_festival-data',
-                   'origin': 'https://mindul-murder-mystery.duckdns.org',
+                   'origin': 'https://eniveil.com',
                    'alias': 'mindul-murder-mystery', 'port': 3000},
     'qa': {'branch': 'qa', 'project': 'murder-parker-qa', 'service': 'festival-qa',
            'container': 'murder-parker-qa-festival-qa-1', 'volume': 'murder-parker-qa_festival-qa-data',

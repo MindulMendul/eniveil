@@ -4,7 +4,7 @@ import UnoCSS from "@unocss/astro";
 
 export default defineConfig({
   output: "static",
-  site: process.env.PUBLIC_SITE_URL || "https://mindul-murder-mystery.duckdns.org",
+  site: process.env.PUBLIC_SITE_URL || "https://eniveil.com",
   i18n: {
     locales: ["ko", "en"],
     defaultLocale: "ko",
