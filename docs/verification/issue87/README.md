@@ -53,3 +53,6 @@ node docs/verification/issue87/empty-opening-browser.cjs
 ```
 
 The existing implementation also lets a started run continue from its pinned source after a story is unpublished. That policy question remains open for product approval; this fix does not change that behavior or claim the policy was approved.
+
+
+재실행은 자체 `DATABASE_PATH=:memory:` 서버에서만 한다. 두 스크립트에 `DISPOSABLE_TEST_SERVER=1`을 지정하고 `BASE_URL`은 정확한 loopback origin으로 지정한다. 브라우저 및 API 요청은 같은 origin으로 제한하고 redirect는 차단한다. QA/운영 URL은 브라우저 실행 전에 거절된다.

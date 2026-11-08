@@ -197,6 +197,19 @@
     };
   }
 
+  function handleAuthLost() {
+    account = { me: null, accountType: null, needsNickname: false };
+    snapshot = null; picker = false; accountLoaded = false;
+    connected = false; busy = false; ownedSoloPlayId = null; soloStartRequest = null;
+    clearTimeout(reconnectTimer);
+    for (const timeout of pending.values()) clearTimeout(timeout);
+    pending.clear();
+    if (socket) {
+      socket.onclose = null; socket.onmessage = null; socket.onopen = null; socket.onerror = null;
+      socket.close(); socket = undefined;
+    }
+  }
+
   function command(type: Command["type"], targetId?: string, mode?: "solo" | "multiplayer") {
     if (!connected || busy || !socket) return;
     if (type === "start") soloEndedNotice = false;
@@ -453,7 +466,7 @@
   {:else if account.needsNickname}
     <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
   {:else if currentPath === "/mypage" && snapshot}
-    <MyPage me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />
+    <MyPage onAuthLost={handleAuthLost} me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />
   {:else if currentPath === "/workshop" && workshopPlayId && room}
     <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "Leave your room before starting a workshop story." : "참가 중인 방에서 나온 뒤 창작 작품을 시작해 줘."}</p><Button onclick={openWorkshop}>{locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"}</Button></Panel></main>
   {:else if currentPath === "/workshop" && workshopPlayId}
@@ -503,11 +516,7 @@
 </div>
 
 {#if snapshot && account.accountType === 'google' && !room && !workshopPlayId && currentPath === '/'}
-  {#key snapshot.me.id}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={() => {
-    account = { me: null, accountType: null, needsNickname: false };
-    snapshot = null; picker = false; accountLoaded = false;
-    socket?.close();
-  }} />{/key}
+  {#key snapshot.me.id}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={handleAuthLost} />{/key}
 {/if}
 
 <StoryPickerDialog

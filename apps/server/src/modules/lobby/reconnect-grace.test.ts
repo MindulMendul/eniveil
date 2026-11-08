@@ -89,3 +89,37 @@ for (const playing of [false, true]) {
     expect(s.changes).toBe(1);
   });
 }
+
+test('voting completes when the last missing voter expires and preserves participant history', () => {
+  const s = setup(true), session = s.game.state.sessions[s.room.sessionId!];
+  s.game.command(s.a, { type: 'advance', requestId: 'discussion' });
+  s.game.command(s.a, { type: 'advance', requestId: 'voting' });
+  s.game.command(s.b, { type: 'vote', requestId: 'vote', targetId: s.a.id });
+  s.presence.disconnect(s.a.id); s.tick(60_000);
+  expect(session.phase).toBe('reveal');
+  expect(session.participants).toHaveLength(2);
+  expect(s.room.hostId).toBe(s.b.id);
+  s.game.command(s.b, { type: 'return', requestId: 'return' });
+  expect(session.endedAt).not.toBeNull();
+  expect(s.room.sessionId).toBeNull();
+});
+
+test('a player who expired before voting does not block the remaining vote', () => {
+  const s = setup(true), session = s.game.state.sessions[s.room.sessionId!];
+  s.presence.disconnect(s.b.id); s.tick(60_000);
+  s.game.command(s.a, { type: 'advance', requestId: 'discussion' });
+  s.game.command(s.a, { type: 'advance', requestId: 'voting' });
+  s.game.command(s.a, { type: 'vote', requestId: 'vote', targetId: s.a.id });
+  expect(session.phase).toBe('reveal');
+  expect(session.participants).toHaveLength(2);
+});
+
+test('an empty running room ends its session without counting abandonment as completion', () => {
+  const s = setup(true), session = s.game.state.sessions[s.room.sessionId!];
+  s.presence.disconnect(s.a.id); s.presence.disconnect(s.b.id); s.tick(60_000);
+  expect(s.game.state.rooms[s.room.id]).toBeUndefined();
+  expect(session.endedAt).not.toBeNull();
+  expect(session.phase).toBe('briefing');
+  const catalog = s.game.catalog({sort:'latest',limit:100,offset:0});
+  expect(catalog.items.find(story => story.id === 'rehearsal')?.completedPlays).toBe(0);
+});
