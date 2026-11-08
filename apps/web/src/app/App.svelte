@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shouldRecoverFocus } from "../shared/lib/focus-policy";
   import FriendsDrawer from '../features/friends/FriendsDrawer.svelte';
   import MyPage from "../pages/account/_MyPage.svelte";
   import NicknameField from "../features/account/NicknameField.svelte";
@@ -72,13 +73,35 @@
     !!room && room.count === room.capacity && room.members.every((member) => member.online),
   );
 
-  let previousFocusKey = '';
+  let shell = $state<HTMLDivElement>();
+  let previousMain: HTMLElement | null = null;
+  let lastFocusedControl: HTMLElement | null = null;
+  let previousNavigation: string | undefined;
+
+  function recoverMainFocus(navigationChanged = false) {
+    if (disposed || loading || !shell?.isConnected) return;
+    const main = shell.querySelector<HTMLElement>('main');
+    const mainReplaced = previousMain !== null && previousMain !== main;
+    const initialSignedIn = previousMain === null && !!account.me;
+    previousMain = main;
+    const active = document.activeElement;
+    if (main && shouldRecoverFocus({
+      ready: !loading,
+      dialogOpen: !!document.querySelector('dialog[open]'),
+      navigationChanged,
+      mainReplaced,
+      focusedControlRemoved: !!lastFocusedControl && !lastFocusedControl.isConnected,
+      initialSignedIn,
+      focusLost: !active || active === document.body || !active.isConnected,
+    })) main.focus();
+  }
+
   $effect(() => {
-    const key = [locale, currentPath, snapshot?.me.id ?? '', room?.id ?? '', session?.phase ?? '', workshopPlayId ?? ''].join(':');
-    if (previousFocusKey && key !== previousFocusKey) void tick().then(() => {
-      if (!document.querySelector('dialog[open]')) document.getElementById('main-content')?.focus();
-    });
-    previousFocusKey = key;
+    const navigation = [locale, currentPath].join(':');
+    if (previousNavigation !== undefined && previousNavigation !== navigation) {
+      void tick().then(() => recoverMainFocus(true));
+    }
+    previousNavigation = navigation;
   });
 
   async function api(path: string, body?: unknown) {
@@ -355,6 +378,13 @@
   }
 
   onMount(() => {
+    const rememberFocus = (event: FocusEvent) => {
+      const target = event.target;
+      lastFocusedControl = target instanceof HTMLElement && target.closest('main') ? target : null;
+    };
+    shell?.addEventListener('focusin', rememberFocus);
+    const focusObserver = new MutationObserver(() => { void tick().then(() => recoverMainFocus()); });
+    if (shell) focusObserver.observe(shell, { childList: true, subtree: true });
     const syncLocale = () => {
       if (loginDialog?.open) loginDialog.close();
       locale = getLocaleFromPath(location.pathname);
@@ -383,6 +413,8 @@
     })();
 
     return () => {
+      focusObserver.disconnect();
+      shell?.removeEventListener('focusin', rememberFocus);
       disposed = true;
       window.removeEventListener("popstate", syncLocale);
       clearTimeout(reconnectTimer);
@@ -396,7 +428,7 @@
   <title>{pageMetadata(localePath(locale, currentPath)).title}</title>
 </svelte:head>
 
-<div class="shell">
+<div class="shell" bind:this={shell}>
   {#if !entryHome}
     <AppHeader {snapshot} {connected} {locale} {t} accountType={account.accountType} onAccount={openAccount} onLocaleChange={changeLocale} />
   {/if}
