@@ -1,31 +1,42 @@
-# Issue 126 — focus recovery follow-up
+# Issue 126 — focus recovery and accessibility regression
 
-PR #138 이후 리뷰의 세 항목을 보완한다.
+PR #138의 포커스 리뷰 3건과 추가 회귀 검사에서 발견한 문제를 보완한다.
 
-- 서버의 단계/스냅샷 업데이트 자체를 포커스 이동 조건으로 쓰지 않는다. 연결된 조작 요소의 포커스를 유지한다.
-- 명시적인 경로·언어 이동은 본문으로 이동한다.
-- 로딩이 끝난 뒤 실제 main이 준비되었을 때 로그인한 화면의 포커스를 복구한다. 임시 로딩 main에는 포커스를 보내지 않는다.
-- solo 시작·소유권 전달·복귀 등 실제 DOM 화면 교체 또는 조작 요소 제거로 포커스를 잃은 경우 새 main으로 복구한다.
-- 계정 조회 중 언어를 변경해도 이동 요청을 유지하고 로딩 완료 후 본문으로 이동한다.
-- 열린 dialog는 포커스를 유지하며 관찰자는 앱 종료 시 해제한다.
+- 서버 단계·스냅샷 갱신 중 연결된 조작 요소의 포커스를 유지한다. 화면/조작 요소 제거로 포커스를 잃었을 때만 새 main으로 복구한다.
+- 경로·언어 이동은 최종 본문으로 이동한다. 계정 조회 중 언어를 바꿔도 요청을 보존하며 임시 로딩 main은 사용하지 않는다.
+- 로그인 초기화, 1인 시작·다른 탭의 소유권 안내·복귀를 처리한다. 열린 dialog를 존중하고 관찰자는 앱 종료 시 해제한다.
+- 게임 단계 글자는 기존 고대비 muted 토큰을 사용하고 현재 단계의 gold를 명시한다. 실제 게임 화면의 axe color-contrast 위반을 수정했다.
+- 다른 탭에서 열린 1인 수사 안내에도 h1을 제공한다. page-has-heading-one 위반을 수정했다.
+- 창작마당 상세 모달은 제목에 초기 포커스를 둔다. Orca가 첫 버튼만 읽고 제목을 생략하던 경우를 보완했다. 닫기 버튼의 primary/secondary 중복도 제거해 color-contrast 위반을 수정했다.
 
-## 검증
+## 2026-11-08 검증
 
-2026-11-08 최종 기본 verify 91 tests/5,162 assertions 통과. 포커스 정책의 단위 테스트 5개/13 assertions가 포함된다. 타입 검사 오류0, 기존 CSS 경고1이며 Astro 빌드도 통과했다. --browser wrapper는 기본 검사 후 test:e2e 부재로 exit1이고 이를 통과로 표시하지 않는다.
+- 최종 `bash scripts/codex/verify.sh`: 91 tests, 5,162 assertions, 실패0. 정책 단위 테스트 5개/13 assertions 포함. 타입 검사 오류0(기존 CSS 경고1), Astro 빌드 통과.
+- `--browser` wrapper는 기본 검사 후 test:e2e 부재로 exit1이었다. 이를 통과로 표시하지 않으며 아래 실제 Chromium 시나리오와 axe 검사로 보완했다.
+- 한국어·영어 × 1440/320 CSS px에서 실제 포커스 시나리오 12건 통과: 로그인 상태 새로고침, 다른 참가자의 단계 변경, 투표 집계/버튼 제거, 1인 시작/소유권/복귀, 계정 로딩 중 언어 변경.
+- 같은 4개 조합에서 건너뛰기, 필드 오류 연결/값 보존, SPA 이동, 상세 모달 Tab 순환/Escape/호출자 복귀/호출자 제거 시 본문 복귀, 200% 글자/간격/동작 감소/320px 재배치 통과.
+- axe-core wcag2a, wcag2aa, wcag21aa, best-practice: 일반 화면 36개(`axe-results.json`), 게임·투표·1인·언어 변경 상태 32개(`axe-focus.json`), 열린 상세 모달 4개(`axe-dialog.json`), 총72개 상태에서 최종 위반0.
 
-별도 실제 Chromium, 자체 메모리 DB 서버 127.0.0.1:3211에서 한국어·영어 × 1440/320px 12개 시나리오가 통과했다.
-
-- 로그인 상태 새로고침 후 최종 main 포커스.
-- 다른 참가자가 단계를 변경하는 동안 기존 헤더 조작 포커스 유지.
-- 투표 집계 업데이트 중 유효한 투표 버튼 포커스 유지.
-- 마지막 투표로 조작 요소가 제거되면 본문 복귀.
-- 1인 시작과 두 번째 탭의 소유권 안내 화면 포커스.
-- 다른 탭에서 수사를 종료하면 두 탭 모두 새 대기 화면으로 포커스 복구.
-
-재현 스크립트: issue126-focus/browser.cjs. 자체 서버를 DATABASE_PATH=:memory:, PORT=3211, APP_ORIGIN=http://127.0.0.1:3211로 실행한 뒤 다음을 사용한다.
+재현 파일은 `issue126-focus/`에 있다. 자체 메모리 DB 서버를 `DATABASE_PATH=:memory: PORT=3211 APP_ORIGIN=http://127.0.0.1:3211`로 실행한다. 외부 요청 차단과 disposable-test guard를 유지한다. 외부 인증이나 QA 데이터를 쓰지 않는다.
 
 ```sh
-DISPOSABLE_TEST_SERVER=1 PLAYWRIGHT_MODULE=/path/to/playwright node docs/verification/issue126-focus/browser.cjs
+DISPOSABLE_TEST_SERVER=1 PLAYWRIGHT_MODULE=/path/to/playwright AXE_PATH=/path/to/axe.min.js node docs/verification/issue126-focus/browser.cjs
+DISPOSABLE_TEST_SERVER=1 PLAYWRIGHT_MODULE=/path/to/playwright AXE_PATH=/path/to/axe.min.js node docs/verification/issue126-focus/keyboard.cjs
+DISPOSABLE_TEST_SERVER=1 PLAYWRIGHT_MODULE=/path/to/playwright AXE_PATH=/path/to/axe.min.js node docs/verification/issue126-focus/audit.cjs
 ```
 
-역할 비밀·토큰은 검증 로그로 수집하지 않는다. 자동 axe 검사 36개 화면에서 위반0, 키보드·오류·모달·확대 검증 4개 조합이 통과했다. axe-results.json에 최신 결과를 남겼다. 실제 스크린리더 검증은 별도 진행 중이며 이 결과로 대체하거나 통과라고 하지 않는다. QA/운영 배포 없음.
+## 실제 스크린리더 조합과 범위
+
+Debian 13, 실제 Orca 48.1 + AT-SPI 2.56.2 + Speech Dispatcher 0.12/espeak-ng + headed Chromium 155.0.8059.79를 사용했다. DOM/ARIA 모의 응답이 아니라 AT-SPI 이벤트를 읽는 실제 Orca의 SPEECH OUTPUT을 확인했다. `native-orca.cjs`와 `orca-results.json`에 시나리오와 익명화된 결과를 남긴다.
+
+한국어·영어 × 1440/320 CSS px에서 각15개, 총60개 실제 낭독 checkpoint가 통과했다: 닉네임/로그인 버튼, 코드 입력, 필터 접힘/펼침과 검색, 상세 제목/닫기 복귀, 창작 제목/저장 버튼, 계정 설정/로그아웃/탈퇴 버튼, 방 시작/1인 플레이 복귀 버튼. 키보드 전체 동작 검증과 구분해 실제 읽기 문자열을 확인한 범위를 기록했다.
+
+환경은 시스템 패키지를 변경하지 않고 공식 Debian 패키지를 작업 경로에 추출했다. 추출 경로를 맞추고, 종료된 zombie 프로세스를 실행 중인 reader로 오인하지 않도록 launcher의 liveness 확인을 보정하고, debug 파일을 line-buffered로 열었다. 읽기·포커스·음성 생성 로직은 변경하지 않았다. 전용 D-Bus/X11/Xauthority, 자체 브라우저 창과 로컬 메모리 DB만 사용했다.
+
+일반 설치 Orca로 재현하려면 전용 데스크톱에서 `orca --debug-file /tmp/orca-debug.out`를 실행한 후 같은 DISPLAY/D-Bus에서 다음을 사용한다. debug 파일은 줄 단위로 flush되어야 한다. 창 관리자 없는 테스트 X11에서는 동봉한 focus-window.py로 자체 Chromium 창에만 native focus를 준다.
+
+```sh
+DISPOSABLE_TEST_SERVER=1 ORCA_DEBUG_LOG=/tmp/orca-debug.out PLAYWRIGHT_MODULE=/path/to/playwright node docs/verification/issue126-focus/native-orca.cjs
+```
+
+제약: 합성 음성은 ALSA null 출력으로 보내고 생성된 낭독 문자열을 검사했다. 사람의 청취·한국어 발음/원어민 이해도, NVDA/VoiceOver, 실제 iOS/Android 보조기기, 모든 WCAG 2.2 항목의 완전한 적합성 인증을 의미하지 않는다. OAuth 제공자 화면은 외부 인증 없이 버튼 이름까지만 확인했다. 이 Orca 시나리오에서 계정 삭제·로그아웃은 버튼 이름·역할까지만 검사했고 실제 삭제는 수행하지 않았다. 게임 규칙/시간제한과 QA/운영 배포는 변경하지 않았다. 역할 비밀·토큰이 포함될 수 있는 원시 Orca 로그는 업로드하지 않는다.

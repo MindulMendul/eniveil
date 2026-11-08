@@ -196,7 +196,7 @@ export default defineConfig({
     "vacant-avatar": "border-dashed bg-transparent",
     "invite-code": "my-6 font-mono text-code tracking-code text-festival-gold",
     steps: "mb-8 grid grid-cols-4 gap-3 border-t border-festival-line",
-    step: "pt-4 text-xs text-festival-muted-olive max-mobile:text-label max-mobile:leading-readable",
+    step: "pt-4 text-xs text-festival-muted max-mobile:text-label max-mobile:leading-readable",
     active: "-mt-px border-t-2 border-festival-gold text-festival-gold",
     narrative: "my-6.5 font-serif text-title-sm leading-narrative text-festival-copy",
     story: "min-h-90 p-9 max-mobile:p-5.5",

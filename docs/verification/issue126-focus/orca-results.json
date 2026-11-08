@@ -1,0 +1,362 @@
+[
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "nickname name and entry role",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "Google login button",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "room code input",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "filter collapsed state",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "filter expanded state",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "search field name",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "named story dialog",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "dialog close restores opener",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "story title field",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "save story button",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "account settings heading",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "sign out button",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "delete account button",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "start game control",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "in-game return control",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "nickname name and entry role",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "Google login button",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "room code input",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "filter collapsed state",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "filter expanded state",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "search field name",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "named story dialog",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "dialog close restores opener",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "story title field",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "save story button",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "account settings heading",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "sign out button",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "delete account button",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "start game control",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "in-game return control",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "nickname name and entry role",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "Google login button",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "room code input",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "filter collapsed state",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "filter expanded state",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "search field name",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "named story dialog",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "dialog close restores opener",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "story title field",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "save story button",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "account settings heading",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "sign out button",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "delete account button",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "start game control",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "in-game return control",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "nickname name and entry role",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "Google login button",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "room code input",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "filter collapsed state",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "filter expanded state",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "search field name",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "named story dialog",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "dialog close restores opener",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "story title field",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "save story button",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "account settings heading",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "sign out button",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "delete account button",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "start game control",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "in-game return control",
+    "pass": true
+  }
+]
