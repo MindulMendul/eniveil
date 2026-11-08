@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { shouldRecoverFocus } from "../shared/lib/focus-policy";
   import FriendsDrawer from '../features/friends/FriendsDrawer.svelte';
   import MyPage from "../pages/account/_MyPage.svelte";
   import NicknameField from "../features/account/NicknameField.svelte";
@@ -72,13 +73,41 @@
     !!room && room.count === room.capacity && room.members.every((member) => member.online),
   );
 
-  let previousFocusKey = '';
+  let shell = $state<HTMLDivElement>();
+  let previousMain: HTMLElement | null = null;
+  let lastFocusedControl: HTMLElement | null = null;
+  let previousNavigation: string | undefined;
+  let pendingNavigationFocus = false;
+
+  function recoverMainFocus(navigationChanged = false) {
+    if (disposed) return;
+    pendingNavigationFocus = pendingNavigationFocus || navigationChanged;
+    if (loading || !shell?.isConnected) return;
+    const main = shell.querySelector<HTMLElement>('main');
+    if (!main) return;
+    const navigationRequested = pendingNavigationFocus;
+    pendingNavigationFocus = false;
+    const mainReplaced = previousMain !== null && previousMain !== main;
+    const initialSignedIn = previousMain === null && !!account.me;
+    previousMain = main;
+    const active = document.activeElement;
+    if (main && shouldRecoverFocus({
+      ready: !loading,
+      dialogOpen: !!document.querySelector('dialog[open]'),
+      navigationChanged: navigationRequested,
+      mainReplaced,
+      focusedControlRemoved: !!lastFocusedControl && !lastFocusedControl.isConnected,
+      initialSignedIn,
+      focusLost: !active || active === document.body || !active.isConnected,
+    })) main.focus();
+  }
+
   $effect(() => {
-    const key = [locale, currentPath, snapshot?.me.id ?? '', room?.id ?? '', session?.phase ?? '', workshopPlayId ?? ''].join(':');
-    if (previousFocusKey && key !== previousFocusKey) void tick().then(() => {
-      if (!document.querySelector('dialog[open]')) document.getElementById('main-content')?.focus();
-    });
-    previousFocusKey = key;
+    const navigation = [locale, currentPath].join(':');
+    if (previousNavigation !== undefined && previousNavigation !== navigation) {
+      void tick().then(() => recoverMainFocus(true));
+    }
+    previousNavigation = navigation;
   });
 
   async function api(path: string, body?: unknown) {
@@ -355,6 +384,13 @@
   }
 
   onMount(() => {
+    const rememberFocus = (event: FocusEvent) => {
+      const target = event.target;
+      lastFocusedControl = target instanceof HTMLElement && target.closest('main') ? target : null;
+    };
+    shell?.addEventListener('focusin', rememberFocus);
+    const focusObserver = new MutationObserver(() => { void tick().then(() => recoverMainFocus()); });
+    if (shell) focusObserver.observe(shell, { childList: true, subtree: true });
     const syncLocale = () => {
       if (loginDialog?.open) loginDialog.close();
       locale = getLocaleFromPath(location.pathname);
@@ -383,6 +419,8 @@
     })();
 
     return () => {
+      focusObserver.disconnect();
+      shell?.removeEventListener('focusin', rememberFocus);
       disposed = true;
       window.removeEventListener("popstate", syncLocale);
       clearTimeout(reconnectTimer);
@@ -396,7 +434,7 @@
   <title>{pageMetadata(localePath(locale, currentPath)).title}</title>
 </svelte:head>
 
-<div class="shell">
+<div class="shell" bind:this={shell}>
   {#if !entryHome}
     <AppHeader {snapshot} {connected} {locale} {t} accountType={account.accountType} onAccount={openAccount} onLocaleChange={changeLocale} />
   {/if}
@@ -427,7 +465,7 @@
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
   {:else if room?.soloStarted && ownedSoloPlayId !== room.soloPlayId}
-    <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
+    <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Investigation in progress" : "수사 진행 중"}</h1><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
   {:else if room?.soloStarted}
     {#key room.soloPlayId}<main id="main-content" tabindex="-1" class="main"><SoloGame {locale} storyId={room.soloStory.id} roomLifecycle={{ roomId: room.id, soloPlayId: room.soloPlayId }} onLifecycleExit={soloPageExited} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>{/key}
   {:else if !room}
