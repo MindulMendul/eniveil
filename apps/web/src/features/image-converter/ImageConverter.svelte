@@ -30,7 +30,7 @@
 </script>
 <section class="image-converter" aria-labelledby="image-converter-title">
   <h3 id="image-converter-title" class="heading-three">{label('이미지 WebP 변환', 'Convert image to WebP')}</h3>
-  <p class="muted">{label('기기에서 변환한 파일을 내려받아요. 최대 10 MB · 1,600만 픽셀. GIF와 움직이는 이미지는 첫 프레임만 저장돼요.', 'Convert and download locally. Up to 10 MB · 16 million pixels. Animated images and GIFs become a still first frame.')}</p>
+  <p class="muted">{label('최대 10 MB · 1,600만 픽셀. GIF와 움직이는 이미지는 첫 프레임만 저장돼요.', 'Up to 10 MB · 16 million pixels. Animated images and GIFs become a still first frame.')}</p>
   <label>{label('변환할 이미지', 'Image to convert')}<input type="file" accept="image/png,image/jpeg,image/gif,image/webp" disabled={busy} onchange={convert} /></label>
   {#if busy}<p role="status">{label('변환 중…', 'Converting…')}</p>{/if}
   {#if error}<p role="alert">{error}</p>{/if}
