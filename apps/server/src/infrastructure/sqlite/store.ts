@@ -69,6 +69,12 @@ export class Store {
     const owners = this.nicknames.get(nicknameKey(nickname));
     return !owners || (owners.size === 1 && owners.has(exceptId ?? ""));
   }
+  accountsNamed(nickname: string) {
+    return [...(this.nicknames.get(nicknameKey(nickname)) ?? [])]
+      .map(id => this.state.guests[id])
+      .filter((guest): guest is Guest => !!guest && this.accountType(guest.id) === 'google')
+      .slice(0, 20);
+  }
   private reserveNickname(nickname: string, id: string) {
     if (!nickname) return; // Google onboarding has not claimed a nickname yet.
     const key = nicknameKey(nickname);
@@ -131,6 +137,8 @@ export class Store {
       this.db.transaction(() => {
         this.db.query("DELETE FROM credentials WHERE guest_id=?").run(me.id);
         if (remove) {
+          if (this.db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='friend_connections'").get())
+            this.db.query('DELETE FROM friend_connections WHERE sender_id=? OR recipient_id=?').run(me.id, me.id);
           if (this.db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='workshop_drafts'").get()) {
             this.db.query("DELETE FROM workshop_favorites WHERE guest_id=? OR story_id IN (SELECT id FROM workshop_drafts WHERE owner_id=?)").run(me.id, me.id);
             this.db.query("DELETE FROM workshop_drafts WHERE owner_id=?").run(me.id);

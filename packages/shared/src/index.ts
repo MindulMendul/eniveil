@@ -6,6 +6,8 @@ export const nicknameSchema = z.string().trim().normalize("NFKC").refine(
   "닉네임은 문자·숫자·밑줄로 2~10자, 영문·숫자·밑줄만 쓰면 4~20자로 입력해 줘.",
 );
 export const guestSchema = z.object({ nickname: nicknameSchema });
+export const friendAccountIdSchema = z.uuid();
+export const friendRequestSchema = z.object({ accountId: friendAccountIdSchema });
 export const createRoomSchema = z.object({
   scenarioId: z.string().min(1).max(80),
 });

@@ -12,6 +12,7 @@ import { SQLiteWorkshopStore } from "./infrastructure/sqlite/workshop-store";
 import { PlayStoryCatalog } from "./modules/platform/stories/play-catalog";
 import { StorySessionService } from "./modules/game/story-session-service";
 import { createAccountRoutes } from "./modules/platform/account-routes";
+import { createFriendRoutes } from "./modules/platform/friend-routes";
 import { createPlatformRoutes } from "./modules/platform/routes";
 import { createWorkshopRoutes } from "./modules/workshop/routes";
 import { createGameRoutes } from "./modules/game/routes";
@@ -81,6 +82,7 @@ const google = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET 
   ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, origin: new URL(process.env.APP_ORIGIN).origin }
   : undefined;
 app.route("/api/platform", createAccountRoutes({ store, production, google, onLogout: lobby.disconnect, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
+app.route('/api/friends', createFriendRoutes(store));
 app.route("/api/platform", createPlatformRoutes({
   store,
   stories: playCatalog,
