@@ -37,3 +37,39 @@ export function pageMetadata(pathname: string) {
   const localized = (language: string) => `${language === 'en' ? '/en' : ''}${path === '/' ? '/' : path + '/'}`;
   return { title: `${name} · ${brand}`, description, brand, en, path, indexable, localized };
 }
+
+export function pageSchema(pathname: string, origin: string) {
+  const meta = pageMetadata(pathname);
+  if (!meta.indexable) return null;
+  const url = new URL(meta.localized(meta.en ? 'en' : 'ko'), origin).href;
+  const website = new URL(meta.en ? '/en/' : '/', origin).href + '#website';
+  return {
+    '@context': 'https://schema.org',
+    '@type': meta.path === '/' ? 'WebSite' : meta.path === '/workshop' ? 'CollectionPage' : meta.path === '/about' ? 'AboutPage' : 'WebPage',
+    '@id': meta.path === '/' ? website : url + '#webpage',
+    name: meta.title, description: meta.description, url,
+    inLanguage: meta.en ? 'en' : 'ko',
+    ...(meta.path === '/' ? {} : { isPartOf: { '@id': website } }),
+  };
+}
+
+export function serializeSchema(value: unknown) {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+export function crawlerGuide(origin: string) {
+  return `# Story Archive · 스토리 아카이브
+
+> Interactive mystery stories to discover, play and create.
+> 인터랙티브 추리 작품을 탐색하고 플레이하며 창작하는 플랫폼입니다.
+
+Public pages are available in Korean and English. Sign in to play or create.
+Private drafts, accounts and role secrets are not public content.
+
+## 한국어
+${publicPaths.map(path => `- [${pageMetadata(path).title}](${new URL(path, origin).href})`).join('\n')}
+
+## English
+${publicPaths.map(path => `- [${pageMetadata('/en' + path).title}](${new URL('/en' + path, origin).href})`).join('\n')}
+`;
+}
