@@ -1,4 +1,5 @@
 <script lang="ts">
+  import FriendsDrawer from '../features/friends/FriendsDrawer.svelte';
   import MyPage from "../pages/account/_MyPage.svelte";
   import NicknameField from "../features/account/NicknameField.svelte";
   import type { Guest } from "@festival/shared";
@@ -462,6 +463,14 @@
     <AppFooter {snapshot} {connected} {t} {locale} />
   {/if}
 </div>
+
+{#if snapshot && account.accountType === 'google' && !room && !workshopPlayId && currentPath === '/'}
+  {#key snapshot.me.id}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={() => {
+    account = { me: null, accountType: null, needsNickname: false };
+    snapshot = null; picker = false; accountLoaded = false;
+    socket?.close();
+  }} />{/key}
+{/if}
 
 <StoryPickerDialog
   open={picker && snapshot !== null}
