@@ -40,3 +40,5 @@ DISPOSABLE_TEST_SERVER=1 ORCA_DEBUG_LOG=/tmp/orca-debug.out PLAYWRIGHT_MODULE=/p
 ```
 
 제약: 합성 음성은 ALSA null 출력으로 보내고 생성된 낭독 문자열을 검사했다. 사람의 청취·한국어 발음/원어민 이해도, NVDA/VoiceOver, 실제 iOS/Android 보조기기, 모든 WCAG 2.2 항목의 완전한 적합성 인증을 의미하지 않는다. OAuth 제공자 화면은 외부 인증 없이 버튼 이름까지만 확인했다. 이 Orca 시나리오에서 계정 삭제·로그아웃은 버튼 이름·역할까지만 검사했고 실제 삭제는 수행하지 않았다. 게임 규칙/시간제한과 QA/운영 배포는 변경하지 않았다. 역할 비밀·토큰이 포함될 수 있는 원시 Orca 로그는 업로드하지 않는다.
+
+재현 스크립트는 한 줄로 압축하지 않고 조건문·오류 생성을 명시했다. 스크린리더/실시간 게임의 순서를 유지하는 runSequential을 사용하며, X11 조회 실행 파일은 /usr/bin/xwininfo로 고정해 PATH 검색을 제거했다. 분석 규칙 제외나 Quality Gate 우회는 하지 않았다.

@@ -1,16 +1,107 @@
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const fs=require('node:fs');const assert=require('node:assert/strict');const {execFileSync}=require('node:child_process');
-const {installBrowserRequestGuard,assertDisposableTestTarget}=require('../test-target-guard.cjs');
-const origin='http://127.0.0.1:3211';assertDisposableTestTarget(origin);const log=process.env.ORCA_DEBUG_LOG;if(!log)throw Error('ORCA_DEBUG_LOG is required');const results=[];
-async function post(p,path,body){return p.evaluate(async({path,body})=>{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw Error('Setup '+r.status);return r.json()},{path,body});}
-async function speech(p,label,action,expected){const start=fs.statSync(log).size;await action();let found=false;for(let i=0;i<20;i++){await p.waitForTimeout(300);const lines=fs.readFileSync(log).subarray(start).toString('utf8').split('\n').filter(x=>x.includes('SPEECH OUTPUT'));if(lines.some(x=>expected.test(x))){found=true;break;}}assert(found,label+' missing native speech');results.push({language:await p.locator('html').getAttribute('lang'),width:p.viewportSize().width,checkpoint:label,pass:true});console.log('PASS native Orca',label);await p.waitForTimeout(600);}
-(async()=>{const b=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',headless:false,args:['--no-sandbox','--force-renderer-accessibility','--disable-features=Translate,TranslateUI','--disable-translate']});try{for(const en of [false,true])for(const width of [1440,320]){if(process.env.ORCA_SKIP_KO_DESKTOP==='1'&&!en&&width===1440)continue;const c=await b.newContext({viewport:{width,height:900},serviceWorkers:'block'});await installBrowserRequestGuard(c,origin);const p=await c.newPage();const prefix=en?'/en':'';const go=async path=>{await p.goto(origin+prefix+path);await p.locator('main h1').waitFor();await p.waitForLoadState('networkidle');await p.waitForTimeout(1500)};await go('/');await p.bringToFront();const tree=execFileSync('xwininfo',['-root','-tree'],{encoding:'utf8'});const win=tree.split('\n').find(x=>x.includes('Chromium')&&!x.includes(' (has no name)'));assert(win);execFileSync('/usr/bin/python3',[require('node:path').join(__dirname,'focus-window.py'),win.match(/0x[0-9a-f]+/i)[0]]);await p.waitForTimeout(1000);
-await speech(p,'nickname name and entry role',()=>p.locator('#nickname').focus(),/닉네임|Nickname|nickname/);
-await speech(p,'Google login button',()=>p.getByRole('button',{name:/Google|구글/}).focus(),/Google|구글/);
-await post(p,'/api/platform/guest',{nickname:'o'+crypto.randomUUID().slice(0,7)});await go('/');await p.locator('details summary').focus();await p.keyboard.press('Enter');await speech(p,'room code input',()=>p.locator('#code').focus(),/코드|code/i);
-const source=JSON.parse(fs.readFileSync(require('node:path').join(__dirname,'../../../apps/server/stories/deokil-trading-murder.mstory'),'utf8'));source.story.title='NativeReader '+crypto.randomUUID().slice(0,5);await post(p,'/api/workshop/drafts',{package:source,published:true});await go('/workshop/');await speech(p,'filter collapsed state',()=>p.locator('details summary').focus(),/collapsed/);await speech(p,'filter expanded state',()=>p.keyboard.press('Enter'),/expanded/);await speech(p,'search field name',()=>p.keyboard.press('Tab'),/제목|Title/);
-const card=p.locator('article').filter({has:p.getByRole('heading',{name:source.story.title,exact:true})});await card.getByRole('button',{name:en?'Details':'자세히 보기',exact:true}).focus();await p.waitForTimeout(1000);await speech(p,'named story dialog',()=>p.keyboard.press('Enter'),/NativeReader/);await speech(p,'dialog close restores opener',()=>p.keyboard.press('Escape'),/자세히 보기|Details/);
-await go('/workshop/editor/');await speech(p,'story title field',()=>p.getByLabel(en?'Title':'제목',{exact:true}).focus(),/제목|Title/);await speech(p,'save story button',async()=>{const save=p.getByRole('button',{name:en?'Save story':'스토리 저장',exact:true});await save.scrollIntoViewIfNeeded();await p.waitForTimeout(500);assert(await save.isEnabled());await save.focus()},/스토리 저장|Save story/);
-await go('/mypage/');await p.getByRole('button',{name:en?'Account settings':'계정 설정',exact:true}).focus();await p.waitForTimeout(1000);await speech(p,'account settings heading',()=>p.getByRole('button',{name:en?'Account settings':'계정 설정',exact:true}).click(),/계정 설정|Account settings/);await speech(p,'sign out button',()=>p.getByRole('button',{name:en?'Sign out':'로그아웃',exact:true}).focus(),/로그아웃|Sign out/);await speech(p,'delete account button',()=>p.getByRole('button',{name:en?'Delete account':'회원탈퇴',exact:true}).focus(),/회원탈퇴|Delete account/);
-await go('/');await post(p,'/api/lobby/rooms',{scenarioId:'deokil-trading-murder'});const start=p.getByRole('button',{name:/게임 시작/});await start.waitFor();await speech(p,'start game control',()=>start.focus(),/게임 시작/);await p.keyboard.press('Enter');const back=p.getByRole('button',{name:en?'Return to room':'방으로 돌아가기',exact:true});await back.waitFor();await speech(p,'in-game return control',()=>back.focus(),/방으로 돌아가기|Return to room/);await c.unrouteAll({behavior:'wait'});await c.close();}}
-finally{await b.close();fs.writeFileSync(process.env.ORCA_RESULTS_PATH || require('node:path').join(__dirname,'orca-results.json'),JSON.stringify(results,null,2));}})().catch(e=>{console.error(e.message);process.exitCode=1});
+// Scenarios share a screen reader, live game or DOM: each action must finish before the next.
+async function runSequential(items, action, index = 0) {
+ if (index >= items.length) { return; }
+ await action(items[index]);
+ return runSequential(items, action, index + 1);
+}
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
+const { installBrowserRequestGuard, assertDisposableTestTarget } = require('../test-target-guard.cjs');
+const origin = 'http://127.0.0.1:3211';
+assertDisposableTestTarget(origin);
+const log = process.env.ORCA_DEBUG_LOG;
+if (!log) {
+    throw new Error('ORCA_DEBUG_LOG is required');
+}
+const results = [];
+async function post(p, path, body) { return p.evaluate(async ({ path, body }) => { const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) {
+    throw new Error('Setup ' + r.status);
+} return r.json(); }, { path, body }); }
+async function waitForSpeech(p, start, expected, attempt = 0) {
+    await p.waitForTimeout(300);
+    const lines = fs.readFileSync(log).subarray(start).toString('utf8').split('\n').filter(x => x.includes('SPEECH OUTPUT'));
+    if (lines.some(x => expected.test(x))) {
+        return true;
+    }
+    if (attempt >= 19) {
+        return false;
+    }
+    return waitForSpeech(p, start, expected, attempt + 1);
+}
+async function speech(p, label, action, expected) {
+    const start = fs.statSync(log).size;
+    await action();
+    assert(await waitForSpeech(p, start, expected), label + ' missing native speech');
+    results.push({ language: await p.locator('html').getAttribute('lang'), width: p.viewportSize().width, checkpoint: label, pass: true });
+    console.log('PASS native Orca', label);
+    await p.waitForTimeout(600);
+}
+(async () => {
+    const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', headless: false, args: ['--no-sandbox', '--force-renderer-accessibility', '--disable-features=Translate,TranslateUI', '--disable-translate'] });
+    try {
+        await runSequential([false, true], async (en) => {
+            await runSequential([1440, 320], async (width) => {
+                if (process.env.ORCA_SKIP_KO_DESKTOP === '1' && !en && width === 1440) {
+                    return;
+                }
+                const c = await b.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block' });
+                await installBrowserRequestGuard(c, origin);
+                const p = await c.newPage();
+                const prefix = en ? '/en' : '';
+                const go = async (path) => { await p.goto(origin + prefix + path); await p.locator('main h1').waitFor(); await p.waitForLoadState('networkidle'); await p.waitForTimeout(1500); };
+                await go('/');
+                await p.bringToFront();
+                const tree = execFileSync('/usr/bin/xwininfo', ['-root', '-tree'], { encoding: 'utf8' });
+                const win = tree.split('\n').find(x => x.includes('Chromium') && !x.includes(' (has no name)'));
+                assert(win);
+                execFileSync('/usr/bin/python3', [require('node:path').join(__dirname, 'focus-window.py'), win.match(/0x[0-9a-f]+/i)[0]]);
+                await p.waitForTimeout(1000);
+                await speech(p, 'nickname name and entry role', () => p.locator('#nickname').focus(), /닉네임|Nickname|nickname/);
+                await speech(p, 'Google login button', () => p.getByRole('button', { name: /Google|구글/ }).focus(), /Google|구글/);
+                await post(p, '/api/platform/guest', { nickname: 'o' + crypto.randomUUID().slice(0, 7) });
+                await go('/');
+                await p.locator('details summary').focus();
+                await p.keyboard.press('Enter');
+                await speech(p, 'room code input', () => p.locator('#code').focus(), /코드|code/i);
+                const source = JSON.parse(fs.readFileSync(require('node:path').join(__dirname, '../../../apps/server/stories/deokil-trading-murder.mstory'), 'utf8'));
+                source.story.title = 'NativeReader ' + crypto.randomUUID().slice(0, 5);
+                await post(p, '/api/workshop/drafts', { package: source, published: true });
+                await go('/workshop/');
+                await speech(p, 'filter collapsed state', () => p.locator('details summary').focus(), /collapsed/);
+                await speech(p, 'filter expanded state', () => p.keyboard.press('Enter'), /expanded/);
+                await speech(p, 'search field name', () => p.keyboard.press('Tab'), /제목|Title/);
+                const card = p.locator('article').filter({ has: p.getByRole('heading', { name: source.story.title, exact: true }) });
+                await card.getByRole('button', { name: en ? 'Details' : '자세히 보기', exact: true }).focus();
+                await p.waitForTimeout(1000);
+                await speech(p, 'named story dialog', () => p.keyboard.press('Enter'), /NativeReader/);
+                await speech(p, 'dialog close restores opener', () => p.keyboard.press('Escape'), /자세히 보기|Details/);
+                await go('/workshop/editor/');
+                await speech(p, 'story title field', () => p.getByLabel(en ? 'Title' : '제목', { exact: true }).focus(), /제목|Title/);
+                await speech(p, 'save story button', async () => { const save = p.getByRole('button', { name: en ? 'Save story' : '스토리 저장', exact: true }); await save.scrollIntoViewIfNeeded(); await p.waitForTimeout(500); assert(await save.isEnabled()); await save.focus(); }, /스토리 저장|Save story/);
+                await go('/mypage/');
+                await p.getByRole('button', { name: en ? 'Account settings' : '계정 설정', exact: true }).focus();
+                await p.waitForTimeout(1000);
+                await speech(p, 'account settings heading', () => p.getByRole('button', { name: en ? 'Account settings' : '계정 설정', exact: true }).click(), /계정 설정|Account settings/);
+                await speech(p, 'sign out button', () => p.getByRole('button', { name: en ? 'Sign out' : '로그아웃', exact: true }).focus(), /로그아웃|Sign out/);
+                await speech(p, 'delete account button', () => p.getByRole('button', { name: en ? 'Delete account' : '회원탈퇴', exact: true }).focus(), /회원탈퇴|Delete account/);
+                await go('/');
+                await post(p, '/api/lobby/rooms', { scenarioId: 'deokil-trading-murder' });
+                const start = p.getByRole('button', { name: /게임 시작/ });
+                await start.waitFor();
+                await speech(p, 'start game control', () => start.focus(), /게임 시작/);
+                await p.keyboard.press('Enter');
+                const back = p.getByRole('button', { name: en ? 'Return to room' : '방으로 돌아가기', exact: true });
+                await back.waitFor();
+                await speech(p, 'in-game return control', () => back.focus(), /방으로 돌아가기|Return to room/);
+                await c.unrouteAll({ behavior: 'wait' });
+                await c.close();
+            });
+        });
+    }
+    finally {
+        await b.close();
+        fs.writeFileSync(process.env.ORCA_RESULTS_PATH || require('node:path').join(__dirname, 'orca-results.json'), JSON.stringify(results, null, 2));
+    }
+})().catch(e => { console.error(e.message); process.exitCode = 1; });
