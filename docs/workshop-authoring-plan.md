@@ -20,7 +20,7 @@
 
 ## 공통 이미지 모듈
 
-- `apps/web/src/shared/images`: UI 없는 `convertToWebp(Blob)`, 파일명/실제 헤더/치수 검증. PNG/JPEG/GIF/WebP 입력, 최대10MiB/1,600만 픽셀. 브라우저 인코더 결과가 실제 image/webp인지 확인한다. GIF/움직이는 입력은 기존과 같이 첫 프레임 정지 이미지로 처리한다.
+- `apps/web/src/shared/images`: UI 없는 `convertToWebp(Blob)`, 파일명/실제 헤더/치수 검증. PNG/JPEG/GIF/WebP 입력, 원본 최대10MiB, 가로·세로 각각4,096px 이하 및1,600만 픽셀 이하, 변환 WebP 최대1MiB. 초과 시 자동 축소 없이 거절한다. 브라우저 인코더 결과가 실제 image/webp인지 확인한다. GIF/움직이는 입력은 기존과 같이 첫 프레임 정지 이미지로 처리한다.
 - `build.ts`: 신뢰된 빌드 원본을 Sharp로 실제 WebP 인코딩한다. 원본은 public 밖에 보관하고, public에는 생성된 WebP만 둔다. 개발/빌드 모두 같은 통합을 사용한다.
 - `packages/shared/src/images.ts`: 바이트·픽셀·품질 정책과 관리 경로 등록부. 현재는 등록된 정적 자산만 허용하며 향후 서버가 검증·등록한 업로드 자산을 연결할 때 확장한다. 아무 `.webp` 주소나 신뢰하지 않는다.
 - `ManagedImage.svelte`: 등록 경로만 출력하고 미등록/이전 외부 경로는 관리되는 기본 이미지로 대체한다. 작성 API도 외부·미등록 경로를 거절한다. 이전 URL은 DB에서 일괄 삭제하지 않고 응답에서 비노출한다.

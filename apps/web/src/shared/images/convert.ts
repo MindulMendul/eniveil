@@ -1,11 +1,11 @@
-import { IMAGE_MAX_BYTES, WEBP_QUALITY } from '@festival/shared/images';
-export const MAX_IMAGE_BYTES = IMAGE_MAX_BYTES;
+import { WEBP_QUALITY, checkImageBytes } from '@festival/shared/images';
+export { IMAGE_MAX_BYTES as MAX_IMAGE_BYTES } from '@festival/shared/images';
 import { checkDimensions, imageDimensions, jpegDimensions } from './headers';
 
 /** Converts locally; verifies actual encoder output rather than renaming a PNG fallback. */
 export async function convertToWebp(file: Blob): Promise<Blob> {
   if (!['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)) throw new Error('format');
-  if (!file.size || file.size > MAX_IMAGE_BYTES) throw new Error('size');
+  checkImageBytes(file.size);
   const dimensions = file.type === 'image/jpeg' ? await jpegDimensions(file)
     : imageDimensions(new Uint8Array(await file.slice(0, 256 * 1024).arrayBuffer()), file.type);
   checkDimensions(dimensions.width, dimensions.height);
@@ -24,6 +24,7 @@ export async function convertToWebp(file: Blob): Promise<Blob> {
       }, 'image/webp', WEBP_QUALITY / 100);
     });
     if (blob.type !== 'image/webp') throw new Error('unsupported');
+    checkImageBytes(blob.size, true);
     return blob;
   } finally { bitmap.close(); }
 }
