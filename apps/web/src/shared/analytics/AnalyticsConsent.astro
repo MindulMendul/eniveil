@@ -31,7 +31,7 @@ const en = Astro.url.pathname.startsWith('/en');
       message.textContent = en ? 'Allow analytics and advertising tags?' : '분석 및 광고 태그 사용에 동의하시나요?';
       privacy.textContent = en ? 'Privacy policy' : '개인정보 처리방침';
       privacy.href = en ? '/en/privacy/' : '/privacy/';
-      error.textContent = en ? 'Your choice could not be saved. Close all site tabs and check browser storage settings.' : '선택을 저장할 수 없습니다. 사이트의 모든 탭을 닫고 브라우저 저장소 설정을 확인해 주세요.';
+      error.textContent = en ? 'Your choice could not be saved. Close all site tabs, then clear the saved consent in browser site data before returning.' : '선택을 저장할 수 없습니다. 사이트의 모든 탭을 닫고 다시 방문하기 전에 브라우저 사이트 데이터에서 저장된 동의를 삭제해 주세요.';
       trackPageView(en ? 'en' : 'ko');
     };
     choice.hidden = analyticsConsent() !== null;
