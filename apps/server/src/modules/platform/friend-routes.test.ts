@@ -6,12 +6,12 @@ import { Hono } from 'hono';
 import { Store } from '../../store';
 import { createFriendRoutes } from './friend-routes';
 const cleanup: (() => void)[] = [];
-const read = async (response: Response) => await response.json() as {friends: {id:string;nickname:string}[];incoming: unknown[];outgoing:unknown[]};
+const read = async (response: Response) => await response.json() as {friends: {id:string;nickname:string;online?:boolean}[];incoming: unknown[];outgoing:unknown[]};
 afterEach(() => { for (const run of cleanup.splice(0).reverse()) run(); });
-function fixture(path = ':memory:') {
+function fixture(path = ':memory:', isOnline?: (id: string) => boolean) {
   const store = new Store(path);
   cleanup.push(() => store.close());
-  const app = new Hono(); app.route('/api/friends', createFriendRoutes(store));
+  const app = new Hono(); app.route('/api/friends', createFriendRoutes(store, { isOnline }));
   app.onError((_error,c) => c.json({error:'Invalid input'},400));
   const account = (name: string) => { const me = store.googleAccount('google:' + name); store.rename(me,name); return {me,cookie:'festival_guest=' + store.issue(me.id)}; };
   const request = (path: string, cookie = '', body?: object) => app.request('http://localhost/api/friends' + path, {
@@ -56,4 +56,17 @@ test('rejection remains private and relationships persist across process restart
   await first.request(`/requests/${a.me.id}/accept`,b.cookie,{});
   const second=fixture(db);
   expect((await read(await second.request('',a.cookie))).friends).toEqual([{id:b.me.id,nickname:'Bobby'}]);
+});
+test('presence is limited to accepted friends and reflects active connections', async () => {
+  const online = new Set<string>();
+  const {request,account} = fixture(':memory:', id => online.has(id));
+  const a=account('Alice'), b=account('Bobby'), c=account('Carol');
+  await request('/requests',a.cookie,{accountId:b.me.id});
+  online.add(b.me.id);
+  expect((await read(await request('',a.cookie))).friends).toEqual([]);
+  await request(`/requests/${a.me.id}/accept`,b.cookie,{});
+  expect((await read(await request('',a.cookie))).friends).toEqual([{id:b.me.id,nickname:'Bobby',online:true}]);
+  expect((await read(await request('',c.cookie))).friends).toEqual([]);
+  online.delete(b.me.id);
+  expect((await read(await request('',a.cookie))).friends).toEqual([{id:b.me.id,nickname:'Bobby',online:false}]);
 });

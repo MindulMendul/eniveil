@@ -4,7 +4,7 @@ import { friendAccountIdSchema, friendRequestSchema, nicknameSchema, type Guest 
 import type { Store } from '../../store';
 
 type Connection = { sender_id: string; recipient_id: string; status: 'pending' | 'accepted' };
-export function createFriendRoutes(store: Store) {
+export function createFriendRoutes(store: Store, options: { isOnline?: (id: string) => boolean } = {}) {
   const app = new Hono<{ Variables: { me: Guest } }>();
   store.db.exec(`CREATE TABLE IF NOT EXISTS friend_connections (
     low_id TEXT NOT NULL, high_id TEXT NOT NULL,
@@ -32,11 +32,11 @@ export function createFriendRoutes(store: Store) {
   app.get('/', c => {
     const me = c.get('me');
     const rows = store.db.query('SELECT sender_id,recipient_id,status FROM friend_connections WHERE sender_id=? OR recipient_id=? LIMIT 500').all(me.id, me.id) as Connection[];
-    const friends: {id:string;nickname:string}[] = [], incoming: typeof friends = [], outgoing: typeof friends = [];
+    const friends: {id:string;nickname:string;online?:boolean}[] = [], incoming: typeof friends = [], outgoing: typeof friends = [];
     for (const row of rows) {
       const other = member(row.sender_id === me.id ? row.recipient_id : row.sender_id);
       if (!other) continue;
-      if (row.status === 'accepted') friends.push(other);
+      if (row.status === 'accepted') friends.push({ ...other, ...(options.isOnline ? {online: options.isOnline(other.id)} : {}) });
       else if (row.recipient_id === me.id) incoming.push(other);
       else outgoing.push(other);
     }
