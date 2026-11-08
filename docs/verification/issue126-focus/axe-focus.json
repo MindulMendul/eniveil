@@ -1,0 +1,194 @@
+[
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "briefing",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "discussion",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "voting",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "reveal",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "solo-playing",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "solo-ownership",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "solo-return",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "delayed-language",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "briefing",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "discussion",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "voting",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "reveal",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "solo-playing",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "solo-ownership",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "solo-return",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "delayed-language",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "briefing",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "discussion",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "voting",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "reveal",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "solo-playing",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "solo-ownership",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "solo-return",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "delayed-language",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "briefing",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "discussion",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "voting",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "reveal",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "solo-playing",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "solo-ownership",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "solo-return",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "delayed-language",
+    "violations": []
+  }
+]

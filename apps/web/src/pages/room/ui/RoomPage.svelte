@@ -13,7 +13,6 @@
     copied,
     onCopy,
     locale,
-    onMode,
     onCommand,
   }: {
     snapshot: Snapshot;
@@ -24,13 +23,12 @@
     connected: boolean;
     copied: boolean;
     locale: "ko" | "en";
-    onMode: (mode: "solo" | "multiplayer") => void;
     onCopy: () => void;
     onCommand: (type: Command["type"], targetId?: string) => void;
   } = $props();
 </script>
 
-<main class="main">
+<main id="main-content" tabindex="-1" class="main">
   <p class="eyebrow">ROOM DETAILS</p>
   <div class="page-heading">
     <div>
@@ -47,16 +45,7 @@
     <Button variant="text" disabled={busy || !connected} onclick={() => onCommand("leave")}>방 나가기 ↗</Button>
   </div>
 
-  <Panel class="mb-6">
-    <h2 class="heading-two">{locale === "en" ? "Room mode" : "방 모드"}</h2>
-    <p class="muted">{locale === "en" ? `Solo plays ${room.soloStory.title}. Multiplayer plays your selected story, ${room.scenario.title}.` : `1인 모드는 「${room.soloStory.title}」을 플레이해. 다인 모드는 선택한 작품 「${room.scenario.title}」을 플레이해.`}</p>
-    <div class="flex flex-wrap gap-3">
-      <Button variant={room.mode === "solo" ? "primary" : "secondary"} disabled={!host || busy || !connected || room.count !== 1} onclick={() => onMode("solo")} aria-pressed={room.mode === "solo"}>{locale === "en" ? "Solo mode" : "1인 모드"} · {room.soloStory.title}</Button>
-      <Button variant={room.mode === "multiplayer" ? "primary" : "secondary"} disabled={!host || busy || !connected} onclick={() => onMode("multiplayer")} aria-pressed={room.mode === "multiplayer"}>{locale === "en" ? "Multiplayer mode" : "다인 모드"}</Button>
-    </div>
-    {#if room.count > 1}<p class="fine">{locale === "en" ? "Solo mode is available when only the host remains." : "방장 혼자 남았을 때 1인 모드로 바꿀 수 있어."}</p>{/if}
     {#if room.mode === "solo"}<p class="fine">{locale === "en" ? "Reloading or leaving this page ends the investigation and returns you to this room. Progress is not saved." : "새로고침하거나 페이지를 떠나면 수사를 종료하고 이 방으로 돌아와. 수사 진행은 저장되지 않아."}</p>{/if}
-  </Panel>
 
   <div class="lobby-grid">
     <Panel>
@@ -64,16 +53,16 @@
         <h2 class="heading-two section-title">참가자</h2>
         <span class="count">{room.count} / {room.capacity}</span>
       </div>
-      <div class="members">
+      <ul class="members m-0 list-none p-0" role="list">
         {#each room.members as member (member.id)}
-          <RoomMemberRow member={member} currentMemberId={snapshot.me.id} hostId={room.hostId} />
+          <li><RoomMemberRow member={member} currentMemberId={snapshot.me.id} hostId={room.hostId} /></li>
         {/each}
         {#each Array(room.capacity - room.count) as _}
-          <div class="member vacant">
+          <li class="member vacant">
             <span class="avatar vacant-avatar">＋</span><span>누군가의 입장을 기다리는 중</span>
-          </div>
+          </li>
         {/each}
-      </div>
+      </ul>
     </Panel>
 
     <aside class="sidebar">

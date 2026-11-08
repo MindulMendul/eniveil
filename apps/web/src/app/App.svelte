@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { shouldRecoverFocus } from "../shared/lib/focus-policy";
+  import FriendsDrawer from '../features/friends/FriendsDrawer.svelte';
   import MyPage from "../pages/account/_MyPage.svelte";
   import NicknameField from "../features/account/NicknameField.svelte";
   import type { Guest } from "@festival/shared";
@@ -42,6 +44,11 @@
   let locale = $state<"ko" | "en">(getLocaleFromPath(location.pathname));
   const pagePath = (pathname: string) => pathname.replace(/^\/en(?=\/|$)/, "").replace(/\/+$/, "") || "/";
   let currentPath = $state(pagePath(location.pathname));
+  const selectedWorkshopStory = () => {
+    const id = new URLSearchParams(location.search).get("play");
+    return pagePath(location.pathname) === "/workshop" && id && id.length <= 200 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id) ? id : null;
+  };
+  let workshopPlayId = $state<string | null>(selectedWorkshopStory());
   let loginDialog = $state<HTMLDialogElement>(undefined!);
   let pendingWorkshopAction: (() => void) | undefined;
   type AuthDestination = { page: "workshop" | "editor" | "account"; id?: string };
@@ -57,6 +64,9 @@
   let socket: WebSocket | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
+  let authGeneration = 0;
+  let authRequests = new AbortController();
+  const currentAuth = (generation: number) => !disposed && generation === authGeneration;
   const pending = new Map<string, ReturnType<typeof setTimeout>>();
 
   let room = $derived(snapshot?.room ?? null);
@@ -66,13 +76,53 @@
     !!room && room.count === room.capacity && room.members.every((member) => member.online),
   );
 
+  let shell = $state<HTMLDivElement>();
+  let previousMain: HTMLElement | null = null;
+  let lastFocusedControl: HTMLElement | null = null;
+  let previousNavigation: string | undefined;
+  let pendingNavigationFocus = false;
+
+  function recoverMainFocus(navigationChanged = false) {
+    if (disposed) return;
+    pendingNavigationFocus = pendingNavigationFocus || navigationChanged;
+    if (loading || !shell?.isConnected) return;
+    const main = shell.querySelector<HTMLElement>('main');
+    if (!main) return;
+    const navigationRequested = pendingNavigationFocus;
+    pendingNavigationFocus = false;
+    const mainReplaced = previousMain !== null && previousMain !== main;
+    const initialSignedIn = previousMain === null && !!account.me;
+    previousMain = main;
+    const active = document.activeElement;
+    if (main && shouldRecoverFocus({
+      ready: !loading,
+      dialogOpen: !!document.querySelector('dialog[open]'),
+      navigationChanged: navigationRequested,
+      mainReplaced,
+      focusedControlRemoved: !!lastFocusedControl && !lastFocusedControl.isConnected,
+      initialSignedIn,
+      focusLost: !active || active === document.body || !active.isConnected,
+    })) main.focus();
+  }
+
+  $effect(() => {
+    const navigation = [locale, currentPath].join(':');
+    if (previousNavigation !== undefined && previousNavigation !== navigation) {
+      void tick().then(() => recoverMainFocus(true));
+    }
+    previousNavigation = navigation;
+  });
+
   async function api(path: string, body?: unknown) {
+    const generation = authGeneration;
     const response = await fetch(`/api${path}`, {
+      signal: authRequests.signal,
       method: body === undefined ? "GET" : "POST",
       headers: body === undefined ? {} : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const data = await response.json();
+    if (!currentAuth(generation)) throw new DOMException("Cancelled account request", "AbortError");
     if (!response.ok) {
       throw Object.assign(new Error(data.error ?? "요청에 실패했어."), { status: response.status });
     }
@@ -81,25 +131,28 @@
 
   async function action(run: () => Promise<void>) {
     if (busy) return;
+    const generation = authGeneration;
     busy = true;
     error = "";
     try {
       await run();
     } catch (cause) {
-      error = cause instanceof Error ? cause.message : "연결을 확인해 줘.";
+      if (currentAuth(generation)) error = cause instanceof Error ? cause.message : "연결을 확인해 줘.";
     } finally {
-      busy = false;
+      if (currentAuth(generation)) busy = false;
     }
   }
 
-  function connect() {
-    if (disposed) return;
+  function connect(generation = authGeneration) {
+    if (!currentAuth(generation)) return;
     socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/lobby/ws`);
     socket.onopen = () => {
+      if (!currentAuth(generation)) return;
       connected = true;
       error = "";
     };
     socket.onmessage = (message) => {
+      if (!currentAuth(generation)) return;
       try {
         const event = JSON.parse(message.data) as ServerEvent;
         if (event.type === "snapshot") {
@@ -127,6 +180,7 @@
       }
     };
     socket.onclose = () => {
+      if (!currentAuth(generation)) return;
       connected = false;
       for (const timeout of pending.values()) clearTimeout(timeout);
       pending.clear();
@@ -135,9 +189,12 @@
       if (!disposed) {
         reconnectTimer = setTimeout(async () => {
           try {
-            snapshot = await api("/lobby/state");
-            connect();
+            const next = await api("/lobby/state");
+            if (!currentAuth(generation)) return;
+            snapshot = next;
+            connect(generation);
           } catch (cause) {
+            if (!currentAuth(generation)) return;
             if ((cause as { status?: number }).status === 401) {
               snapshot = null;
               error = "게스트 로그인이 만료됐어.";
@@ -149,8 +206,26 @@
       }
     };
     socket.onerror = () => {
+      if (!currentAuth(generation)) return;
       error = "실시간 연결을 확인 중이야.";
     };
+  }
+
+  function handleAuthLost() {
+    authGeneration++;
+    authRequests.abort();
+    authRequests = new AbortController();
+    loading = false;
+    account = { me: null, accountType: null, needsNickname: false };
+    snapshot = null; picker = false; accountLoaded = false;
+    connected = false; busy = false; ownedSoloPlayId = null; soloStartRequest = null;
+    clearTimeout(reconnectTimer);
+    for (const timeout of pending.values()) clearTimeout(timeout);
+    pending.clear();
+    if (socket) {
+      socket.onclose = null; socket.onmessage = null; socket.onopen = null; socket.onerror = null;
+      socket.close(); socket = undefined;
+    }
   }
 
   function command(type: Command["type"], targetId?: string, mode?: "solo" | "multiplayer") {
@@ -179,9 +254,19 @@
   }
 
   function openWorkshop() {
+    workshopPlayId = null;
     picker = false;
     currentPath = "/workshop";
     history.pushState({}, "", localePath(locale, "/workshop"));
+  }
+
+  function playWorkshopStory(id: string) {
+    if (room) {
+      error = locale === "en" ? "Leave your room before starting a workshop story." : "참가 중인 방에서 나온 뒤 창작 작품을 시작해 줘.";
+      return;
+    }
+    workshopPlayId = id;
+    history.pushState({}, "", `${localePath(locale, "/workshop")}?play=${encodeURIComponent(id)}`);
   }
 
   function openEditor(id?: string) {
@@ -212,23 +297,33 @@
   }
 
   async function loadAccount() {
-    account = await api("/platform/account");
+    const generation = authGeneration;
+    const nextAccount = await api("/platform/account");
+    if (!currentAuth(generation)) return;
+    account = nextAccount;
     if (account.me && !account.needsNickname) {
-      snapshot = await api("/lobby/state");
+      const next = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      snapshot = next;
       if (!accountLoaded) {
         soloRecovery = pendingSoloExit(sessionStorage, snapshot?.room ?? null);
         if (soloRecovery) await reconcileSolo();
+        if (!currentAuth(generation)) return;
       }
       accountLoaded = true;
-      if (!socket || socket.readyState > 1) connect();
+      if (!socket || socket.readyState > 1) connect(generation);
       resumeGoogleAction();
     }
   }
   async function reconcileSolo() {
     if (!soloRecovery) return;
+    const generation = authGeneration;
     const exit = soloRecovery;
     await api("/lobby/rooms/solo-exit", exit);
-    snapshot = await api("/lobby/state");
+    if (!currentAuth(generation)) return;
+    const next = await api("/lobby/state");
+    if (!currentAuth(generation)) return;
+    snapshot = next;
     clearSoloExit(sessionStorage, exit);
     soloRecovery = null;
     soloEndedNotice = true;
@@ -271,18 +366,28 @@
     await action(async () => {
       if (!authConfig.demo) throw Error(locale === "en" ? "Google sign-in is not configured. Please use guest sign-in." : "구글 로그인 설정이 필요해요. 게스트 로그인을 이용해 주세요.");
       rememberGoogleAction();
-      account = await api("/platform/auth/google/demo", {});
+      const generation = authGeneration;
+      const next = await api("/platform/auth/google/demo", {});
+      if (!currentAuth(generation)) return;
+      account = next;
       nickname = "";
       loginDialog?.close();
       await loadAccount();
     });
   }
   async function rename(next: string) {
-    await action(async () => { account = await api("/platform/account/nickname", { nickname: next }); await loadAccount(); });
+    await action(async () => {
+      const generation = authGeneration;
+      const nextAccount = await api("/platform/account/nickname", { nickname: next });
+      if (!currentAuth(generation)) return;
+      account = nextAccount; await loadAccount();
+    });
   }
   async function logout(remove = false) {
     await action(async () => {
+      const generation = authGeneration;
       await api(remove ? "/platform/account/delete" : "/platform/account/logout", {});
+      if (!currentAuth(generation)) return;
       sessionStorage.removeItem("festival_auth_return");
       if (socket) { socket.onclose = null; socket.close(); }
       clearTimeout(reconnectTimer);
@@ -293,28 +398,39 @@
     const resume = loginDialog?.open ? pendingWorkshopAction : undefined;
     pendingWorkshopAction = undefined;
     await action(async () => {
+      const generation = authGeneration;
       await api("/platform/guest", { nickname });
+      if (!currentAuth(generation)) return;
       await loadAccount();
+      if (!currentAuth(generation)) return;
       if (loginDialog?.open) {
         loginDialog.close();
         await tick();
-        resume?.();
+        if (currentAuth(generation)) resume?.();
       }
     });
   }
 
   async function create(scenarioId: string) {
     await action(async () => {
+      const generation = authGeneration;
       await api("/lobby/rooms", { scenarioId });
-      snapshot = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      const next = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      snapshot = next;
       picker = false;
     });
   }
 
   async function join(invite = code) {
     await action(async () => {
+      const generation = authGeneration;
       await api("/lobby/rooms/join", { code: invite });
-      snapshot = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      const next = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      snapshot = next;
       code = "";
     });
   }
@@ -330,34 +446,53 @@
   }
 
   onMount(() => {
+    const rememberFocus = (event: FocusEvent) => {
+      const target = event.target;
+      lastFocusedControl = target instanceof HTMLElement && target.closest('main') ? target : null;
+    };
+    shell?.addEventListener('focusin', rememberFocus);
+    const focusObserver = new MutationObserver(() => { void tick().then(() => recoverMainFocus()); });
+    if (shell) focusObserver.observe(shell, { childList: true, subtree: true });
     const syncLocale = () => {
       if (loginDialog?.open) loginDialog.close();
       locale = getLocaleFromPath(location.pathname);
       currentPath = pagePath(location.pathname);
+      workshopPlayId = selectedWorkshopStory();
       code = new URLSearchParams(location.search).get("room") ?? "";
       editorId = new URLSearchParams(location.search).get("id") ?? undefined;
       document.documentElement.lang = locale;
     };
     window.addEventListener("popstate", syncLocale);
     void (async () => {
+      const generation = authGeneration;
       try {
-        authConfig = await api("/platform/auth/config");
+        const config = await api("/platform/auth/config");
+        if (!currentAuth(generation)) return;
+        authConfig = config;
         const authError = new URLSearchParams(location.search).get("auth");
         if (authError) sessionStorage.removeItem("festival_auth_return");
         await loadAccount();
+        if (!currentAuth(generation)) return;
         if (authError) error = locale === "en" ? "Google sign-in was cancelled or failed. Please try again." : "구글 로그인이 취소되었거나 실패했어요. 다시 시도해 주세요.";
       } catch (cause) {
+        if (!currentAuth(generation)) return;
         if ((cause as { status?: number }).status !== 401) {
           error = "서버에 연결할 수 없어. 잠시 후 새로고침해 줘.";
         }
       } finally {
+        if (currentAuth(generation)) {
         code = new URLSearchParams(location.search).get("room") ?? "";
         loading = false;
+        }
       }
     })();
 
     return () => {
+      focusObserver.disconnect();
+      shell?.removeEventListener('focusin', rememberFocus);
       disposed = true;
+      authGeneration++;
+      authRequests.abort();
       window.removeEventListener("popstate", syncLocale);
       clearTimeout(reconnectTimer);
       for (const timeout of pending.values()) clearTimeout(timeout);
@@ -370,13 +505,13 @@
   <title>{pageMetadata(localePath(locale, currentPath)).title}</title>
 </svelte:head>
 
-<div class="shell">
+<div class="shell" bind:this={shell}>
   {#if !entryHome}
     <AppHeader {snapshot} {connected} {locale} {t} accountType={account.accountType} onAccount={openAccount} onLocaleChange={changeLocale} />
   {/if}
 
   {#if error}
-    <ErrorNotice message={error} onDismiss={() => (error = "")} />
+    <ErrorNotice message={error} {locale} onDismiss={() => (error = "")} />
   {/if}
   {#if soloEndedNotice}
     <p class="main" role="status">{locale === "en" ? "Your previous solo investigation ended when you left the page. You are back in the room; start a new investigation when ready." : "페이지를 떠나 이전 1인 수사가 종료됐어. 같은 방으로 돌아왔으니 준비되면 새 수사를 시작해 줘."}</p>
@@ -385,21 +520,25 @@
   {#if loading}
     <PageState kind="loading" message={t("workshopLoading")} />
   {:else if soloRecovery && snapshot}
-    <main class="main"><Panel><p role="status">{locale === "en" ? "The previous solo investigation has ended. Reconnect to return to your room." : "이전 1인 수사가 종료됐어. 연결을 확인한 뒤 같은 방으로 돌아가 줘."}</p><Button disabled={busy} onclick={() => void action(async () => { await reconcileSolo(); if (!socket || socket.readyState > 1) connect(); })}>{locale === "en" ? "Retry returning to room" : "방 복귀 다시 시도"}</Button></Panel></main>
+    <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "The previous solo investigation has ended. Reconnect to return to your room." : "이전 1인 수사가 종료됐어. 연결을 확인한 뒤 같은 방으로 돌아가 줘."}</p><Button disabled={busy} onclick={() => void action(async () => { await reconcileSolo(); if (!socket || socket.readyState > 1) connect(); })}>{locale === "en" ? "Retry returning to room" : "방 복귀 다시 시도"}</Button></Panel></main>
   {:else if account.needsNickname}
-    <main class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
+    <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
   {:else if currentPath === "/mypage" && snapshot}
-    <MyPage me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />
+    <MyPage onAuthLost={handleAuthLost} me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />
+  {:else if currentPath === "/workshop" && workshopPlayId && room}
+    <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "Leave your room before starting a workshop story." : "참가 중인 방에서 나온 뒤 창작 작품을 시작해 줘."}</p><Button onclick={openWorkshop}>{locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"}</Button></Panel></main>
+  {:else if currentPath === "/workshop" && workshopPlayId}
+    {#key workshopPlayId}<main id="main-content" tabindex="-1" class="main"><SoloGame {locale} storyId={workshopPlayId} onExit={openWorkshop} exitLabel={locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"} /></main>{/key}
   {:else if currentPath === "/workshop"}
-    <WorkshopPage {locale} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
+    <WorkshopPage {locale} onPlay={playWorkshopStory} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
   {:else if editorPath && snapshot}
     {#key editorId}<WorkshopEditor {locale} onDirtyChange={(dirty) => { editorHasChanges = dirty; }} storyId={editorId} onBack={openWorkshop} onSaved={savedWorkshopStory} />{/key}
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
   {:else if room?.soloStarted && ownedSoloPlayId !== room.soloPlayId}
-    <main class="main"><Panel><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
+    <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Investigation in progress" : "수사 진행 중"}</h1><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
   {:else if room?.soloStarted}
-    {#key room.soloPlayId}<main class="main"><SoloGame {locale} storyId={room.soloStory.id} roomLifecycle={{ roomId: room.id, soloPlayId: room.soloPlayId }} onLifecycleExit={soloPageExited} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>{/key}
+    {#key room.soloPlayId}<main id="main-content" tabindex="-1" class="main"><SoloGame {locale} storyId={room.soloStory.id} roomLifecycle={{ roomId: room.id, soloPlayId: room.soloPlayId }} onLifecycleExit={soloPageExited} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>{/key}
   {:else if !room}
     <LobbyPage
       bind:code
@@ -408,7 +547,6 @@
       {connected}
       {t}
       onSelectMode={selectGameMode}
-      onCreate={create}
       onJoin={join}
     />
   {:else if !session}
@@ -421,7 +559,6 @@
       {connected}
       {copied}
       {locale}
-      onMode={(mode) => command("mode", undefined, mode)}
       onCopy={copyInviteLink}
       onCommand={command}
     />
@@ -435,6 +572,10 @@
     <AppFooter {snapshot} {connected} {t} {locale} />
   {/if}
 </div>
+
+{#if snapshot && account.accountType === 'google' && !room && !workshopPlayId && currentPath === '/'}
+  {#key snapshot.me.id}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={handleAuthLost} />{/key}
+{/if}
 
 <StoryPickerDialog
   open={picker && snapshot !== null}

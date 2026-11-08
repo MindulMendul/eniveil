@@ -1,0 +1,422 @@
+[
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "nickname name and entry role",
+    "spoken": "닉네임 entry required.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "Google login button",
+    "spoken": "구글로 로그인 (테스트) button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "room code input",
+    "spoken": "6자리 초대 코드 entry 예: A1B2C3.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "filter collapsed state",
+    "spoken": "작품 필터 원하는 이야기를 찾아보세요 toggle button collapsed.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "filter expanded state",
+    "spoken": "expanded",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "search field name",
+    "spoken": "제목·설명 entry 어떤 이야기를 찾으세요?",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "named story dialog",
+    "spoken": "NativeReader b5fa3 heading 2 clickable.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "dialog close restores opener",
+    "spoken": "자세히 보기 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "story title field",
+    "spoken": "제목 entry 새 이야기.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "save story button",
+    "spoken": "스토리 저장 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "account settings heading",
+    "spoken": "계정 설정 heading 2 clickable.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "sign out button",
+    "spoken": "로그아웃 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "delete account button",
+    "spoken": "회원탈퇴 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "start game control",
+    "spoken": "게임 시작 → button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 1440,
+    "checkpoint": "in-game return control",
+    "spoken": "방으로 돌아가기 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "nickname name and entry role",
+    "spoken": "닉네임 entry required.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "Google login button",
+    "spoken": "구글로 로그인 (테스트) button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "room code input",
+    "spoken": "6자리 초대 코드 entry 예: A1B2C3.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "filter collapsed state",
+    "spoken": "작품 필터 원하는 이야기를 찾아보세요 toggle button collapsed.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "filter expanded state",
+    "spoken": "expanded",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "search field name",
+    "spoken": "제목·설명 entry 어떤 이야기를 찾으세요?",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "named story dialog",
+    "spoken": "NativeReader da50e heading 2 clickable.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "dialog close restores opener",
+    "spoken": "자세히 보기 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "story title field",
+    "spoken": "제목 entry 새 이야기.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "save story button",
+    "spoken": "스토리 저장 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "account settings heading",
+    "spoken": "계정 설정 heading 2 clickable.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "sign out button",
+    "spoken": "로그아웃 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "delete account button",
+    "spoken": "회원탈퇴 button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "start game control",
+    "spoken": "게임 시작 → button.",
+    "pass": true
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "checkpoint": "in-game return control",
+    "spoken": "방으로 돌아가기 button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "nickname name and entry role",
+    "spoken": "Nickname entry required.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "Google login button",
+    "spoken": "Sign in with Google (test) button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "room code input",
+    "spoken": "6-character invite code entry 예: A1B2C3.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "filter collapsed state",
+    "spoken": "Story filters Find a story for you toggle button collapsed.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "filter expanded state",
+    "spoken": "expanded",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "search field name",
+    "spoken": "Title / description entry Find your next story.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "named story dialog",
+    "spoken": "NativeReader fc82a heading 2 clickable.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "dialog close restores opener",
+    "spoken": "Details button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "story title field",
+    "spoken": "Title entry New story.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "save story button",
+    "spoken": "Save story button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "account settings heading",
+    "spoken": "Account settings heading 2 clickable.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "sign out button",
+    "spoken": "Sign out button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "delete account button",
+    "spoken": "Delete account button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "start game control",
+    "spoken": "게임 시작 → button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "checkpoint": "in-game return control",
+    "spoken": "Return to room button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "nickname name and entry role",
+    "spoken": "Nickname entry required.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "Google login button",
+    "spoken": "Sign in with Google (test) button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "room code input",
+    "spoken": "6-character invite code entry 예: A1B2C3.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "filter collapsed state",
+    "spoken": "Story filters Find a story for you toggle button collapsed.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "filter expanded state",
+    "spoken": "expanded",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "search field name",
+    "spoken": "Title / description entry Find your next story.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "named story dialog",
+    "spoken": "NativeReader 9b329 heading 2 clickable.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "dialog close restores opener",
+    "spoken": "Details button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "story title field",
+    "spoken": "Title entry New story.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "save story button",
+    "spoken": "Save story button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "account settings heading",
+    "spoken": "Account settings heading 2 clickable.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "sign out button",
+    "spoken": "Sign out button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "delete account button",
+    "spoken": "Delete account button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "start game control",
+    "spoken": "게임 시작 → button.",
+    "pass": true
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "checkpoint": "in-game return control",
+    "spoken": "Return to room button.",
+    "pass": true
+  }
+]

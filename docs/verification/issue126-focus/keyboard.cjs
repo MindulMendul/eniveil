@@ -1,0 +1,88 @@
+// Scenarios share a screen reader, live game or DOM: each action must finish before the next.
+async function runSequential(items, action, index = 0) {
+ if (index >= items.length) { return; }
+ await action(items[index]);
+ return runSequential(items, action, index + 1);
+}
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { installBrowserRequestGuard } = require('../test-target-guard.cjs');
+const dialogAxe = [];
+const origin = 'http://127.0.0.1:3211';
+async function post(page, path, body) { return page.evaluate(async ({ path, body }) => { const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) {
+    throw new Error('Setup failed ' + r.status);
+} return r.json(); }, { path, body }); }
+async function check(browser, en, width) {
+    const c = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block', reducedMotion: 'reduce' });
+    await installBrowserRequestGuard(c, origin);
+    const p = await c.newPage();
+    const prefix = en ? '/en' : '';
+    try {
+        await p.goto(origin + prefix + '/');
+        await p.locator('#nickname').waitFor();
+        await p.keyboard.press('Tab');
+        assert.equal(await p.evaluate(() => document.activeElement.className), 'skip-link');
+        await p.keyboard.press('Enter');
+        assert.equal(await p.evaluate(() => document.activeElement.id), 'main-content');
+        const taken = 't' + crypto.randomUUID().slice(0, 7);
+        const other = await browser.newContext();
+        const r = await other.request.post(origin + '/api/platform/guest', { headers: { Origin: origin }, data: { nickname: taken } });
+        assert.equal(r.status(), 201);
+        await other.close();
+        await p.locator('#nickname').fill(taken);
+        await p.getByRole('button', { name: en ? 'Check availability' : '중복 확인', exact: true }).click();
+        await p.locator('#nickname[aria-invalid="true"]').waitFor();
+        assert((await p.locator('#nickname').getAttribute('aria-describedby')).includes('nickname-result'));
+        assert.equal(await p.locator('#nickname').inputValue(), taken);
+        await p.locator('#nickname').fill('n' + crypto.randomUUID().slice(0, 7));
+        assert.equal(await p.locator('#nickname').getAttribute('aria-invalid'), null);
+        await post(p, '/api/platform/guest', { nickname: 'g' + crypto.randomUUID().slice(0, 7) });
+        await p.reload();
+        const account = p.getByRole('button', { name: en ? 'My page' : '마이페이지', exact: true });
+        await account.click();
+        await p.waitForFunction(() => document.activeElement.id === 'main-content');
+        const source = JSON.parse(fs.readFileSync(require('node:path').join(__dirname, '../../../apps/server/stories/deokil-trading-murder.mstory'), 'utf8'));
+        source.story.title = 'Accessibility ' + crypto.randomUUID().slice(0, 6);
+        await post(p, '/api/workshop/drafts', { package: source, published: true });
+        await p.goto(origin + prefix + '/workshop/');
+        const card = p.locator('article').filter({ has: p.getByRole('heading', { name: source.story.title, exact: true }) });
+        const details = card.getByRole('button', { name: en ? 'Details' : '자세히 보기', exact: true });
+        await details.click();
+        let dialog = p.getByRole('dialog');
+        await dialog.waitFor();
+        await p.addScriptTag({ path: process.env.AXE_PATH || require.resolve('axe-core/axe.min.js') });
+        const ax = await p.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'] } }));
+        dialogAxe.push({ language: en ? 'en' : 'ko', width, stage: 'story-dialog', violations: ax.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) })) });
+        fs.writeFileSync(process.env.AXE_DIALOG_RESULTS_PATH || require('node:path').join(__dirname, 'axe-dialog.json'), JSON.stringify(dialogAxe, null, 2));
+        assert.equal(ax.violations.length, 0);
+        await runSequential(Array.from({ length: 12 }), async () => { await p.keyboard.press('Tab'); assert(await p.evaluate(() => !!document.activeElement.closest('dialog'))); });
+        await p.keyboard.press('Escape');
+        await p.waitForFunction(() => !document.querySelector('dialog[open]'));
+        assert.equal(await details.evaluate(node => document.activeElement === node), true);
+        await details.click();
+        await dialog.waitFor();
+        await details.evaluate(node => node.remove());
+        await p.keyboard.press('Escape');
+        await p.waitForFunction(() => document.activeElement.id === 'main-content');
+        await p.goto(origin + prefix + '/');
+        await p.waitForSelector('astro-island[ssr]', { state: 'detached' });
+        await p.evaluate(() => { document.documentElement.style.fontSize = '200%'; const style = document.createElement('style'); style.textContent = 'p{line-height:1.5!important;letter-spacing:.12em!important;word-spacing:.16em!important}'; document.head.append(style); });
+        assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        console.log('PASS', en ? 'en' : 'ko', width, 'keyboard skip, field errors, route focus, modal trap/Escape/return/fallback, 200% text/reflow/reduced-motion');
+    }
+    finally {
+        await c.unrouteAll({ behavior: 'wait' });
+        await c.close();
+    }
+}
+(async () => { const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] }); try {
+    await runSequential([false, true], async (en) => {
+        await runSequential([1440, 320], async (width) => {
+            await check(b, en, width);
+        });
+    });
+}
+finally {
+    await b.close();
+} })().catch(e => { console.error(e); process.exitCode = 1; });

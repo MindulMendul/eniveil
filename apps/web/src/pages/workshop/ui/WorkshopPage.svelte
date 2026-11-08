@@ -2,8 +2,8 @@
   import { Modal, Button, Select, TextInput, FilterBar, StateMessage } from "../../../shared/ui";
   import { onDestroy, tick, untrack } from 'svelte';
   import { workshopRequest, type WorkshopStory } from '../model/_story';
-  let { locale, loggedIn = false, onLogin, onEdit }: {
-    locale: 'ko' | 'en'; loggedIn?: boolean; onLogin: (resume?: () => void) => void; onEdit: (id?: string) => void;
+  let { locale, loggedIn = false, onLogin, onEdit, onPlay }: {
+    locale: 'ko' | 'en'; loggedIn?: boolean; onLogin: (resume?: () => void) => void; onEdit: (id?: string) => void; onPlay: (id: string) => void;
   } = $props();
   const label = (ko: string, en: string) => locale === 'en' ? en : ko;
   let stories = $state<WorkshopStory[]>([]), total = $state(0), offset = $state(0);
@@ -74,7 +74,7 @@
     } catch (cause) { if (!disposed && version === request) error = cause instanceof Error ? cause.message : label('즐겨찾기를 저장하지 못했어요.', 'Could not save favorite.'); }
     finally { if (!disposed) favoriteBusy = favoriteBusy.filter(id => id !== story.id); }
   }
-  async function details(story: WorkshopStory) { selected = story; await tick(); dialog.showModal(); }
+  async function details(story: WorkshopStory) { selected = story; await tick(); dialog.showModal(); dialog.querySelector<HTMLElement>('#story-dialog-title')?.focus(); }
   function reset() {
     query = ''; author = ''; mode = ''; difficulty = ''; ratingMin = ''; playsMin = ''; favoritesMin = ''; publishedAfter = ''; refresh();
   }
@@ -89,9 +89,9 @@
   onDestroy(() => { disposed = true; clearTimeout(timer); request++; });
 </script>
 
-<main class="main workshop">
+<main id="main-content" tabindex="-1" class="main workshop">
   <div class="page-heading">
-    <div><p class="eyebrow">COMMUNITY STORIES</p><h1 class="heading-one">{label('창작마당', 'Workshop')}</h1><p class="muted">{label('누군가의 상상에서 시작된 이야기. 다음 이야기는 당신이 만들어 보세요.', 'Discover stories from the community. Create the next one yourself.')}</p></div>
+    <div><p class="eyebrow">COMMUNITY STORIES</p><h1 class="heading-one">{label('창작마당', 'Workshop')}</h1></div>
     <Button class="primary" onclick={() => edit()} variant="primary">＋ {label('새 머미 만들기', 'Create a story')}</Button>
   </div>
   <a class="text-button" href={locale === 'en' ? '/en/' : '/'}>← {label('플랫폼으로 돌아가기', 'Back to platform')}</a>
@@ -121,7 +121,7 @@
   {#if loading}<StateMessage kind="loading" message={label('이야기를 불러오는 중…', 'Loading stories…')} />
   {:else if !stories.length}<div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{label('아직 일치하는 이야기가 없어요.', 'No stories match yet.')}</h2><p class="muted">{label('필터를 바꾸거나 새로운 이야기를 만들어 보세요.', 'Try different filters or create a story.')}</p></div>
   {:else}
-    <div class="story-grid">{#each stories as story (story.id)}
+    <ul class="story-grid m-0 list-none p-0" role="list">{#each stories as story (story.id)}<li class="grid min-w-0">
       <article class="panel story-card">
         <div class="thumbnail">{#if story.thumbnailUrl}<img src={story.thumbnailUrl} alt={story.title} loading="lazy" referrerpolicy="no-referrer" />{:else}<span aria-hidden="true">✧</span><span class="thumbnail-caption">STORY ARCHIVE</span>{/if}<span class="mode-tag">{story.mode === 'solo' ? label('혼자 플레이', 'Solo') : label('함께 플레이', 'Multiplayer')}</span></div>
         <div class="card-content"><div class="card-heading"><span class="tag">{difficultyLabel(story.difficulty)}</span>{#if !story.published}<span class="tag">{label('비공개 초안', 'Private draft')}</span>{/if}</div>
@@ -129,13 +129,13 @@
         <div class="statistics"><span>★ {story.averageRating === null ? label('평가 전', 'Unrated') : story.averageRating.toFixed(1)} <small>({story.ratingCount})</small></span><span>▷ {story.playCount} {label('플레이', 'plays')}</span><span>♡ {story.favoriteCount}</span></div>
         <div class="card-actions"><Button class="secondary" onclick={() => details(story)} variant="secondary">{label('자세히 보기', 'Details')}</Button>{#if story.published}<button class="favorite" class:saved={story.isFavorite} aria-pressed={story.isFavorite} aria-label={`${story.title} ${label('즐겨찾기', 'favorite')}`} disabled={favoriteBusy.includes(story.id)} onclick={() => void favorite(story)}>{story.isFavorite ? '♥' : '♡'}</button>{/if}{#if story.canEdit}<Button class="text-button" onclick={() => edit(story.id)} variant="text">{label('수정하기', 'Edit')} ↗</Button>{/if}</div>
         </div>
-      </article>
-    {/each}</div>
+      </article></li>
+    {/each}</ul>
     {#if total > pageSize}<nav class="pagination" aria-label={label('작품 페이지', 'Story pages')}><Button class="secondary" disabled={loading || offset === 0} onclick={() => void load(Math.max(0, offset-pageSize))} variant="secondary">← {label('이전', 'Previous')}</Button><span class="muted">{offset+1}–{Math.min(offset+pageSize,total)} / {total}</span><Button class="secondary" disabled={loading || offset+pageSize >= total} onclick={() => void load(offset+pageSize)} variant="secondary">{label('다음', 'Next')} →</Button></nav>{/if}
   {/if}
 </main>
 <Modal bind:element={dialog} class="story-dialog" labelledby="story-dialog-title" onClose={() => selected = null}>
-  {#if selected}<div class="dialog-content"><p class="eyebrow">STORY DETAILS</p><h2 id="story-dialog-title" class="heading-two">{selected.title}</h2><p class="muted">{selected.subtitle}</p><p>{label('만든 이', 'Creator')}: {selected.author.name}</p><p>{label('난이도', 'Difficulty')}: {difficultyLabel(selected.difficulty)}</p><p>★ {selected.averageRating?.toFixed(1) ?? label('평가 전', 'Unrated')} · {selected.playCount} {label('플레이', 'plays')} · ♡ {selected.favoriteCount}</p><p class="muted">{selected.playerCount.min}–{selected.playerCount.max} {label('명', 'players')} · {selected.estimatedMinutes} {label('분', 'min')}</p><div class="card-actions"><Button class="primary" onclick={() => dialog.close()} variant="primary">{label('닫기', 'Close')}</Button>{#if selected.canEdit}<Button class="secondary" onclick={() => { const id = selected!.id; dialog.close(); edit(id); }} variant="secondary">{label('수정하기', 'Edit')}</Button>{/if}</div></div>{/if}
+  {#if selected}<div class="dialog-content"><p class="eyebrow">STORY DETAILS</p><h2 tabindex="-1" id="story-dialog-title" class="heading-two">{selected.title}</h2><p class="muted">{selected.subtitle}</p><p>{label('만든 이', 'Creator')}: {selected.author.name}</p><p>{label('난이도', 'Difficulty')}: {difficultyLabel(selected.difficulty)}</p><p>★ {selected.averageRating?.toFixed(1) ?? label('평가 전', 'Unrated')} · {selected.playCount} {label('플레이', 'plays')} · ♡ {selected.favoriteCount}</p><p class="muted">{selected.playerCount.min}–{selected.playerCount.max} {label('명', 'players')} · {selected.estimatedMinutes} {label('분', 'min')}</p>{#if !selected.published}<p class="muted">{label('비공개 초안 · 플레이하려면 공개 필요', 'Private draft · Publish to play')}</p>{:else if selected.mode !== 'solo'}<p class="muted">{label('지원하지 않는 플레이 방식', 'Unsupported play format')}</p>{/if}<div class="card-actions">{#if selected.published && selected.mode === 'solo'}<Button variant="primary" class="primary" onclick={() => { const id = selected!.id; dialog.close(); onPlay(id); }}>{label('플레이하기', 'Play story')} →</Button>{/if}<Button class="secondary" onclick={() => dialog.close()} variant="secondary">{label('닫기', 'Close')}</Button>{#if selected.canEdit}<Button class="secondary" onclick={() => { const id = selected!.id; dialog.close(); edit(id); }} variant="secondary">{label('수정하기', 'Edit')}</Button>{/if}</div></div>{/if}
 </Modal>
 <style>
 .workshop {

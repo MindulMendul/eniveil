@@ -80,7 +80,7 @@ export class Game {
                 },
                 clues:
                   session.phase === "briefing" ? [] : (story?.content.clues ?? []),
-                voteCount: Object.keys(session.votes).length,
+                voteCount: r.memberIds.filter((id) => !!session.votes[id]).length,
                 hasVoted: !!session.votes[me.id],
                 result:
                   session.phase === "reveal"
@@ -129,7 +129,7 @@ export class Game {
         players: new Set<string>(),
       };
       plays.started++;
-      if (session.endedAt) {
+      if (session.endedAt && session.phase === "reveal") {
         plays.completed++;
         for (const participant of session.participants) {
           plays.players.add(participant.id);
@@ -199,6 +199,7 @@ export class Game {
       code,
       hostId: me.id,
       scenarioId,
+      mode: scenarioId === supportedSoloStory.id ? 'solo' : 'multiplayer',
       memberIds: [me.id],
       sessionId: null,
     };
@@ -217,6 +218,30 @@ export class Game {
     this.store.save();
     return r;
   }
+  expireConnection(guestId: string, roomId: string) {
+    const room = this.roomFor(guestId);
+    if (!room || room.id !== roomId || (this.online.get(guestId) ?? 0) > 0) return;
+    // End access to the room without rewriting the game's participant history.
+    room.memberIds = room.memberIds.filter((id) => id !== guestId);
+    const session = room.sessionId ? this.state.sessions[room.sessionId] : undefined;
+    const previousPhase = session?.phase, previouslyEnded = !!session?.endedAt;
+    if (!room.memberIds.length) {
+      if (session && !session.endedAt) session.endedAt = new Date().toISOString();
+      delete this.state.rooms[room.id];
+    } else {
+      if (room.hostId === guestId) room.hostId = room.memberIds[0];
+      if (session) this.revealWhenAllActiveVoted(room, session);
+    }
+    this.store.save();
+    if (session && (session.phase !== previousPhase || !!session.endedAt !== previouslyEnded)) {
+      return { sessionId: session.id, phase: session.phase, ended: !!session.endedAt };
+    }
+  }
+  private revealWhenAllActiveVoted(room: Room, session: Session) {
+    if (session.phase === "voting" && room.memberIds.every((id) => !!session.votes[id])) {
+      session.phase = "reveal";
+    }
+  }
   command(me: Guest, command: Command) {
     const r = this.needRoom(me.id);
     const s = r.sessionId ? this.state.sessions[r.sessionId] : null;
@@ -226,6 +251,7 @@ export class Game {
     switch (command.type) {
       case "mode":
         host();
+        if (r.scenarioId === supportedSoloStory.id && command.mode !== 'solo') throw Error('선택한 작품은 1인 플레이만 지원해.');
         if (s || r.soloStarted) throw Error("게임 시작 전에만 모드를 바꿀 수 있어.");
         if (command.mode === "solo" && r.memberIds.length !== 1) throw Error("혼자 있는 방에서만 1인 모드를 열 수 있어.");
         r.mode = command.mode;
@@ -286,8 +312,7 @@ export class Game {
         if (!s.participants.some((p) => p.id === command.targetId))
           throw Error("투표 대상을 확인해 줘.");
         s.votes[me.id] = command.targetId;
-        if (Object.keys(s.votes).length === s.participants.length)
-          s.phase = "reveal";
+        this.revealWhenAllActiveVoted(r, s);
         break;
       case "return":
         host();

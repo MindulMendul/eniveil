@@ -1,0 +1,218 @@
+[
+  {
+    "en": false,
+    "width": 1440,
+    "path": "entry",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "path": "/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "path": "/workshop/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "path": "/workshop/editor/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "path": "/mypage/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "path": "/terms/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "path": "/privacy/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "path": "/about/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "path": "/missing-page/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "entry",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "/workshop/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "/workshop/editor/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "/mypage/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "/terms/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "/privacy/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "/about/",
+    "violations": []
+  },
+  {
+    "en": false,
+    "width": 320,
+    "path": "/missing-page/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "entry",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "/workshop/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "/workshop/editor/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "/mypage/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "/terms/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "/privacy/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "/about/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "path": "/missing-page/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "entry",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "/workshop/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "/workshop/editor/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "/mypage/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "/terms/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "/privacy/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "/about/",
+    "violations": []
+  },
+  {
+    "en": true,
+    "width": 320,
+    "path": "/missing-page/",
+    "violations": []
+  }
+]

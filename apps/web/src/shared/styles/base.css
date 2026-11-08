@@ -1,5 +1,7 @@
 /* Values come from design-tokens.tokens.json through the UnoCSS preflight. */
 * { box-sizing: border-box; }
+.skip-link { position:absolute; left:1rem; top:.5rem; z-index:1000; transform:translateY(-200%); background:#171c1a; color:#e9e5da; padding:.75rem; }
+.skip-link:focus { transform:translateY(0); }
 html { overflow-wrap: anywhere; }
 body { min-width: 0; }
 button, input, select, textarea { font: inherit; }
@@ -24,6 +26,7 @@ textarea { resize: vertical; }
 @keyframes ui-spin { to { transform: rotate(360deg); } }
 @keyframes ui-pulse { to { opacity: .4; } }
 @media (prefers-reduced-motion: reduce) { .ui-spinner, .ui-skeleton { animation: none; } }
+.steps .step.active { color: var(--color-festival-gold); }
 /* Reflow works for narrow foldable cover screens and split windows without device detection. */
 @media (max-width: 520px) {
   .header > div { width: 100%; justify-content: space-between; gap: var(--spacing-2); }
