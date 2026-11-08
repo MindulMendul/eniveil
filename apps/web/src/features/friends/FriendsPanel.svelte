@@ -17,6 +17,7 @@
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const data = await response.json();
+    if (response.status === 401 || response.status === 403) { friends = []; incoming = []; outgoing = []; matches = []; }
     if (!response.ok) throw Error(label(data.error || '요청에 실패했어요.', 'Request failed. Check the account and try again.'));
     return data;
   }
@@ -26,6 +27,9 @@
       const data = await api();
       if (controller.signal.aborted) return;
       friends = data.friends; incoming = data.incoming; outgoing = data.outgoing;
+    } catch (cause) {
+      if (!controller.signal.aborted) { friends = []; incoming = []; outgoing = []; }
+      throw cause;
     } finally { if (!controller.signal.aborted) loading = false; }
   }
   async function action(run: () => Promise<void>) {
@@ -38,6 +42,7 @@
   onMount(() => { void action(load); });
   async function search() {
     await action(async () => {
+      matches = []; searched = false;
       const result = await api('/search?nickname=' + encodeURIComponent(nickname.trim()));
       matches = result.items; searched = true;
     });
@@ -60,7 +65,7 @@
 <div class="friends-panel">
   <form onsubmit={event => { event.preventDefault(); void search(); }}>
     <label for={inputId}>{label('친구 닉네임', 'Friend nickname')}</label>
-    <div class="friend-search"><TextInput id={inputId} bind:value={nickname} required maxlength={20} autocomplete="off" disabled={busy} /><Button type="submit" disabled={busy || !nickname.trim()}>{label('검색', 'Search')}</Button></div>
+    <div class="friend-search"><TextInput id={inputId} bind:value={nickname} oninput={() => { matches = []; searched = false; }} required maxlength={20} autocomplete="off" disabled={busy} /><Button type="submit" disabled={busy || !nickname.trim()}>{label('검색', 'Search')}</Button></div>
   </form>
   {#if error}<p role="alert">{error}</p><Button variant="secondary" disabled={busy} onclick={() => void action(load)}>{label('목록 다시 불러오기', 'Reload list')}</Button>{/if}
   <p role="status">{message}</p>
