@@ -2,7 +2,7 @@
 
 | Environment | Branch | Compose project / service | Existing volume | HTTPS |
 | --- | --- | --- | --- | --- |
-| production | main | deploy / festival | deploy_festival-data | https://mindul-murder-mystery.duckdns.org |
+| production | main | deploy / festival | deploy_festival-data | https://eniveil.com |
 | qa | qa | murder-parker-qa / festival-qa | murder-parker-qa_festival-qa-data | https://qa-mindul-murder-mystery.duckdns.org |
 
 The deployment workflow validates the app and deployment tests, then sends
