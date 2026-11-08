@@ -1,4 +1,4 @@
-import { pageMetadata, shareImage, siteOrigin } from './metadata';
+import { pageMetadata, pageSchema, serializeSchema, shareImage, siteOrigin } from './metadata';
 export function syncMetadata(pathname: string) {
   const m = pageMetadata(pathname), origin = siteOrigin(import.meta.env.PUBLIC_SITE_URL);
   const url = new URL(m.localized(m.en ? 'en' : 'ko'), origin).href;
@@ -20,5 +20,5 @@ export function syncMetadata(pathname: string) {
   for (const [key, value] of Object.entries({image: image.url, 'image:type': image.type, 'image:width': image.width, 'image:height': image.height, 'image:alt': image.alt})) meta('og:' + key, value, true);
   meta('twitter:card','summary_large_image'); meta('twitter:title',m.title);meta('twitter:description',m.description);
   meta('twitter:image',image.url); meta('twitter:image:alt',image.alt);
-  add('script',{type:'application/ld+json'},JSON.stringify({'@context':'https://schema.org','@type':m.path==='/'?'WebSite':m.path==='/workshop'?'CollectionPage':'WebPage',name:m.title,description:m.description,url,inLanguage:m.en?'en':'ko'}));
+  add('script',{type:'application/ld+json'},serializeSchema(pageSchema(pathname, origin)));
 }

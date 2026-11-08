@@ -84,15 +84,15 @@
 <svelte:window onbeforeunload={(event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } }} />
 <main class="main editor">
   <Button class="text-button" onclick={back} variant="text">← {label('창작마당으로 돌아가기', 'Back to workshop')}</Button>
-  <div class="page-heading"><div><p class="eyebrow">STORY SANDBOX</p><h1 class="heading-one">{storyId ? label('머미 수정하기', 'Edit story') : label('새 머미 만들기', 'Create a story')}</h1><p class="muted">{label('이야기가 시작되는 작업 공간', 'A workspace for your next story')}</p></div></div>
-  <section class="panel"><h2 class="heading-two">{label('샌드박스', 'Sandbox')}</h2><p class="muted">{label('기본 1인 조사 스토리에서 시작하거나 .mstory 파일을 불러와 편집하세요.', 'Start with a basic solo investigation or import a .mstory file to edit.')}</p>
+  <div class="page-heading"><div><p class="eyebrow">STORY SANDBOX</p><h1 class="heading-one">{storyId ? label('머미 수정하기', 'Edit story') : label('새 머미 만들기', 'Create a story')}</h1></div></div>
+  <section class="panel"><h2 class="heading-two">{label('샌드박스', 'Sandbox')}</h2>
     {#if loading}<p role="status">{label('기존 스토리를 불러오는 중…', 'Loading your story…')}</p>{/if}
     {#if error}<p role="alert" class="notice">{error}</p>{/if}
     {#if message}<p role="status">{message}</p>{/if}
     <label class="file-label">{label('.mstory 파일 불러오기', 'Import .mstory file')}<input bind:this={fileInput} type="file" accept=".mstory,application/json" disabled={loading || saving || validating} onchange={importFile} /><small class="muted">{label('최대 900 KB · 유효한 스토리 패키지', 'Up to 900 KB · Valid story package')}</small></label>
     <ImageConverter {locale} />
     {#if validating}<p role="status">{label('파일을 확인하는 중…', 'Validating file…')}</p>{/if}
-    {#if source}<div class="source-summary"><h3 class="heading-three">{source.story.title}</h3><p class="muted">{label('스토리 파일을 불러왔어요. 공개 여부와 작품 정보를 설정해 주세요.', 'Story loaded. Choose its visibility and metadata.')}</p></div>
+    {#if source}<div class="source-summary"><h3 class="heading-three">{source.story.title}</h3></div>
       <StoryFields bind:pendingChanges={pendingSceneIds} bind:source {locale} disabled={saving || validating || loading} />
       {#if issues.length}<div role="alert" class="notice"><p>{label('다음 필드를 확인해 주세요.', 'Check these fields before saving:')}</p><ul>{#each issues as issue}<li>{issue}</li>{/each}</ul></div>{/if}
       <Button variant="secondary" disabled={saving || validating || loading || issues.length > 0 || pendingSceneIds} onclick={exportFile}>{label('.mstory 내보내기', 'Export .mstory')}</Button>

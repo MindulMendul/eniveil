@@ -199,6 +199,7 @@ export class Game {
       code,
       hostId: me.id,
       scenarioId,
+      mode: scenarioId === supportedSoloStory.id ? 'solo' : 'multiplayer',
       memberIds: [me.id],
       sessionId: null,
     };
@@ -235,6 +236,7 @@ export class Game {
     switch (command.type) {
       case "mode":
         host();
+        if (r.scenarioId === supportedSoloStory.id && command.mode !== 'solo') throw Error('선택한 작품은 1인 플레이만 지원해.');
         if (s || r.soloStarted) throw Error("게임 시작 전에만 모드를 바꿀 수 있어.");
         if (command.mode === "solo" && r.memberIds.length !== 1) throw Error("혼자 있는 방에서만 1인 모드를 열 수 있어.");
         r.mode = command.mode;

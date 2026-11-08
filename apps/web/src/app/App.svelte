@@ -428,7 +428,6 @@
       {connected}
       {t}
       onSelectMode={selectGameMode}
-      onCreate={create}
       onJoin={join}
     />
   {:else if !session}
@@ -441,7 +440,6 @@
       {connected}
       {copied}
       {locale}
-      onMode={(mode) => command("mode", undefined, mode)}
       onCopy={copyInviteLink}
       onCommand={command}
     />
