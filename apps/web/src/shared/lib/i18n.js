@@ -86,7 +86,6 @@ const translations = {
   workshopLoading: ["이야기를 불러오는 중…", "Loading stories…"],
   workshopLoadFailed: ["이야기 목록을 불러오지 못했어.", "Could not load the story catalog."],
   workshopRetry: ["다시 불러오기", "Try again"],
-  workshopEmpty: ["아직 등록된 이야기가 없어.", "No stories have been published yet."],
   workshopNoMatches: ["검색 조건에 맞는 이야기가 없어.", "No stories match your search."],
   workshopPlayers: ["플레이 인원", "Players"],
   workshopMinutes: ["예상 시간", "Estimated time"],
