@@ -20,7 +20,7 @@
 <main id="main-content" tabindex="-1" class="main flex items-center justify-center">
   <section class="w-full max-w-sm py-8" aria-labelledby="entry-title">
     <div class="mb-10 text-center">
-      <span class="emblem" aria-hidden="true">S</span>
+      <span class="emblem" aria-hidden="true">E</span>
       <p class="eyebrow mt-4">{t("brand")}</p>
       <h1 id="entry-title" class="heading-two text-festival-gold">{t("entryInvitation")}</h1>
     </div>

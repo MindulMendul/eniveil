@@ -139,6 +139,8 @@ for (const [legacy, target] of Object.entries({
   '/images/story-invitation.svg': MANAGED_IMAGES.invitation,
   '/og/story-archive-ko-v1.png': MANAGED_IMAGES.ogKo,
   '/og/story-archive-en-v1.png': MANAGED_IMAGES.ogEn,
+  '/og/story-archive-ko-v2.webp': MANAGED_IMAGES.ogKo,
+  '/og/story-archive-en-v2.webp': MANAGED_IMAGES.ogEn,
 })) app.get(legacy, (c) => c.redirect(target, 301));
 
 const webRoot = resolve(import.meta.dir, "../../web/dist");

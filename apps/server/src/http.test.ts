@@ -31,7 +31,7 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
       expect(response.status).toBe(302);
       expect(response.headers.get('location')).toBe(prefix + '/workshop/');
     }
-    for (const [legacy, target] of [['/favicon.ico','/favicon.webp'],['/images/story-invitation.svg','/images/story-invitation.webp'],['/og/story-archive-ko-v1.png','/og/story-archive-ko-v2.webp']]) {
+    for (const [legacy, target] of [['/favicon.ico','/favicon.webp'],['/images/story-invitation.svg','/images/story-invitation.webp'],['/og/story-archive-ko-v1.png','/og/eniveil-ko-v3.webp'],['/og/story-archive-en-v1.png','/og/eniveil-en-v3.webp'],['/og/story-archive-ko-v2.webp','/og/eniveil-ko-v3.webp'],['/og/story-archive-en-v2.webp','/og/eniveil-en-v3.webp']]) {
       const response = await fetch(origin + legacy,{redirect:'manual'});
       expect(response.status).toBe(301);
       expect(response.headers.get('location')).toBe(target);

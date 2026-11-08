@@ -26,7 +26,7 @@ for lang in ('ko', 'en'):
     draw.rectangle((32*SCALE, 32*SCALE, 1168*SCALE, 598*SCALE), outline='#384139', width=2)
     line([(72, 105), (126, 105)], width=3)
     text(142, 91, 'INTERACTIVE MYSTERY STORIES', 18, '#d8bb79')
-    text(72, 203, '스토리 아카이브' if lang == 'ko' else 'Story Archive', 64)
+    text(72, 203, '애니베일' if lang == 'ko' else 'Eniveil', 64)
     text(76, 306, '당신의 선택으로 이어지는 이야기' if lang == 'ko' else 'Every choice opens a new story.', 27, '#a1aaa2')
     text(76, 480, '발견하고 · 플레이하세요' if lang == 'ko' else 'DISCOVER  /  PLAY', 21, '#d8bb79')
 
@@ -42,4 +42,4 @@ for lang in ('ko', 'en'):
     line([(1023, 291), (1064, 334)], '#d8bb79', 3)
     line([(846, 421), (1102, 421)], '#384139')
     text(913, 443, 'STORY / 01', 16, '#a1aaa2')
-    image.resize((1200, 630), Image.Resampling.LANCZOS).save(OUT / f'story-archive-{lang}.png', optimize=True)
+    image.resize((1200, 630), Image.Resampling.LANCZOS).save(OUT / f'eniveil-{lang}.png', optimize=True)
