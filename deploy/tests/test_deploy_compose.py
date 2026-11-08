@@ -64,3 +64,28 @@ class ComposeDeploymentTests(unittest.TestCase):
         up=next(i for i,c in enumerate(calls) if 'up' in c)
         self.assertLess(backup,up)
         self.assertTrue(any('rollback.json' in ' '.join(c) and 'up' in c for c in calls))
+
+
+class BuildStorageTests(unittest.TestCase):
+    def check_space(self, free_values, expected_calls, fails=False):
+        from types import SimpleNamespace
+        from unittest.mock import call, patch
+        with patch.object(deployment.shutil, 'disk_usage', side_effect=[SimpleNamespace(free=n) for n in free_values]), patch.object(deployment, 'run') as run:
+            if fails:
+                with self.assertRaisesRegex(RuntimeError, 'Insufficient Docker storage'):
+                    deployment.ensure_build_space(Path('/var/lib/docker'))
+            else:
+                deployment.ensure_build_space(Path('/var/lib/docker'))
+            self.assertEqual(run.call_args_list, [call(*args) for args in expected_calls])
+
+    def test_sufficient_space_does_not_prune(self):
+        self.check_space([4*1024**3], [])
+
+    def test_cache_cleanup_can_avoid_image_prune(self):
+        self.check_space([1, 4*1024**3], [('docker','builder','prune','--all','--force')])
+
+    def test_only_dangling_images_are_pruned_after_cache_is_insufficient(self):
+        self.check_space([1, 2, 4*1024**3], [('docker','builder','prune','--all','--force'), ('docker','image','prune','--force')])
+
+    def test_insufficient_space_still_aborts_after_both_safe_cleanups(self):
+        self.check_space([1, 2, 3], [('docker','builder','prune','--all','--force'), ('docker','image','prune','--force')], fails=True)
