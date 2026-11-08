@@ -1,0 +1,26 @@
+[
+  {
+    "language": "ko",
+    "width": 1440,
+    "stage": "story-dialog",
+    "violations": []
+  },
+  {
+    "language": "ko",
+    "width": 320,
+    "stage": "story-dialog",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 1440,
+    "stage": "story-dialog",
+    "violations": []
+  },
+  {
+    "language": "en",
+    "width": 320,
+    "stage": "story-dialog",
+    "violations": []
+  }
+]

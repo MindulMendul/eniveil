@@ -1,0 +1,188 @@
+{
+  "ko": {
+    "terms": {
+      "introduction": "이 약관은 MindulMendul(운영자)이 제공하는 스토리 아카이브의 인터랙티브 작품, 멀티플레이 및 창작마당 이용에 적용됩니다. 이용 전 약관과 개인정보처리방침을 확인해 주세요.",
+      "sections": [
+        {
+          "title": "1. 서비스와 게스트 이용",
+          "paragraphs": [
+            "작품 탐색과 안내 문서는 로그인 없이 볼 수 있습니다. 게스트 로그인이 필요한 기능에서는 닉네임과 브라우저 쿠키로 이용자를 구분합니다. 쿠키가 삭제되거나 만료되면 기존 게스트와 창작물에 다시 접근하지 못할 수 있습니다. 초대 코드와 게스트 인증 정보는 다른 사람에게 공개하지 마세요."
+          ]
+        },
+        {
+          "title": "2. 함께 지킬 이용 규칙",
+          "paragraphs": [
+            "타인을 사칭하거나 괴롭히는 행위, 개인정보·불법 콘텐츠 게시, 저작권 침해, 스팸, 보안 우회, 다른 이용자의 비밀이나 미공개 게임 정보에 대한 무단 접근을 금지합니다. 서비스에 과도한 부하를 주거나 게임 진행을 방해해서는 안 됩니다.",
+            "위반 콘텐츠나 이용은 필요한 범위에서 제한하거나 중단할 수 있습니다. 신고·이의 제기는 아래 운영자 문의 경로를 이용해 주세요."
+          ]
+        },
+        {
+          "title": "3. 창작물과 이용 권한",
+          "paragraphs": [
+            "작품과 이미지 등 콘텐츠의 권리는 해당 권리자에게 있습니다. 별도 라이선스나 권리자의 허락 없이 콘텐츠를 복제·재배포하거나 상업적으로 이용할 수 없습니다.",
+            "업로드한 창작물의 권리는 창작자에게 남습니다. 창작자는 게시에 필요한 권리를 확보해야 하며, 운영자에게 서비스 제공에 필요한 저장·표시·전송 권한을 부여합니다. 공개한 작품은 다른 이용자가 열람하고 플레이할 수 있습니다. 비공개 초안이나 작품에 타인의 개인정보를 넣지 마세요."
+          ]
+        },
+        {
+          "title": "4. 작품 내용과 이용자 선택",
+          "paragraphs": [
+            "작품에는 허구의 범죄·죽음·갈등 등 민감한 소재가 포함될 수 있습니다. 작품 안내를 확인하고 불편하면 이용을 중단해 주세요. 이용자가 작성한 작품은 해당 작성자의 표현이며 운영자의 견해를 의미하지 않습니다."
+          ]
+        },
+        {
+          "title": "5. 서비스 변경과 책임",
+          "paragraphs": [
+            "점검, 장애, 보안 조치 또는 운영상 필요로 기능이나 콘텐츠가 변경·중단될 수 있습니다. 중요한 변경은 서비스 또는 저장소 공지를 통해 안내합니다. 서비스의 무중단 제공이나 게스트 기록의 영구 보존을 보장하지 않으므로 중요한 창작물은 별도로 보관해 주세요.",
+            "운영자와 이용자의 책임은 적용 법령에 따릅니다. 이 약관은 법령상 보장되는 이용자 권리나 운영자의 법적 책임을 배제하지 않습니다."
+          ]
+        },
+        {
+          "title": "6. 개인정보와 약관 변경",
+          "paragraphs": [
+            "개인정보의 처리와 쿠키·분석 도구는 별도의 개인정보처리방침에서 설명합니다. 약관을 변경할 때에는 변경 내용과 적용일을 안내합니다. 문의나 분쟁은 운영자에게 먼저 알려 주시고, 해결되지 않으면 적용 법령의 절차에 따릅니다."
+          ]
+        }
+      ]
+    },
+    "privacy": {
+      "introduction": "MindulMendul(운영자)은 스토리 아카이브 운영을 위해 아래 정보를 처리합니다. 이 문서는 현재 서비스에서 사용하는 게스트 인증, 게임·창작마당 저장 및 선택적으로 설정되는 분석 도구를 설명합니다.",
+      "sections": [
+        {
+          "title": "1. 처리 항목과 목적",
+          "paragraphs": [
+            "게스트 로그인 시 입력한 닉네임, 생성된 게스트 ID 및 인증 토큰의 해시·만료 시각을 저장해 로그인과 접근 권한을 확인합니다. Google 로그인 시 Google에서 계정 고유 식별자(subject, sub)를 받아 서비스 계정 ID와 영속적으로 연결합니다. 이 연결로 다시 로그인할 때 같은 닉네임·작품·즐겨찾기에 접근합니다. Google에 요청하는 범위는 openid이며 실명·이메일·비밀번호를 수집하는 회원 가입 양식은 제공하지 않습니다.",
+            "방과 참가자, 역할·선택 등 게임 진행 상태, 솔로 플레이의 실행 ID·진행·결과·평점·이벤트 시각을 저장해 게임을 제공하고 작품 품질을 살펴봅니다. 창작마당에는 게스트 ID와 연결된 초안·공개 작품·메타데이터·즐겨찾기를 저장합니다. 닉네임과 공개 작품 정보는 해당 기능을 이용하는 다른 사람에게 표시될 수 있습니다."
+          ]
+        },
+        {
+          "title": "2. 쿠키와 브라우저 설정",
+          "paragraphs": [
+            "festival_guest 쿠키는 게스트 인증에 사용되며 발급 후 30일간 유효합니다. HttpOnly·SameSite=Lax 속성을 사용하고 운영 환경에서는 Secure 속성을 사용합니다. 브라우저 설정에서 쿠키를 차단하거나 삭제할 수 있지만 로그인과 내 작품 접근 등이 제한될 수 있습니다.",
+            "쿠키 삭제 또는 30일 만료는 서버의 게스트 기록·창작물 삭제를 뜻하지 않습니다. 삭제가 필요하면 아래 문의 경로로 요청해 주세요."
+          ]
+        },
+        {
+          "title": "3. 분석·오류 및 성능 측정",
+          "paragraphs": [
+            "GA4 측정 ID가 설정된 배포에서는 Google Analytics가 페이지 경로·언어·체류 시간·작품 이용 이벤트와 브라우저 정보를 처리하고 분석용 쿠키를 사용할 수 있습니다. 앱은 방 초대 코드가 포함된 쿼리와 해시를 페이지 조회 주소에서 제외합니다. Google의 개인정보처리방침과 Analytics 차단 도구를 아래에서 확인할 수 있습니다.",
+            "운영·QA 도메인에서는 Grafana Faro로 오류·세션·성능·추적 정보를 수집합니다. 전송 전 사용자 메타데이터와 페이지 경로·쿼리를 제거합니다. 서버에는 작품별 성능 측정값과 탐색 ID가 저장될 수 있습니다. 접속·보안 운영 과정에서 서버나 호스팅 로그에 IP 주소, 요청 정보, 브라우저 정보가 남을 수 있습니다."
+          ]
+        },
+        {
+          "title": "4. 보관과 삭제",
+          "paragraphs": [
+            "로그인 인증의 유효기간은 30일입니다. 게스트가 앱에서 로그아웃하면 해당 닉네임·작품·즐겨찾기와 모든 인증 세션을 삭제합니다. Google 계정의 로그아웃은 모든 인증 세션을 삭제하지만 subject와 계정 ID의 연결, 닉네임·작품·즐겨찾기는 다음 로그인을 위해 보관합니다. 계정 설정에서 회원탈퇴를 확인하면 닉네임, Google 연결, 만든 작품, 즐겨찾기와 인증 세션을 삭제합니다. Google 계정 자체는 삭제되지 않으며 완료된 게임 기록과 익명 집계 통계는 남을 수 있습니다. 로그아웃이나 쿠키 만료만으로 Google 계정 및 계정·게임 기록 전체가 삭제되지는 않습니다. 운영자에게 열람·정정·삭제 또는 처리 정지를 요청할 수 있으며 본인 확인과 다른 이용자의 권리를 검토해 처리합니다.",
+            "처리 목적이 끝났거나 유효한 삭제 요청을 처리할 때에는 해당 정보를 삭제 또는 익명화합니다. 법령상 보존이 필요한 경우에는 그 사유와 범위를 안내합니다. 외부 분석·호스팅 시스템의 보관 기간은 각 서비스 설정과 정책에 따릅니다."
+          ]
+        },
+        {
+          "title": "5. 외부 서비스와 정보 전송",
+          "paragraphs": [
+            "Google Analytics를 활성화하면 Google이 분석 정보를 처리하며 국외 서버에서 처리될 수 있습니다. Faro와 서버 로그는 배포에 설정된 수집·호스팅 인프라에서 처리됩니다. 사이트 글꼴을 불러올 때 Google Fonts에 IP 주소·브라우저 정보가 전송될 수 있습니다.",
+            "이 문서는 확인되지 않은 수탁 업체·서버 국가·보관 기간을 확정하지 않습니다. 구체적인 배포 환경의 처리 업체와 국외 이전 관련 사항은 운영자 문의 경로로 확인해 주세요."
+          ]
+        },
+        {
+          "title": "6. 이용자 권리와 문의",
+          "paragraphs": [
+            "운영자는 MindulMendul이며 개인정보 문의는 아래 GitHub 문의 링크로 접수합니다. 공개 이슈에는 인증 쿠키, 초대 코드, 실명 등 개인정보를 적지 마세요. 민감한 내용이 필요한 요청은 먼저 비공개 전달 방법을 문의해 주세요.",
+            "본인 또는 법정대리인은 개인정보 열람·정정·삭제·처리 정지를 요청할 수 있습니다. 아동의 정보가 부적절하게 제공된 것을 알게 되면 운영자에게 알려 주세요. 방침의 중요한 변경은 변경 내용과 적용일을 안내합니다."
+          ]
+        }
+      ]
+    }
+  },
+  "en": {
+    "terms": {
+      "introduction": "These terms apply to the interactive stories, multiplayer features and workshop in Story Archive, operated by MindulMendul (the operator). Please read these terms and the Privacy Policy before using the service.",
+      "sections": [
+        {
+          "title": "1. Service and guest access",
+          "paragraphs": [
+            "You can browse stories and information pages without signing in. Features requiring guest access identify you using a nickname and a browser cookie. Deleting or losing that cookie, or its expiry, may prevent access to your existing guest identity and creations. Keep room invitation codes and guest credentials private."
+          ]
+        },
+        {
+          "title": "2. Acceptable use",
+          "paragraphs": [
+            "Do not impersonate or harass others, post personal information or illegal content, infringe copyright, spam, bypass security, or access another player's secrets or unreleased game information without permission. Do not overload the service or disrupt games.",
+            "The operator may restrict content or access as necessary to address violations. Use the contact route below to report a concern or appeal a restriction."
+          ]
+        },
+        {
+          "title": "3. Content and permissions",
+          "paragraphs": [
+            "Stories, images and other content belong to their respective rights holders. Copying, redistribution or commercial use requires an applicable license or permission from the rights holder.",
+            "Creators retain rights to their uploads and must have permission to publish all included material. Uploading grants the operator permission to store, display and transmit the content as needed to provide the service. Published stories can be viewed and played by others. Do not include another person's personal information in stories or private drafts."
+          ]
+        },
+        {
+          "title": "4. Story content and your choices",
+          "paragraphs": [
+            "Stories may contain fictional crime, death, conflict or other sensitive themes. Review the story description and stop playing if uncomfortable. User-created stories express their authors' views, not necessarily the operator's."
+          ]
+        },
+        {
+          "title": "5. Changes and responsibility",
+          "paragraphs": [
+            "Maintenance, outages, security measures or operational needs may change or interrupt features and content. Significant changes will be announced through the service or repository. Uninterrupted availability and permanent preservation of guest records are not guaranteed; keep your own copies of important creations.",
+            "The operator's and users' responsibilities are governed by applicable law. These terms do not exclude statutory user rights or the operator's legal obligations."
+          ]
+        },
+        {
+          "title": "6. Privacy and updates",
+          "paragraphs": [
+            "The separate Privacy Policy explains personal data processing, cookies and analytics. Changes to these terms will be announced with their effective date. Contact the operator about concerns or disputes first; unresolved matters follow the procedures provided by applicable law."
+          ]
+        }
+      ]
+    },
+    "privacy": {
+      "introduction": "MindulMendul (the operator) processes the information below to operate Story Archive. This policy describes the current guest authentication, game and workshop storage, and analytics tools that may be configured for a deployment.",
+      "sections": [
+        {
+          "title": "1. Information and purposes",
+          "paragraphs": [
+            "Guest sign-in stores your nickname, generated guest ID, and a hash and expiry time for the authentication token to provide access and check permissions. Google sign-in obtains the unique Google account identifier (subject, sub) and persistently links it to a service account ID, so subsequent sign-ins restore the same nickname, stories and favorites. The requested Google scope is openid; no registration form collects a real name, email address or password.",
+            "Rooms, participants, roles, choices and other game state, plus solo run IDs, progress, outcomes, ratings and event times, are stored to provide games and understand story quality. The workshop stores drafts, published stories, metadata and favorites linked to a guest ID. Your nickname and published story information may be visible to others using those features."
+          ]
+        },
+        {
+          "title": "2. Cookies and browser controls",
+          "paragraphs": [
+            "The festival_guest cookie authenticates a guest for 30 days after issue. It uses HttpOnly and SameSite=Lax, and Secure in production. You can block or delete cookies in your browser, but this may prevent sign-in and access to your creations.",
+            "Deleting the cookie or its expiry after 30 days does not delete server-side guest records or creations. Contact the operator below to request deletion."
+          ]
+        },
+        {
+          "title": "3. Analytics, errors and performance",
+          "paragraphs": [
+            "Deployments with a GA4 measurement ID configured use Google Analytics to process page paths, language, time spent, story interaction events and browser information, and may use analytics cookies. The app excludes queries and fragments containing room invitation codes from page-view URLs. Links to Google's privacy policy and Analytics opt-out tool appear below.",
+            "Production and QA domains use Grafana Faro for errors, sessions, performance and tracing. User metadata and page paths and queries are removed before sending. Story performance measurements and navigation IDs may also be stored on the server. Server or hosting logs may contain IP addresses, request information and browser details for access and security operations."
+          ]
+        },
+        {
+          "title": "4. Retention and deletion",
+          "paragraphs": [
+            "Sign-in credentials are valid for 30 days. Signing out of a guest account in the app deletes its nickname, stories, favorites and all authentication sessions. Signing out of a Google account deletes all authentication sessions but retains the subject-to-account link, nickname, stories and favorites for the next sign-in. Confirming account deletion in account settings deletes the nickname, Google link, created stories, favorites and authentication sessions. It does not delete the Google account itself; completed game records and anonymous aggregate statistics may remain. Signing out or cookie expiry alone does not delete the Google account link or all account and game records. You can also request access, correction, deletion or restriction of processing; the operator will review identity verification and other users' rights when handling requests.",
+            "When the purpose ends or a valid deletion request is processed, the relevant information is deleted or anonymized. Where legal retention is required, its reason and scope will be explained. Retention in external analytics and hosting systems depends on their settings and policies."
+          ]
+        },
+        {
+          "title": "5. External services and transfers",
+          "paragraphs": [
+            "When enabled, Google Analytics processes analytics information through Google and may process it on servers outside your country. Faro and server logs use the collection and hosting infrastructure configured for the deployment. Loading Google Fonts may send your IP address and browser information to Google.",
+            "This policy does not assert unverified processor identities, server countries or retention periods. Contact the operator for deployment-specific processors and information about international transfers."
+          ]
+        },
+        {
+          "title": "6. Your rights and contact",
+          "paragraphs": [
+            "The operator is MindulMendul. Use the GitHub contact link below for privacy inquiries. Never post authentication cookies, room invitation codes, real names or other personal data in a public issue. If a request needs sensitive details, first ask for a private way to provide them.",
+            "You or your legal representative can request access, correction, deletion or restriction of personal data processing. Contact the operator if you discover that a child's information has been provided inappropriately. Significant policy changes will be announced with their effective date."
+          ]
+        }
+      ]
+    }
+  }
+}

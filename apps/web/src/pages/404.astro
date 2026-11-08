@@ -1,0 +1,29 @@
+---
+import { CallToAction } from "../shared/ui";
+import "../shared/styles/base.css";
+---
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>404 · Story Archive</title>
+    <meta name="robots" content="noindex,nofollow" />
+  </head>
+  <body class="m-0 min-h-screen bg-festival-bg font-sans text-festival-text">
+    <main id="main-content" tabindex="-1" class="shell">
+      <h1>404 · 페이지를 찾을 수 없습니다 / Page not found</h1>
+        <CallToAction id="error-home" href="/">홈으로 / Home →</CallToAction>
+    </main>
+  </body>
+</html>
+<script>
+  import { getLocaleFromPath, localePath } from "../shared/lib";
+  const locale = getLocaleFromPath(location.pathname);
+  document.documentElement.lang = locale;
+  const home = document.querySelector<HTMLAnchorElement>("#error-home");
+  if (home) {
+    home.href = localePath(locale);
+    home.textContent = locale === "en" ? "Home →" : "홈으로 →";
+  }
+</script>

@@ -8,7 +8,11 @@ import { metrics, observeHTTP } from "./observability";
 import { storyCatalog } from "./modules/platform/stories/catalog";
 import { fileStoryCatalog } from "./modules/platform/stories/file-catalog";
 import { SQLiteStoryRunStore } from "./infrastructure/sqlite/story-run-store";
+import { SQLiteWorkshopStore } from "./infrastructure/sqlite/workshop-store";
+import { PlayStoryCatalog } from "./modules/platform/stories/play-catalog";
 import { StorySessionService } from "./modules/game/story-session-service";
+import { createAccountRoutes } from "./modules/platform/account-routes";
+import { createFriendRoutes } from "./modules/platform/friend-routes";
 import { createPlatformRoutes } from "./modules/platform/routes";
 import { createWorkshopRoutes } from "./modules/workshop/routes";
 import { createGameRoutes } from "./modules/game/routes";
@@ -23,7 +27,9 @@ export const store = new Store(
 );
 export const game = new Game(store, storyCatalog);
 const storyRunStore = new SQLiteStoryRunStore(store.db);
-const storySessions = new StorySessionService(fileStoryCatalog, storyRunStore);
+const workshopStore = new SQLiteWorkshopStore(store.db);
+const playCatalog = new PlayStoryCatalog(fileStoryCatalog, workshopStore);
+const storySessions = new StorySessionService(playCatalog, storyRunStore);
 
 const notifyTemporal = (action: "start" | "event" | "end", payload: object) => {
   const baseUrl = process.env.TEMPORAL_GATEWAY_URL;
@@ -72,16 +78,26 @@ app.use("*", async (c, next) => {
 });
 
 const lobby = createLobbyRoutes({ store, game, notifyTemporal });
+const google = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.APP_ORIGIN
+  ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, origin: new URL(process.env.APP_ORIGIN).origin }
+  : undefined;
+app.route("/api/platform", createAccountRoutes({ store, production, google, onLogout: lobby.disconnect, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
+app.route('/api/friends', createFriendRoutes(store, { isOnline: id => (game.online.get(id) ?? 0) > 0 }));
 app.route("/api/platform", createPlatformRoutes({
   store,
-  stories: fileStoryCatalog,
+  stories: playCatalog,
   runs: storyRunStore,
   production,
   adminToken: process.env.STORY_ADMIN_TOKEN,
 }));
-app.route("/api/workshop", createWorkshopRoutes({ stories: fileStoryCatalog }));
-app.route("/api/game", createGameRoutes({
+app.route("/api/workshop", createWorkshopRoutes({
   stories: fileStoryCatalog,
+  store,
+  workshop: workshopStore,
+  runs: storyRunStore,
+}));
+app.route("/api/game", createGameRoutes({
+  stories: playCatalog,
   runs: storyRunStore,
   sessions: storySessions,
 }));
@@ -113,11 +129,12 @@ app.notFound((c) => c.json({ error: "찾을 수 없는 경로야." }, 404));
 const webRoot = resolve(import.meta.dir, "../../web/dist");
 app.use("*", serveStatic({ root: webRoot }));
 app.get("*", async (c) => {
-  if (c.req.path.startsWith("/api/"))
+  if (c.req.path === "/api" || c.req.path.startsWith("/api/"))
     return c.json({ error: "찾을 수 없는 경로야." }, 404);
-  const file = Bun.file(resolve(webRoot, "index.html"));
+  // Existing pages and assets were handled by serveStatic, including directory indexes.
+  const file = Bun.file(resolve(webRoot, "404.html"));
   return (await file.exists())
-    ? c.html(await file.text())
+    ? c.html(await file.text(), 404)
     : c.text("Run bun run build first.", 503);
 });
 

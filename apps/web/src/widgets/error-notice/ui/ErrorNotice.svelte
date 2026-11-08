@@ -1,9 +1,5 @@
 <script lang="ts">
-  import { Button } from "../../../shared/ui";
-  let { message, onDismiss }: { message: string; onDismiss: () => void } = $props();
+  import { Toast } from "../../../shared/ui";
+  let { message, onDismiss, locale = 'ko' }: { message: string; onDismiss: () => void; locale?: 'ko' | 'en' } = $props();
 </script>
-
-<div class="notice" role="alert">
-  {message}
-  <Button variant="dismiss" ariaLabel="알림 닫기" onclick={onDismiss}>×</Button>
-</div>
+<Toast {message} {onDismiss} kind="error" dismissLabel={locale === 'en' ? 'Dismiss notification' : '알림 닫기'} />

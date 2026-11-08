@@ -1,12 +1,15 @@
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { createBunWebSocket } from "hono/bun";
-import { createRoomSchema, joinRoomSchema, commandSchema } from "@festival/shared";
+import { createRoomSchema, joinRoomSchema, commandSchema, soloRoomExitSchema } from "@festival/shared";
 import type { Guest } from "@festival/shared";
 import type { WSContext } from "hono/ws";
 import type { Store } from "../../store";
 import type { Game } from "../game/game";
 import type { ApiEnv } from "../http/env";
+
+import { ReconnectGrace } from "./reconnect-grace";
+import { notifySessionExpiry } from "./session-expiry";
 
 type TemporalAction = "start" | "event" | "end";
 
@@ -17,9 +20,10 @@ export function createLobbyRoutes(deps: {
 }) {
   const app = new Hono<ApiEnv>();
   const { upgradeWebSocket, websocket } = createBunWebSocket();
-  const sockets = new Map<WSContext, Guest>();
+  const sockets = new Map<WSContext, { guest: Guest; expires: number }>();
   const broadcast = () => {
-    for (const [ws, guest] of sockets) {
+    for (const [ws, { guest, expires }] of sockets) {
+      if (expires <= Date.now()) { ws.close(1008, "Expired"); continue; }
       try {
         ws.send(JSON.stringify({ type: "snapshot", data: deps.game.snapshot(guest) }));
       } catch {
@@ -27,6 +31,10 @@ export function createLobbyRoutes(deps: {
       }
     }
   };
+  const presence = new ReconnectGrace(deps.game, (transition) => {
+    notifySessionExpiry(transition, deps.notifyTemporal);
+    broadcast();
+  });
   const authenticate = (c: Context<ApiEnv>) =>
     deps.store.authenticate(getCookie(c, "festival_guest"));
 
@@ -85,6 +93,12 @@ export function createLobbyRoutes(deps: {
     broadcast();
     return c.json({ roomId: room.id });
   });
+  app.post("/rooms/solo-exit", async (c) => {
+    const { roomId, soloPlayId } = soloRoomExitSchema.parse(await c.req.json());
+    deps.game.endSolo(c.get("guest"), roomId, soloPlayId);
+    broadcast();
+    return c.json({ ok: true });
+  });
   app.get(
     "/ws",
     async (c, next) => {
@@ -101,8 +115,8 @@ export function createLobbyRoutes(deps: {
       return {
         onOpen(_event, ws) {
           connection = ws;
-          sockets.set(ws, guest);
-          deps.game.online.set(guest.id, (deps.game.online.get(guest.id) ?? 0) + 1);
+          sockets.set(ws, { guest, expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
+          presence.connect(guest.id);
           broadcast();
         },
         onMessage(event, ws) {
@@ -153,10 +167,7 @@ export function createLobbyRoutes(deps: {
         },
         onClose(_event, ws) {
           if (connection && sockets.delete(connection)) {
-            deps.game.online.set(
-              guest.id,
-              Math.max(0, (deps.game.online.get(guest.id) ?? 1) - 1),
-            );
+            presence.disconnect(guest.id);
             broadcast();
           }
         },
@@ -165,5 +176,11 @@ export function createLobbyRoutes(deps: {
   );
   setInterval(broadcast, 30000).unref();
 
-  return { app, websocket, connectionCount: () => sockets.size };
+  const disconnect = (guestId: string) => {
+    for (const [ws, entry] of sockets) if (entry.guest.id === guestId) {
+      entry.expires = 0;
+      ws.close(1008, "Signed out");
+    }
+  };
+  return { app, websocket, disconnect, connectionCount: () => sockets.size };
 }

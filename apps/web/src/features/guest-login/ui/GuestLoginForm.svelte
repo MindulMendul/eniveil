@@ -1,25 +1,19 @@
 <script lang="ts">
-  import { Button, TextInput } from "../../../shared/ui";
+  import NicknameField from "../../account/NicknameField.svelte";
+  import { Button } from "../../../shared/ui";
 
   let {
+    locale,
     nickname = $bindable(""),
     busy,
     t,
     onSubmit,
-  }: { nickname?: string; busy: boolean; t: (key: string) => string; onSubmit: () => void } = $props();
+  }: { locale: "ko" | "en"; nickname?: string; busy: boolean; t: (key: string) => string; onSubmit: () => void } = $props();
 </script>
 
 <form onsubmit={(event) => { event.preventDefault(); onSubmit(); }}>
-  <label class="input-label" for="nickname">{t("guestName")}</label>
-  <TextInput
-    id="nickname"
-    bind:value={nickname}
-    maxlength={20}
-    placeholder={t("namePlaceholder")}
-    required
-    autocomplete="nickname"
-  />
+  <NicknameField id="nickname" bind:value={nickname} {locale} {busy} />
   <Button type="submit" disabled={busy || !nickname.trim()}>
-    {busy ? "입장 중…" : t("guestStart")} <span>↗</span>
+    {busy ? t("guestLoggingIn") : t("guestStart")} <span aria-hidden="true">↗</span>
   </Button>
 </form>

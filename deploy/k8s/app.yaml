@@ -43,6 +43,18 @@ spec:
               value: /data/festival.sqlite
             - name: APP_ORIGIN
               value: https://festival.example.com
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: festival-google-oauth
+                  key: client-id
+                  optional: true
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: festival-google-oauth
+                  key: client-secret
+                  optional: true
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               valueFrom:
                 configMapKeyRef:

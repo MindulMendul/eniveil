@@ -2,14 +2,13 @@
   import type { Snapshot } from "@festival/shared";
   import { RoomCard } from "../../../entities/room";
   import { JoinRoomForm } from "../../../features/room-join";
-  import { Button, Panel } from "../../../shared/ui";
+  import { Button } from "../../../shared/ui";
 
   let {
     snapshot,
     busy,
     connected,
     t,
-    modes,
     code = $bindable(""),
     onSelectMode,
     onJoin,
@@ -18,61 +17,42 @@
     busy: boolean;
     connected: boolean;
     t: (key: string) => string;
-    modes: { id: string; titleKey: string; descriptionKey: string; actionKey: string }[];
     code?: string;
     onSelectMode: (modeId: string) => void;
     onJoin: (code?: string) => void;
   } = $props();
+
+  let joinOpen = $state(false);
+  $effect(() => {
+    if (code.trim()) joinOpen = true;
+  });
 </script>
 
-<main class="main">
-  <div class="page-heading">
-    <div>
-      <p class="eyebrow">THE LOBBY</p>
-      <h1 class="heading-one">{t("lobbyTitle")}</h1>
-      <p class="muted">{t("lobbyDescription")}</p>
-    </div>
-    <span class="count">{snapshot.rooms.length}개의 방</span>
+<main id="main-content" tabindex="-1" class="main !pt-5 max-mobile:!pt-4">
+  <h1 class="sr-only">{t("lobbyTitle")}</h1>
+  <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <Button
+      class="!m-0 !w-auto !px-3 !py-2"
+      disabled={busy || !connected}
+      onclick={() => onSelectMode("host")}
+    >
+      <span aria-hidden="true">＋</span> {t("createRoom")}
+    </Button>
+    <details class="min-w-0 max-w-full" bind:open={joinOpen}>
+      <summary class="min-h-11 cursor-pointer py-3 text-body-sm text-festival-muted hover:text-festival-gold">{t("joinByCode")}</summary>
+      <div class="mt-2 border border-festival-line bg-festival-panel p-4">
+        <JoinRoomForm bind:code {busy} {connected} {t} onSubmit={() => onJoin()} />
+      </div>
+    </details>
   </div>
 
-  <section class="mb-8">
-    <div class="section-heading">
-      <h2 class="heading-two section-title">{t("gameModes")}</h2>
-      <span class="tag">PLAY</span>
-    </div>
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {#each modes as mode (mode.id)}
-        <Panel>
-          <p class="eyebrow">{t("gameModeLabel")}</p>
-          <h3 class="heading-three">{t(mode.titleKey)}</h3>
-          <p class="muted mb-5">{t(mode.descriptionKey)}</p>
-          {#if mode.id === "join"}
-            <JoinRoomForm bind:code {busy} {connected} {t} onSubmit={() => onJoin()} />
-          {:else}
-            <Button
-              class="w-full"
-              disabled={mode.id === "host" && !connected}
-              onclick={() => onSelectMode(mode.id)}
-            >
-              {t(mode.actionKey)} <span>↗</span>
-            </Button>
-          {/if}
-        </Panel>
-      {/each}
-    </div>
-  </section>
-
-  <section>
-    <div class="section-heading">
-      <h2 class="heading-two section-title">{t("openRooms")}</h2>
-      <span class="tag">LIVE</span>
+  <section class="mt-8 border-t border-festival-line pt-5" aria-labelledby="lobby-rooms-title">
+    <div class="section-heading mb-4">
+      <h2 id="lobby-rooms-title" class="heading-two section-title">{t("openRooms")}</h2>
+      <span class="count">{snapshot.rooms.length}</span>
     </div>
     {#if !snapshot.rooms.length}
-      <div class="empty">
-        <span class="empty-symbol">✧</span>
-        <h3 class="heading-three">{t("quietFestival")}</h3>
-        <p class="empty-copy">{t("createFirstRoom")}</p>
-      </div>
+      <p class="muted" role="status">{t("noOpenRooms")}</p>
     {:else}
       <div class="rooms">
         {#each snapshot.rooms as room (room.id)}

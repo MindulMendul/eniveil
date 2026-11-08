@@ -1,19 +1,22 @@
 <script>
+  import { Button } from "../../shared/ui";
+  import { supportedSoloStory } from '@festival/shared';
+  import { rememberSoloExit } from '../../shared/lib/solo-lifecycle';
   import { onMount } from 'svelte';
   import { translate } from '../../shared/lib/i18n.js';
   import { trackEvent } from '../../analytics.js';
   import StoryCuePlayer from './StoryCuePlayer.svelte';
   import StoryRating from './StoryRating.svelte';
 
-  /** @type {{ locale?: 'ko' | 'en', onExit?: () => void }} */
-  let { locale = 'ko', onExit = () => {} } = $props();
+  /** @type {{ locale?: 'ko' | 'en', storyId?: string, onExit?: () => void, exitLabel?: string, exitDisabled?: boolean, exitMessage?: string, roomLifecycle?: import('../../shared/lib/solo-lifecycle').SoloExit, onLifecycleExit?: (exit: import('../../shared/lib/solo-lifecycle').SoloExit) => void }} */
+  let { locale = 'ko', storyId = supportedSoloStory.id, onExit = () => {}, exitLabel, exitDisabled = false, exitMessage = '', roomLifecycle, onLifecycleExit = () => {} } = $props();
   /** @param {Parameters<typeof translate>[1]} key */
   const t = (key) => translate(locale, key);
 
-  let storyPackage = $state(/** @type {import('@festival/shared').StoryPackage | null} */ (null));
+  let storyPackage = $state(/** @type {import('@festival/shared').SoloStoryView | null} */ (null));
   let storyLoadError = $state('');
   let mechanics = $derived(
-    storyPackage?.content.mechanics.type === 'solo-investigation'
+    storyPackage?.content?.mechanics.type === 'solo-investigation'
       ? storyPackage.content.mechanics
       : null,
   );
@@ -21,12 +24,12 @@
   let evidence = $derived(Object.fromEntries((mechanics?.evidence ?? []).map((item) => [item.id, item])));
   let rooms = $derived((mechanics?.locations ?? []).map((location) => ({ ...location, evidence: location.evidenceIds })));
   let alibis = $derived(Object.fromEntries((mechanics?.alibis ?? []).map(({ suspectId, statements }) => [suspectId, statements])));
-  /** @type {Record<string, Record<string, [string, boolean?]>>} */
+  /** @type {Record<string, Record<string, [string]>>} */
   let reactions = $derived((mechanics?.reactions ?? []).reduce((bySuspect, item) => {
     bySuspect[item.suspectId] ??= {};
-    bySuspect[item.suspectId][item.evidenceId] = [item.lines.join('\n'), item.revealsTruth];
+    bySuspect[item.suspectId][item.evidenceId] = [item.lines.join('\n')];
     return bySuspect;
-  }, /** @type {Record<string, Record<string, [string, boolean?]>>} */ ({})));
+  }, /** @type {Record<string, Record<string, [string]>>} */ ({})));
   /** @type {import('@festival/shared').StoryCue[]} */
   let openingCues = $state([]);
   /** @type {import('@festival/shared').StoryCue[]} */
@@ -54,6 +57,7 @@
   let selected = $derived(suspects.find((suspect) => suspect.id === selectedSuspect));
 
   onMount(() => {
+    const lifecycle = roomLifecycle;
     const navigationId = crypto.randomUUID();
     const navigation = performance.getEntriesByType('navigation')[0];
     const pageLoadMs = navigation instanceof PerformanceNavigationTiming && navigation.loadEventEnd > 0
@@ -64,22 +68,31 @@
       headers: { 'Content-Type': 'application/json' },
       keepalive: true,
       body: JSON.stringify({
-        storyId: 'deokil-trading-murder',
+        storyId,
         metricName: 'page_load_ms',
         value: Math.max(0, pageLoadMs),
         navigationId,
         route: '/solo',
       }),
     }).catch(() => {});
-    void fetch('/api/game/stories/deokil-trading-murder')
+    void fetch(`/api/game/stories/${encodeURIComponent(storyId)}`)
       .then(async (response) => {
-        if (!response.ok) throw new Error('스토리를 불러오지 못했어.');
-        storyPackage = await response.json();
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? '스토리를 불러오지 못했어.');
+        storyPackage = data;
       })
       .catch((error) => {
         storyLoadError = error instanceof Error ? error.message : '스토리를 불러오지 못했어.';
       });
+    let exited = false;
     const recordAbandonment = () => {
+      if (exited) return;
+      exited = true;
+      if (lifecycle) {
+        rememberSoloExit(sessionStorage, lifecycle);
+        onLifecycleExit(lifecycle);
+        navigator.sendBeacon('/api/lobby/rooms/solo-exit', new Blob([JSON.stringify(lifecycle)], { type: 'application/json' }));
+      }
       if (!startedAt || phase === 'win' || phase === 'fail') return;
       if (runId) navigator.sendBeacon(`/api/game/sessions/${runId}/abandon`, new Blob([], { type: 'application/json' }));
       trackEvent('story_abandon', {
@@ -90,14 +103,19 @@
       });
     };
     window.addEventListener('pagehide', recordAbandonment);
-    return () => window.removeEventListener('pagehide', recordAbandonment);
+    /** @param {PageTransitionEvent} event */
+    const restorePage = (event) => { if (event.persisted && lifecycle) location.reload(); };
+    window.addEventListener('pageshow', restorePage);
+    return () => {
+      window.removeEventListener('pagehide', recordAbandonment);
+      window.removeEventListener('pageshow', restorePage);
+      recordAbandonment();
+    };
   });
 
   async function startOver() {
     if (!storyPackage) return;
-    runId = '';
     storyLoadError = '';
-    resolutionCues = [];
     try {
       const response = await fetch('/api/game/sessions', {
         method: 'POST',
@@ -106,14 +124,16 @@
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? '플레이를 시작하지 못했어.');
+      storyPackage = data.package;
       runId = data.runId;
+      resolutionCues = [];
       openingCues = data.scene.cues;
       startedAt = Date.parse(data.progress.startedAt);
     } catch (error) {
       storyLoadError = error instanceof Error ? error.message : '플레이를 시작하지 못했어.';
       return;
     }
-    trackEvent('story_start', { story_id: storyPackage.story.id, language: locale });
+    trackEvent('story_start', { story_id: storyPackage?.story.id ?? storyId, language: locale });
     phase = 'intro';
     roomId = '';
     found = [];
@@ -230,8 +250,9 @@
 <svelte:head><title>{storyPackage?.story.title ?? '덕일상사 살인사건'} · 이상한 축제</title></svelte:head>
 
 {#if storyLoadError}<p class="mx-auto mb-4 max-w-[960px] border border-red-700/50 bg-festival-panel px-5 py-3 text-sm text-red-300" role="alert">{storyLoadError}</p>{/if}
+{#if exitMessage}<p class="mx-auto mb-4 max-w-[960px] text-sm text-festival-muted" role="status">{exitMessage}</p>{/if}
 {#if hintMessage}
-  <aside class="mx-auto mb-6 flex max-w-[960px] items-start justify-between gap-4 border border-festival-gold-border bg-festival-panel px-5 py-4" role="status"><p class="m-0 text-sm leading-[1.9] text-festival-copy"><span class="mr-2 text-festival-gold">힌트</span>{hintMessage}</p><button class="dismiss" aria-label="힌트 닫기" onclick={() => hintMessage = ''}>×</button></aside>
+  <aside class="mx-auto mb-6 flex max-w-[960px] items-start justify-between gap-4 border border-festival-gold-border bg-festival-panel px-5 py-4" role="status"><p class="m-0 text-sm leading-[1.9] text-festival-copy"><span class="mr-2 text-festival-gold">힌트</span>{hintMessage}</p><Button class="dismiss" ariaLabel="힌트 닫기" onclick={() => hintMessage = ''} variant="dismiss">×</Button></aside>
 {/if}
 
 {#if phase === 'title'}
@@ -239,7 +260,7 @@
     <p class="eyebrow">A CASE FOR ONE DETECTIVE</p>
     <div class="mb-7 border-y border-festival-line py-8">
       <span class="text-5xl text-festival-gold" aria-hidden="true">✳</span>
-      <p class="my-4 text-[11px] tracking-[3px] text-festival-muted">{locale === 'en' ? 'DEOKIL TRADING · 23:00' : '덕일상사 · 23:00'}</p>
+      <p class="my-4 text-[11px] tracking-[3px] text-festival-muted">{storyPackage?.story.estimatedMinutes ?? 25} {locale === 'en' ? 'MIN · SOLO INVESTIGATION' : '분 · 1인 수사'}</p>
       <h1 class="m-0 font-serif text-[38px] font-medium leading-[1.5] tracking-[-1px] max-[520px]:text-[30px]">{storyPackage?.story.title ?? t('caseTitle')}</h1>
       <p class="mt-3 text-sm leading-[1.9] text-festival-muted">{storyPackage?.story.subtitle ?? t('caseSubtitle')}</p>
     </div>
@@ -248,11 +269,18 @@
         <div class="border border-festival-line px-4 py-3"><span class="text-[10px] tracking-[1px] text-festival-gold">{step.number}</span><p class="mb-0 mt-2 text-sm">{step.label}</p></div>
       {/each}
     </div>
-    <button class="primary mx-auto max-w-[540px]" disabled={!storyPackage} onclick={startOver}>{t('caseStart')} <span>→</span></button>
-    <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>{t('backToFestival')}</button>
+    <Button class="primary mx-auto max-w-[540px]" disabled={!storyPackage} onclick={startOver} variant="primary">{t('caseStart')} <span>→</span></Button>
+    <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={exitDisabled} onclick={onExit}>{exitLabel ?? t('backToPlatform')}</button>
   </section>
 {:else if phase === 'intro'}
-  {#if openingCues.length}<StoryCuePlayer cues={openingCues} onComplete={finishOpening} />{/if}
+  {#if openingCues.length}
+    <StoryCuePlayer cues={openingCues} onComplete={finishOpening} />
+  {:else}
+    <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center">
+      <p class="muted">{t('openingHasNoNarration')}</p>
+      <Button class="primary mx-auto max-w-[400px]" onclick={finishOpening} variant="primary">{t('beginInvestigation')} <span>→</span></Button>
+    </section>
+  {/if}
 {:else if phase === 'cast'}
   <section class="mx-auto max-w-[840px]">
     <p class="eyebrow">THE SUSPECTS</p><h1 class="heading-one page-title">{t('suspectsTitle')}</h1><p class="muted mb-7">{t('suspectDescription')}</p>
@@ -262,7 +290,7 @@
         <article class="panel"><div class="section-heading"><span class="eyebrow section-eyebrow">SUSPECT 0{i + 1}</span><span class="tag">{t('suspect')}</span></div><h2 class="heading-two mb-2 mt-4">{suspect.name}</h2><p class="muted">{suspect.details}</p></article>
       {/each}
     </div>
-    <button class="primary mt-6" onclick={() => { phase = 'explore'; }}>{t('investigate')} <span>→</span></button>
+    <Button class="primary mt-6" onclick={() => { phase = 'explore'; }} variant="primary">{t('investigate')} <span>→</span></Button>
   </section>
 {:else if phase === 'explore'}
   <section class="mx-auto max-w-[960px]">
@@ -278,11 +306,11 @@
     </section><aside class="panel min-h-[210px]">
       {#if selectedRoom}
         <p class="eyebrow">SEARCH THE ROOM</p><h2 class="heading-two">{selectedRoom.name}</h2><p class="muted">{selectedRoom.mood}</p>
-        <div class="grid gap-2">{#each selectedRoom.evidence as id}<button class="secondary mt-0" onclick={() => inspect(id)}><span>{found.includes(id) ? '✓ ' : ''}{evidence[id].name}</span><span>↗</span></button>{/each}</div>
+        <div class="grid gap-2">{#each selectedRoom.evidence as id}<Button class="secondary mt-0" onclick={() => inspect(id)} variant="secondary"><span>{found.includes(id) ? '✓ ' : ''}{evidence[id].name}</span><span>↗</span></Button>{/each}</div>
         {#if currentEvidence}<div class="mt-5 border-t border-festival-line pt-4"><p class="mb-2 text-xs text-festival-gold">{evidence[currentEvidence].icon} {evidence[currentEvidence].name}</p><p class="m-0 text-sm leading-[1.9] text-festival-copy-soft">{evidence[currentEvidence].detail}</p></div>{/if}
       {:else}<p class="eyebrow">CRIME SCENE</p><h2 class="heading-two">{t('whereStart')}</h2><p class="muted">{t('searchRoom')}</p>{/if}
     </aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><button class="primary mt-0 w-auto min-w-[230px]" onclick={() => { phase = 'alibi'; selectedSuspect = ''; }}>{t('exploreNext')} <span>→</span></button></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><Button class="text-button" onclick={showHint} variant="text">{t('hint')}</Button><Button class="primary mt-0 w-auto min-w-[230px]" onclick={() => { phase = 'alibi'; selectedSuspect = ''; }} variant="primary">{t('exploreNext')} <span>→</span></Button></div>
   </section>
 {:else if phase === 'alibi' || phase === 'cross'}
   <section class="mx-auto max-w-[960px]">
@@ -293,21 +321,21 @@
     {/each}</section><aside class="panel min-h-[300px]">
       {#if selected}
         <p class="eyebrow">QUESTION · {selected.name}</p><h2 class="heading-two">{t('chooseQuestion')}</h2>
-        {#if phase === 'alibi'}<div class="grid gap-2"><button class="secondary mt-0" onclick={() => askAlibi(0)}>{t('askAlibi')} <span>↗</span></button><button class="secondary mt-0" onclick={() => askAlibi(1)}>{t('askRelationship')} <span>↗</span></button></div>
-        {:else}<p class="muted mb-3">{t('showEvidence')}</p>{#if found.length}<div class="grid max-h-[230px] gap-2 overflow-auto">{#each found as id}<button class="secondary mt-0" onclick={() => presentEvidence(id)}><span>{evidence[id].icon} {evidence[id].name}</span><span>↗</span></button>{/each}</div>{:else}<p class="muted">{t('noEvidence')}</p>{/if}{/if}
+        {#if phase === 'alibi'}<div class="grid gap-2"><Button class="secondary mt-0" onclick={() => askAlibi(0)} variant="secondary">{t('askAlibi')} <span>↗</span></Button><Button class="secondary mt-0" onclick={() => askAlibi(1)} variant="secondary">{t('askRelationship')} <span>↗</span></Button></div>
+        {:else}<p class="muted mb-3">{t('showEvidence')}</p>{#if found.length}<div class="grid max-h-[230px] gap-2 overflow-auto">{#each found as id}<Button class="secondary mt-0" onclick={() => presentEvidence(id)} variant="secondary"><span>{evidence[id].icon} {evidence[id].name}</span><span>↗</span></Button>{/each}</div>{:else}<p class="muted">{t('noEvidence')}</p>{/if}{/if}
         <div class="mt-5 grid gap-3">{#each responses.slice().reverse() as response}<blockquote class="m-0 border-l-2 border-festival-gold-border bg-festival-panel-input px-4 py-3"><span class="text-[10px] tracking-[1px] text-festival-gold">{response.source}</span><p class="mb-0 mt-2 text-sm leading-[1.9] text-festival-copy">“{response.text}”</p></blockquote>{/each}</div>
       {:else}<p class="eyebrow">INTERVIEW NOTES</p><h2 class="heading-two">{t('chooseSuspect')}</h2><p class="muted">{t('compareStatements')}</p>{/if}
     </aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><div class="flex flex-wrap gap-3"><button class="secondary mt-0 w-auto" onclick={() => { phase = phase === 'alibi' ? 'explore' : 'alibi'; selectedSuspect = ''; }}>← {t('previous')}</button>{#if phase === 'alibi'}<button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'cross'; selectedSuspect = ''; }}>{t('presentEvidence')} <span>→</span></button>{:else}<button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'accuse'; selectedSuspect = ''; accusation = []; }}>{t('accusationTitle')} <span>→</span></button>{/if}</div></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><Button class="text-button" onclick={showHint} variant="text">{t('hint')}</Button><div class="flex flex-wrap gap-3"><Button class="secondary mt-0 w-auto" onclick={() => { phase = phase === 'alibi' ? 'explore' : 'alibi'; selectedSuspect = ''; }} variant="secondary">← {t('previous')}</Button>{#if phase === 'alibi'}<Button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'cross'; selectedSuspect = ''; }} variant="primary">{t('presentEvidence')} <span>→</span></Button>{:else}<Button class="primary mt-0 w-auto min-w-[190px]" onclick={() => { phase = 'accuse'; selectedSuspect = ''; accusation = []; }} variant="primary">{t('accusationTitle')} <span>→</span></Button>{/if}</div></div>
   </section>
 {:else if phase === 'accuse'}
   <section class="mx-auto max-w-[960px]">
     <p class="eyebrow">FINAL · 04</p><h1 class="heading-one page-title">{t('accusationTitle')}</h1><p class="muted mb-7">{t('accusationDescription')}</p>
-    <div class="lobby-grid"><section class="panel"><h2 class="heading-two">{t('culpritQuestion')}</h2><div class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">{#each suspects as suspect}<button class="cursor-pointer border p-4 text-left focus-visible:outline-2 focus-visible:outline-festival-gold {selectedSuspect === suspect.id ? 'border-festival-gold bg-festival-panel-hover' : 'border-festival-line bg-transparent hover:border-festival-gold-border'}" onclick={() => chooseSuspect(suspect.id)}><span class="text-xs text-festival-muted">{selectedSuspect === suspect.id ? `● ${t('selectedLabel')}` : `○ ${t('selectLabel')}`}</span><h3 class="heading-three mb-0 mt-2">{suspect.name}</h3></button>{/each}</div></section><aside class="panel"><div class="section-heading"><h2 class="heading-two mb-0">{t('decisiveEvidence')}</h2><span class="tag gold">{accusation.length} / 3</span></div><p class="muted my-4">{t('chooseThreeEvidence')}</p><div class="grid max-h-[390px] gap-2 overflow-auto">{#each found as id}<button class="secondary mt-0" onclick={() => toggleAccusation(id)}><span>{accusation.includes(id) ? '☑' : '☐'} {evidence[id].icon} {evidence[id].name}</span><span>{accusation.includes(id) ? t('selectedLabel') : ''}</span></button>{/each}</div></aside></div>
-    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><button class="text-button" onclick={showHint}>{t('hint')}</button><div class="flex gap-3"><button class="secondary mt-0 w-auto" onclick={() => { phase = 'cross'; selectedSuspect = ''; }}>{t('reviewEvidence')}</button><button class="primary mt-0 w-auto min-w-[190px]" disabled={!selectedSuspect || accusation.length !== 3} onclick={arrest}>{t('arrest')} <span>→</span></button></div></div>
+    <div class="lobby-grid"><section class="panel"><h2 class="heading-two">{t('culpritQuestion')}</h2><div class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">{#each suspects as suspect}<button class="cursor-pointer border p-4 text-left focus-visible:outline-2 focus-visible:outline-festival-gold {selectedSuspect === suspect.id ? 'border-festival-gold bg-festival-panel-hover' : 'border-festival-line bg-transparent hover:border-festival-gold-border'}" onclick={() => chooseSuspect(suspect.id)}><span class="text-xs text-festival-muted">{selectedSuspect === suspect.id ? `● ${t('selectedLabel')}` : `○ ${t('selectLabel')}`}</span><h3 class="heading-three mb-0 mt-2">{suspect.name}</h3></button>{/each}</div></section><aside class="panel"><div class="section-heading"><h2 class="heading-two mb-0">{t('decisiveEvidence')}</h2><span class="tag gold">{accusation.length} / 3</span></div><p class="muted my-4">{t('chooseThreeEvidence')}</p><div class="grid max-h-[390px] gap-2 overflow-auto">{#each found as id}<Button class="secondary mt-0" onclick={() => toggleAccusation(id)} variant="secondary"><span>{accusation.includes(id) ? '☑' : '☐'} {evidence[id].icon} {evidence[id].name}</span><span>{accusation.includes(id) ? t('selectedLabel') : ''}</span></Button>{/each}</div></aside></div>
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><Button class="text-button" onclick={showHint} variant="text">{t('hint')}</Button><div class="flex gap-3"><Button class="secondary mt-0 w-auto" onclick={() => { phase = 'cross'; selectedSuspect = ''; }} variant="secondary">{t('reviewEvidence')}</Button><Button class="primary mt-0 w-auto min-w-[190px]" disabled={!selectedSuspect || accusation.length !== 3} onclick={arrest} variant="primary">{t('arrest')} <span>→</span></Button></div></div>
   </section>
 {:else if phase === 'win'}
-  <section class="mx-auto max-w-[760px] border border-festival-gold-border bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('allCaught')}</p><h1 class="heading-one page-title">{t('success')}</h1><p class="muted">{t('successDescription')}</p>{#if resolutionCues.length}<div class="mt-8"><StoryCuePlayer cues={resolutionCues} onComplete={() => {}} /></div>{/if}<StoryRating {runId} /><button class="primary mt-7" onclick={startOver}>{t('replay')} <span>↻</span></button><button class="mt-4 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold" onclick={onExit}>{t('backToFestival')}</button></section>
+  <section class="mx-auto max-w-[760px] border border-festival-gold-border bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('allCaught')}</p><h1 class="heading-one page-title">{t('success')}</h1><p class="muted">{locale === 'en' ? 'You identified the culprit and the key evidence.' : '범인과 핵심 증거를 정확히 짚어냈어.'}</p>{#if resolutionCues.length}<div class="mt-8"><StoryCuePlayer cues={resolutionCues} onComplete={() => {}} /></div>{/if}<StoryRating {runId} /><Button class="primary mt-7" onclick={startOver} variant="primary">{t('replay')} <span>↻</span></Button><button class="mt-4 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={exitDisabled} onclick={onExit}>{exitLabel ?? t('backToPlatform')}</button></section>
 {:else}
-  <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('caseUnresolved')}</p><span class="text-5xl text-festival-gold" aria-hidden="true">…</span><h1 class="heading-one page-title mt-5">{t('unresolved')}</h1><p class="narrative">{resultMessage}</p><StoryRating {runId} /><div class="mt-7 grid gap-3 sm:grid-cols-2"><button class="primary mt-0" onclick={startOver}>{t('restart')} <span>↻</span></button><button class="secondary mt-0" onclick={onExit}>{t('backToFestival')} <span>↗</span></button></div></section>
+  <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('caseUnresolved')}</p><span class="text-5xl text-festival-gold" aria-hidden="true">…</span><h1 class="heading-one page-title mt-5">{t('unresolved')}</h1><p class="narrative">{resultMessage}</p><StoryRating {runId} /><div class="mt-7 grid gap-3 sm:grid-cols-2"><Button class="primary mt-0" onclick={startOver} variant="primary">{t('restart')} <span>↻</span></Button><Button class="secondary mt-0" disabled={exitDisabled} onclick={onExit} variant="secondary">{exitLabel ?? t('backToPlatform')} <span>↗</span></Button></div></section>
 {/if}

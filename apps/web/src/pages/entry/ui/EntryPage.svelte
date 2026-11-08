@@ -1,13 +1,15 @@
 <script lang="ts">
   import { GuestLoginForm } from "../../../features/guest-login";
-  import { Panel } from "../../../shared/ui";
+  import { Button } from "../../../shared/ui";
 
   let {
+    locale, demo = false, onGoogle,
     nickname = $bindable(""),
     busy,
     t,
     onLogin,
   }: {
+    locale: "ko" | "en"; demo?: boolean; onGoogle: () => void;
     nickname?: string;
     busy: boolean;
     t: (key: string) => string;
@@ -15,23 +17,23 @@
   } = $props();
 </script>
 
-<main class="main entrance">
-  <section>
-    <p class="eyebrow">AN INVITATION TO THE UNKNOWN</p>
-    <h1 class="heading-one entrance-title">
-      {t("invitation")}<br />{t("hiddenStory")} <em class="not-italic text-festival-gold">{t("story")}</em>.
-    </h1>
-    <p class="intro">{t("invitationDescription")}</p>
-    <div class="ticket">
-      <span>ADMIT ONE</span><span>비밀을 가진 당신에게</span><span>NO. 001</span>
+<main id="main-content" tabindex="-1" class="main flex items-center justify-center">
+  <section class="w-full max-w-sm py-8" aria-labelledby="entry-title">
+    <div class="mb-10 text-center">
+      <span class="emblem" aria-hidden="true">S</span>
+      <p class="eyebrow mt-4">{t("brand")}</p>
+      <h1 id="entry-title" class="heading-two text-festival-gold">{t("entryInvitation")}</h1>
+    </div>
+    <div class="border-t border-festival-line pt-2">
+      <GuestLoginForm bind:nickname {busy} {t} {locale} onSubmit={onLogin} />
+    </div>
+    <div class="mt-6 border-t border-festival-line pt-1">
+      <Button variant="secondary" disabled={busy} onclick={onGoogle}>
+        {t("googleLogin")}{demo ? (locale === "en" ? " (test)" : " (테스트)") : ""}
+      </Button>
+      <Button variant="secondary" disabled={busy} onclick={() => window.alert(t("emailLoginPending"))}>
+        {t("emailLogin")}
+      </Button>
     </div>
   </section>
-
-  <Panel class="login">
-    <p class="eyebrow">ENTER THE FESTIVAL</p>
-    <h2 class="heading-two">{t("enterFestival")}</h2>
-    <p class="muted">{t("namePrompt")}</p>
-    <GuestLoginForm bind:nickname {busy} {t} onSubmit={onLogin} />
-    <p class="fine">가입 없이 시작해. 같은 브라우저에서 다시 접속하면<br />참가 정보가 이어져.</p>
-  </Panel>
 </main>

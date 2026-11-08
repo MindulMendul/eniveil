@@ -1,0 +1,40 @@
+/* Values come from design-tokens.tokens.json through the UnoCSS preflight. */
+* { box-sizing: border-box; }
+.skip-link { position:absolute; left:1rem; top:.5rem; z-index:1000; transform:translateY(-200%); background:#171c1a; color:#e9e5da; padding:.75rem; }
+.skip-link:focus { transform:translateY(0); }
+html { overflow-wrap: anywhere; }
+body { min-width: 0; }
+button, input, select, textarea { font: inherit; }
+button { min-height: var(--layout-touch); }
+button, a, input, select, textarea { touch-action: manipulation; }
+input, select, textarea { min-width: 0; max-width: 100%; min-height: var(--layout-touch); }
+textarea { resize: vertical; }
+:focus-visible { outline: var(--border-strong) solid var(--color-festival-gold); outline-offset: var(--spacing-1); }
+.shell > *, .lobby-grid > *, .page-heading > *, .panel, .room-card { min-width: 0; }
+.header { height: auto; min-height: var(--spacing-24); flex-wrap: wrap; gap: var(--spacing-4); padding-block: var(--spacing-4); }
+.header > div, .identity { min-width: 0; flex-wrap: wrap; }
+.page-heading, .section-heading, .footer { flex-wrap: wrap; }
+.primary, .secondary { gap: var(--spacing-3); }
+.notice { gap: var(--spacing-3); }
+.ui-filter-bar { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,var(--layout-filter-min)),1fr)); gap: var(--spacing-4); }
+.ui-filter-bar label { display: flex; flex-direction: column; gap: var(--spacing-2); font-size: var(--typography-size-body-sm); min-width: 0; }
+.ui-modal { width: min(var(--layout-modal),calc(100% - var(--spacing-6))); max-height: calc(100dvh - var(--spacing-6)); overscroll-behavior: contain; overflow-wrap: anywhere; }
+.ui-modal::backdrop { background: var(--color-festival-modal-backdrop); }
+.ui-offcanvas { margin: 0 0 0 auto; min-height: 100dvh; max-height: 100dvh; width: min(100%,var(--layout-modal)); }
+.ui-spinner { width: var(--spacing-5); height: var(--spacing-5); flex-shrink: 0; border: var(--border-strong) solid var(--color-festival-line); border-top-color: var(--color-festival-gold); border-radius: 50%; animation: ui-spin calc(var(--motion-loading) * 1ms) linear infinite; }
+.ui-skeleton { min-height: var(--spacing-5); background: var(--color-festival-panel-hover); animation: ui-pulse calc(var(--motion-loading) * 1ms) ease-in-out infinite alternate; }
+@keyframes ui-spin { to { transform: rotate(360deg); } }
+@keyframes ui-pulse { to { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .ui-spinner, .ui-skeleton { animation: none; } }
+.steps .step.active { color: var(--color-festival-gold); }
+/* Reflow works for narrow foldable cover screens and split windows without device detection. */
+@media (max-width: 520px) {
+  .header > div { width: 100%; justify-content: space-between; gap: var(--spacing-2); }
+  .page-heading { flex-direction: column; align-items: stretch; }
+  .pagination { flex-wrap: wrap; }
+  .steps { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .input-field { font-size: 1rem; }
+}
+@media (horizontal-viewport-segments: 2) {
+  .shell { max-width: env(viewport-segment-width 0 0); margin-inline: 0; }
+}
