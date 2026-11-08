@@ -7,6 +7,7 @@ const canonical = new URL(meta.localized(meta.en ? 'en' : 'ko'), origin).href;
 const schema = pageSchema(Astro.url.pathname, origin);
 ---
 <title>{meta.title}</title>
+<link rel="icon" href="/favicon.ico" sizes="any" />
 <meta data-site-meta name="description" content={meta.description} />
 <meta data-site-meta name="robots" content={meta.indexable ? 'index,follow' : 'noindex,nofollow'} />
 {meta.indexable && <>
