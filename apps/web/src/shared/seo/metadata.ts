@@ -1,4 +1,4 @@
-export const publicPaths = ['/', '/workshop/', '/terms/', '/privacy/'];
+export const publicPaths = ['/', '/workshop/', '/terms/', '/privacy/', '/about/'];
 export function shareImage(en: boolean, origin: string) {
   return {
     url: new URL(`/og/story-archive-${en ? 'en' : 'ko'}-v1.png`, origin).href,
@@ -16,6 +16,7 @@ export function pageMetadata(pathname: string) {
   const path = pathname.replace(/^\/en(?=\/|$)/, '').replace(/\/+$/, '') || '/';
   const brand = en ? 'Story Archive' : '스토리 아카이브';
   const pages: Record<string, [string, string]> = en ? {
+    '/about': ['About', 'Learn how to discover, play and create interactive mystery stories on Story Archive.'],
     '/': ['Interactive Stories', 'Discover interactive mystery stories to enjoy alone or with friends. Explore community stories and create your own.'],
     '/workshop': ['Workshop', 'Explore community mystery stories, save favorites and start creating your own story.'],
     '/terms': ['Terms of Service', 'Read the terms for using Story Archive and its interactive story platform.'],
@@ -23,6 +24,7 @@ export function pageMetadata(pathname: string) {
     '/mypage': ['My page', 'Manage your account and stories.'],
     '/workshop/editor': ['Story editor', 'Create and edit your private story drafts.'],
   } : {
+    '/about': ['서비스 소개', '스토리 아카이브에서 인터랙티브 추리 작품을 찾고, 플레이하고, 창작하는 방법을 소개합니다.'],
     '/': ['인터랙티브 작품', '혼자 또는 친구와 즐기는 인터랙티브 추리 이야기를 만나세요. 창작마당에서 작품을 찾고 나만의 이야기를 시작할 수 있습니다.'],
     '/workshop': ['창작마당', '다른 제작자의 추리 작품을 둘러보고 즐겨찾기에 저장하세요. 나만의 이야기도 창작마당에서 시작할 수 있습니다.'],
     '/terms': ['이용약관', '스토리 아카이브의 인터랙티브 작품과 서비스 이용에 관한 약관을 확인하세요.'],
