@@ -16,7 +16,7 @@ REPOSITORY = 'https://github.com/MindulMendul/murder-parker.git'
 TARGETS = {
     'production': {'branch': 'main', 'project': 'deploy', 'service': 'festival',
                    'container': 'deploy-festival-1', 'volume': 'deploy_festival-data',
-                   'origin': 'https://mindul-murder-mystery.duckdns.org',
+                   'origin': 'https://eniveil.com',
                    'alias': 'mindul-murder-mystery', 'port': 3000},
     'qa': {'branch': 'qa', 'project': 'murder-parker-qa', 'service': 'festival-qa',
            'container': 'murder-parker-qa-festival-qa-1', 'volume': 'murder-parker-qa_festival-qa-data',
@@ -54,7 +54,7 @@ def wait_https(origin):
     last = None
     for _ in range(12):
         try:
-            with urllib.request.urlopen(origin+'/api/health', timeout=10) as response:
+            with urllib.request.urlopen(urllib.request.Request(origin+'/api/health', headers={'User-Agent':'mindul-deployment-health/1.0'}), timeout=10) as response:
                 if response.status == 200:
                     return
         except Exception as error:
