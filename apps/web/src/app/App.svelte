@@ -77,10 +77,16 @@
   let previousMain: HTMLElement | null = null;
   let lastFocusedControl: HTMLElement | null = null;
   let previousNavigation: string | undefined;
+  let pendingNavigationFocus = false;
 
   function recoverMainFocus(navigationChanged = false) {
-    if (disposed || loading || !shell?.isConnected) return;
+    if (disposed) return;
+    pendingNavigationFocus = pendingNavigationFocus || navigationChanged;
+    if (loading || !shell?.isConnected) return;
     const main = shell.querySelector<HTMLElement>('main');
+    if (!main) return;
+    const navigationRequested = pendingNavigationFocus;
+    pendingNavigationFocus = false;
     const mainReplaced = previousMain !== null && previousMain !== main;
     const initialSignedIn = previousMain === null && !!account.me;
     previousMain = main;
@@ -88,7 +94,7 @@
     if (main && shouldRecoverFocus({
       ready: !loading,
       dialogOpen: !!document.querySelector('dialog[open]'),
-      navigationChanged,
+      navigationChanged: navigationRequested,
       mainReplaced,
       focusedControlRemoved: !!lastFocusedControl && !lastFocusedControl.isConnected,
       initialSignedIn,

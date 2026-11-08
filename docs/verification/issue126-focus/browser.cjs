@@ -45,4 +45,16 @@ async function soloFocus(browser,en,width) {
   console.log('PASS',en?'en':'ko',width,'solo start/ownership and return recover focus after actual screen replacement');
  } finally { await close(page); }
 }
-(async()=>{const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',args:['--no-sandbox']});try{for(const en of [false,true])for(const width of [1440,320]){await gameFocus(browser,en,width);await soloFocus(browser,en,width);}}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1;});
+async function delayedNavigation(browser,en,width) {
+ const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'});await installBrowserRequestGuard(context,origin);
+ const page=await context.newPage();let release;const pending=new Promise(resolve=>{release=resolve});
+ await page.route(origin+'/api/platform/account',async route=>{await pending;await route.continue()});
+ try {
+  await page.goto(origin+(en?'/en/workshop/':'/workshop/'));
+  await page.locator('#language').focus();await page.locator('#language').selectOption(en?'ko':'en');release();
+  await page.locator('main h1').waitFor();await page.waitForFunction(()=>document.activeElement.id==='main-content');
+  assert.equal(await page.locator('html').getAttribute('lang'),en?'ko':'en');
+  console.log('PASS',en?'en':'ko',width,'language navigation while account is loading recovers final content focus');
+ } finally {release();await context.unrouteAll({behavior:'wait'});await context.close();}
+}
+(async()=>{const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH || '/usr/bin/chromium',args:['--no-sandbox']});try{for(const en of [false,true])for(const width of [1440,320]){await gameFocus(browser,en,width);await soloFocus(browser,en,width);await delayedNavigation(browser,en,width);}}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1;});
