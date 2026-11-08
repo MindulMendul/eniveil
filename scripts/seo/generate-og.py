@@ -1,14 +1,14 @@
 """Render original share cards. Optional tooling: Pillow and Noto Sans CJK KR.
 
 python3 scripts/seo/generate-og.py /path/to/NotoSansCJK-Regular.ttc
-The checked-in PNGs are used directly; building the app does not require Python.
+Checked-in PNG sources feed the common WebP build; app builds do not require Python.
 """
 from pathlib import Path
 import sys
 from PIL import Image, ImageDraw, ImageFont
 
 FONT = sys.argv[1]
-OUT = Path(__file__).resolve().parents[2] / 'apps/web/public/og'
+OUT = Path(__file__).resolve().parents[2] / 'apps/web/assets/images'
 OUT.mkdir(parents=True, exist_ok=True)
 SCALE = 2
 
@@ -28,7 +28,7 @@ for lang in ('ko', 'en'):
     text(142, 91, 'INTERACTIVE MYSTERY STORIES', 18, '#d8bb79')
     text(72, 203, '스토리 아카이브' if lang == 'ko' else 'Story Archive', 64)
     text(76, 306, '당신의 선택으로 이어지는 이야기' if lang == 'ko' else 'Every choice opens a new story.', 27, '#a1aaa2')
-    text(76, 480, '발견하고 · 플레이하고 · 창작하세요' if lang == 'ko' else 'DISCOVER  /  PLAY  /  CREATE', 21, '#d8bb79')
+    text(76, 480, '발견하고 · 플레이하세요' if lang == 'ko' else 'DISCOVER  /  PLAY', 21, '#d8bb79')
 
     # An open book whose branching paths represent the reader's choices.
     line([(846, 213), (910, 201), (974, 213), (1038, 201), (1102, 213), (1102, 389), (1038, 377), (974, 389), (910, 377), (846, 389), (846, 213)], width=3)
@@ -42,4 +42,4 @@ for lang in ('ko', 'en'):
     line([(1023, 291), (1064, 334)], '#d8bb79', 3)
     line([(846, 421), (1102, 421)], '#384139')
     text(913, 443, 'STORY / 01', 16, '#a1aaa2')
-    image.resize((1200, 630), Image.Resampling.LANCZOS).save(OUT / f'story-archive-{lang}-v1.png', optimize=True)
+    image.resize((1200, 630), Image.Resampling.LANCZOS).save(OUT / f'story-archive-{lang}.png', optimize=True)

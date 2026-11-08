@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { storyPackageSchema, type StoryPackage } from "@festival/shared";
+import { MANAGED_IMAGES, storyPackageSchema, type StoryPackage } from "@festival/shared";
 import { Store } from "../../store";
 import { SQLiteStoryRunStore } from "../../infrastructure/sqlite/story-run-store";
 import { SQLiteWorkshopStore, WorkshopQuotaError, type WorkshopLimits } from "../../infrastructure/sqlite/workshop-store";
@@ -119,7 +119,7 @@ test("guest byte quotas count UTF-8 source and metadata and permit exact-boundar
   grow.story.title += "한";
   expect(payloadBytes(grow, owner.nickname) - payloadBytes(f.source, owner.nickname)).toBe(6);
   expect((await f.request(`/drafts/${item.id}`, { method: "PUT", cookie: owner.cookie, body: { package: grow } })).status).toBe(413);
-  expect((await f.request(`/drafts/${item.id}`, { method: "PUT", cookie: owner.cookie, body: { package: f.source, thumbnailUrl: "/a.png" } })).status).toBe(413);
+  expect((await f.request(`/drafts/${item.id}`, { method: "PUT", cookie: owner.cookie, body: { package: f.source, thumbnailUrl: MANAGED_IMAGES.invitation } })).status).toBe(413);
   expect(f.workshop.source(item.id, owner.id)).toEqual(f.source);
   const smaller = structuredClone(f.source);
   smaller.story.title = "A";
@@ -327,7 +327,7 @@ test("draft source and edits belong to the server-authenticated creator", async 
   const f = fixture();
   const owner = f.guest("Owner");
   const other = f.guest("Other");
-  const item = await f.create(owner.cookie, false, { difficulty: "hard", thumbnailUrl: "/images/story.svg" });
+  const item = await f.create(owner.cookie, false, { difficulty: "hard", thumbnailUrl: MANAGED_IMAGES.invitation });
   expect(item.id).not.toBe(f.source.story.id);
   expect(item.author).toEqual({ id: owner.id, name: owner.nickname });
   expect(item.canEdit).toBe(true);
@@ -539,7 +539,8 @@ test("invalid filters, unsafe metadata, malformed files and oversized writes fai
   const owner = f.guest("Owner");
   for (const extra of [
     { ownerId: "other" }, { author: { id: "other", name: "Other" } },
-    { thumbnailUrl: "javascript:alert(1)" }, { thumbnailUrl: "//evil.example/image" },
+    { thumbnailUrl: "https://example.com/image.webp" }, { thumbnailUrl: "/images/unknown.webp" },
+    { thumbnailUrl: "/images/story.svg" }, { thumbnailUrl: "javascript:alert(1)" }, { thumbnailUrl: "//evil.example/image" },
     { thumbnailUrl: "https://user:password@example.com/image" }, { thumbnailUrl: "data:image/svg+xml,test" },
     { difficulty: ["easy"] }, { published: "true" },
   ]) expect((await f.request("/drafts", { method: "POST", cookie: owner.cookie, body: { package: f.source, ...extra } })).status).toBe(400);
@@ -586,4 +587,16 @@ test('deletion restores exact count/byte quotas and rolls back linked cleanup on
   f.store.db.exec('DROP TRIGGER reject_draft_delete');
   expect(f.workshop.deletePrivate(draft.id, owner.id)).toBe('deleted');
   expect((await create()).status).toBe(201);
+});
+
+
+test('only managed thumbnails are exposed; legacy external URLs remain stored without being rendered', async () => {
+  const f = fixture();
+  const owner = f.guest('Owner');
+  const item = f.workshop.create(owner, { package: f.source, published: true, difficulty: null, thumbnailUrl: 'https://legacy.example/old.jpg' });
+  expect((await f.list()).items.find(row => row.id === item.id)?.thumbnailUrl).toBeNull();
+  expect(f.workshop.get(item.id)?.thumbnailUrl).toBe('https://legacy.example/old.jpg');
+  const updated = await f.request(`/drafts/${item.id}`, {method:'PUT',cookie:owner.cookie,body:{package:f.source,published:true,thumbnailUrl:MANAGED_IMAGES.invitation}});
+  expect(updated.status).toBe(200);
+  expect((await f.list()).items.find(row => row.id === item.id)?.thumbnailUrl).toBe(MANAGED_IMAGES.invitation);
 });

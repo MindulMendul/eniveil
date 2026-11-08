@@ -1,6 +1,7 @@
 import { defineConfig } from "astro/config";
 import svelte from "@astrojs/svelte";
 import UnoCSS from "@unocss/astro";
+import { managedWebpAssets } from "./src/shared/images/build";
 
 export default defineConfig({
   output: "static",
@@ -10,7 +11,7 @@ export default defineConfig({
     defaultLocale: "ko",
     routing: { prefixDefaultLocale: false },
   },
-  integrations: [svelte(), UnoCSS()],
+  integrations: [managedWebpAssets(), svelte(), UnoCSS()],
   server: { host: "0.0.0.0", port: 5173 },
   vite: {
     server: {

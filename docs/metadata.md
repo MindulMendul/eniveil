@@ -19,18 +19,23 @@ PUBLIC_SITE_URL=https://qa-mindul-murder-mystery.duckdns.org bun run build
 
 GEO는 검색 시스템이 읽을 수 있는 구조화된 페이지 정보를 제공하는 범위다.
 검색 노출·순위·AI 답변 채택을 보장하지 않으며 실제 색인은 서비스 배포 후 확인한다.
-대표 공유 이미지는 직접 제작한 한국어·영어 1200×630 PNG다. 현재 브랜드명과
+대표 공유 이미지는 직접 제작한 한국어·영어 1200×630 WebP다. 현재 브랜드명과
 디자인 토큰의 색상, 선택지가 갈라지는 책 삽화를 사용하며 외부 사진에 의존하지 않는다.
-`apps/web/public/og/story-archive-{ko,en}-v1.png`를 정적 파일로 제공한다.
+`apps/web/assets/images/story-archive-{ko,en}.png`는 빌드용 원본이다.
+공통 이미지 통합이 이를 실제 WebP로 인코딩하고 `public/og/story-archive-{ko,en}-v2.webp`로 내보낸다.
+페이지와 og:image:type은 등록된 WebP 경로와 image/webp를 사용한다.
 공개 페이지에만 og:image(타입·크기·대체 설명 포함)와 twitter:image를 넣으며,
 이미지의 절대 URL은 PUBLIC_SITE_URL을 따른다. 언어 전환 시 이미지도 교체한다.
 
 이미지 재생성은 Pillow와 Noto Sans CJK 폰트가 설치된 환경에서 다음 명령으로 한다.
-앱 빌드는 체크인한 PNG를 사용하므로 이미지 제작 도구를 요구하지 않는다.
+재생성 스크립트는 public 밖의 원본 PNG를 갱신하며, 이어서 앱 빌드를 실행하면 새 WebP에 반영된다.
+앱 빌드에는 Sharp를 사용하고 Python/Pillow/폰트는 원본을 다시 그릴 때만 필요하다.
 
 ```sh
 python3 scripts/seo/generate-og.py /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
+bun run build
 ```
 
-이미지가 변경되면 파일명 버전과 metadata.ts의 경로를 함께 올려 공유 캐시를 구분한다.
+이미지가 변경되면 `packages/shared/src/images.ts`의 OG 출력 파일명 버전을 올려 공유 캐시를 구분한다.
+빌드와 metadata.ts는 같은 등록부를 사용한다. 생성된 public WebP를 직접 수정하지 않는다.
 배포 후 공유 서비스의 기존 미리보기는 재수집 전까지 이전 캐시를 표시할 수 있다.
