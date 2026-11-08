@@ -28,7 +28,7 @@
   });
 </script>
 
-<main class="main !pt-5 max-mobile:!pt-4">
+<main id="main-content" tabindex="-1" class="main !pt-5 max-mobile:!pt-4">
   <h1 class="sr-only">{t("lobbyTitle")}</h1>
   <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
     <Button

@@ -17,7 +17,7 @@
   } = $props();
 </script>
 
-<main class="main flex items-center justify-center">
+<main id="main-content" tabindex="-1" class="main flex items-center justify-center">
   <section class="w-full max-w-sm py-8" aria-labelledby="entry-title">
     <div class="mb-10 text-center">
       <span class="emblem" aria-hidden="true">S</span>
