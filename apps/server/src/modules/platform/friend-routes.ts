@@ -17,7 +17,7 @@ export function createFriendRoutes(store: Store) {
     const guest = store.state.guests[id];
     return guest?.nickname && store.accountType(id) === 'google' ? { id, nickname: guest.nickname } : null;
   };
-  const pair = (a: string, b: string) => [a, b].sort((left, right) => left.localeCompare(right)) as [string, string];
+  const pair = (a: string, b: string) => [a, b].sort((left, right) => left < right ? -1 : left > right ? 1 : 0) as [string, string];
   const connection = (a: string, b: string) => store.db.query('SELECT sender_id,recipient_id,status FROM friend_connections WHERE low_id=? AND high_id=?').get(...pair(a, b)) as Connection | null;
   const count = (id: string) => (store.db.query('SELECT count(*) AS n FROM friend_connections WHERE sender_id=? OR recipient_id=?').get(id,id) as { n:number }).n;
   const attempts = new Map<string, { count: number; until: number }>();
