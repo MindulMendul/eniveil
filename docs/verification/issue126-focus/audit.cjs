@@ -15,7 +15,8 @@ const { installBrowserRequestGuard } = require('../test-target-guard.cjs');
         } await p.waitForLoadState('networkidle'); await check(path); }); async function check(path) { assert.equal(await p.locator('main').count(), 1, path); assert.equal(await p.locator('main h1').count(), 1, path); assert.equal(await p.locator('main main').count(), 0); assert(await p.evaluate(() => [...document.querySelectorAll('ul,ol')].every(list => [...list.children].every(child => ['LI', 'SCRIPT', 'TEMPLATE'].includes(child.tagName))))); assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); await p.addScriptTag({ path: process.env.AXE_PATH || require.resolve('axe-core/axe.min.js') }); const r = await p.evaluate(() => axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'best-practice'] } })); results.push({ en, width, path, violations: r.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => n.target) })) }); } await p.waitForLoadState('networkidle'); await c.close(); });
     });
     fs.writeFileSync(process.env.AXE_RESULTS_PATH || require('node:path').join(__dirname, 'axe-results.json'), JSON.stringify(results, null, 2));
-    console.log(JSON.stringify(results.filter(x => x.violations.length)));
+    assert.equal(results.length, 36, 'Complete language/viewport matrix');
+    assert.equal(results.filter(x => x.violations.length).length, 0, 'Axe violations are saved in axe-results.json');
     console.log('PASS: one main/heading, no nested main/overflow, 36 screens inspected');
 }
 finally {
