@@ -1,6 +1,6 @@
 /* Values come from design-tokens.tokens.json through the UnoCSS preflight. */
 * { box-sizing: border-box; }
-.skip-link { position:absolute; left:1rem; top:.5rem; z-index:1000; transform:translateY(-200%); background:#171c1a; color:#e9e5da; padding:.75rem; }
+.skip-link { position:absolute; left:var(--spacing-4); top:var(--spacing-2); z-index:1000; transform:translateY(-200%); background:#171c1a; color:#e9e5da; padding:var(--spacing-3); }
 .skip-link:focus { transform:translateY(0); }
 html { overflow-wrap: anywhere; }
 body { min-width: 0; }

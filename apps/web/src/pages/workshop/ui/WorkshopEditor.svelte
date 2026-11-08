@@ -88,7 +88,7 @@
     {#if loading}<p role="status">{label('기존 스토리를 불러오는 중…', 'Loading your story…')}</p>{/if}
     {#if error}<p role="alert" class="notice">{error}</p>{/if}
     {#if message}<p role="status">{message}</p>{/if}
-    <label class="file-label">{label('.mstory 파일 불러오기', 'Import .mstory file')}<input bind:this={fileInput} type="file" accept=".mstory,application/json" disabled={loading || saving || validating} onchange={importFile} /><small class="muted">{label('최대 900 KB · 유효한 스토리 패키지', 'Up to 900 KB · Valid story package')}</small></label>
+    <label class="file-label">{label('.mstory 파일 불러오기', 'Import .mstory file')}<input class="file-input" bind:this={fileInput} type="file" accept=".mstory,application/json" disabled={loading || saving || validating} onchange={importFile} /><small class="muted">{label('최대 900 KB · 유효한 스토리 패키지', 'Up to 900 KB · Valid story package')}</small></label>
     {#if validating}<p role="status">{label('파일을 확인하는 중…', 'Validating file…')}</p>{/if}
     {#if source}<div class="source-summary"><h3 class="heading-three">{source.story.title}</h3></div>
       <StoryFields bind:pendingChanges={pendingSceneIds} bind:source {locale} disabled={saving || validating || loading} />
@@ -114,6 +114,17 @@
   border:var(--border-thin) dashed var(--color-workshop-border);
   padding:var(--spacing-6);
   margin:var(--spacing-6) 0}
+.file-input {
+  width:100%;
+  padding:var(--spacing-2);
+  border:var(--border-thin) solid var(--color-workshop-border)}
+.file-input::file-selector-button {
+  padding:var(--spacing-2) var(--spacing-3);
+  margin-inline-end:var(--spacing-3);
+  border:var(--border-thin) solid var(--color-workshop-border);
+  background:var(--color-festival-panel);
+  color:inherit;
+  font:inherit}
 .metadata {
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--layout-size-200-px)),1fr));
