@@ -58,9 +58,9 @@
           <li><RoomMemberRow member={member} currentMemberId={snapshot.me.id} hostId={room.hostId} /></li>
         {/each}
         {#each Array(room.capacity - room.count) as _}
-          <div class="member vacant">
+          <li class="member vacant">
             <span class="avatar vacant-avatar">＋</span><span>누군가의 입장을 기다리는 중</span>
-          </div>
+          </li>
         {/each}
       </ul>
     </Panel>
