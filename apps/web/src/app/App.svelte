@@ -428,7 +428,6 @@
       {connected}
       {t}
       onSelectMode={selectGameMode}
-      onCreate={create}
       onJoin={join}
     />
   {:else if !session}
