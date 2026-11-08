@@ -18,3 +18,5 @@ Chromium155, 한국어/영어 × 1440/320px에서 다음6개 상태(총24)를 �
 공통 변환 모듈을 브라우저 ESM으로 직접 호출했다. PNG/JPEG/GIF/WebP를 인코딩하고 실제 WebP signature·MIME 및 디코딩 결과를 확인했다. 잘못된 형식, 10MiB 초과와 브라우저의 PNG 인코더 fallback은 거절했다. 별도 입력/다운로드 UI는 사용하지 않았다.
 
 익명화 결과: `managed-images/results.json`. 브라우저 코드의 픽셀 제한·형식 헤더·JPEG 메타데이터 스캔과 정적 자산의 실제 인코딩/디코딩·치수·입력 URL 정책은 저장소 테스트에도 포함한다. GIF/애니메이션 입력의 첫 프레임 처리와 향후 자산 관리/제작기 범위는 `docs/workshop-authoring-plan.md`에 기록했다.
+
+추가 통합 검증: 최신 dev의 화면 지연 로딩을 보존해 병합한 뒤 기본98 tests/5,237 assertions와 동일24개 브라우저 상태를 다시 통과했다. OG 생성기는 이제 public 밖의 실제 원본 경로를 갱신한다. 재생성 후 앱 빌드를 수행해 한국어·영어 원본 PNG와 WebP 산출물4개의 SHA256이 모두 변경되는 것을 확인했다(`og-regeneration.json`). 공유 카드의 창작 CTA도 숨김 상태에 맞춰 탐색/플레이로 정리했다.
