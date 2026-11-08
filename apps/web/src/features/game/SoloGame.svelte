@@ -1,15 +1,14 @@
 <script>
   import { Button } from "../../shared/ui";
   import { supportedSoloStory } from '@festival/shared';
-  import { rememberSoloExit } from '../../shared/lib/solo-lifecycle';
   import { onMount } from 'svelte';
   import { translate } from '../../shared/lib/i18n.js';
   import { trackEvent } from '../../analytics.js';
   import StoryCuePlayer from './StoryCuePlayer.svelte';
   import StoryRating from './StoryRating.svelte';
 
-  /** @type {{ locale?: 'ko' | 'en', storyId?: string, onExit?: () => void, exitLabel?: string, exitDisabled?: boolean, exitMessage?: string, roomLifecycle?: import('../../shared/lib/solo-lifecycle').SoloExit, onLifecycleExit?: (exit: import('../../shared/lib/solo-lifecycle').SoloExit) => void }} */
-  let { locale = 'ko', storyId = supportedSoloStory.id, onExit = () => {}, exitLabel, exitDisabled = false, exitMessage = '', roomLifecycle, onLifecycleExit = () => {} } = $props();
+  /** @type {{ locale?: 'ko' | 'en', storyId?: string, onExit?: () => void, exitLabel?: string, exitDisabled?: boolean, exitMessage?: string }} */
+  let { locale = 'ko', storyId = supportedSoloStory.id, onExit = () => {}, exitLabel, exitDisabled = false, exitMessage = '' } = $props();
   /** @param {Parameters<typeof translate>[1]} key */
   const t = (key) => translate(locale, key);
 
@@ -57,7 +56,6 @@
   let selected = $derived(suspects.find((suspect) => suspect.id === selectedSuspect));
 
   onMount(() => {
-    const lifecycle = roomLifecycle;
     const navigationId = crypto.randomUUID();
     const navigation = performance.getEntriesByType('navigation')[0];
     const pageLoadMs = navigation instanceof PerformanceNavigationTiming && navigation.loadEventEnd > 0
@@ -88,11 +86,6 @@
     const recordAbandonment = () => {
       if (exited) return;
       exited = true;
-      if (lifecycle) {
-        rememberSoloExit(sessionStorage, lifecycle);
-        onLifecycleExit(lifecycle);
-        navigator.sendBeacon('/api/lobby/rooms/solo-exit', new Blob([JSON.stringify(lifecycle)], { type: 'application/json' }));
-      }
       if (!startedAt || phase === 'win' || phase === 'fail') return;
       if (runId) navigator.sendBeacon(`/api/game/sessions/${runId}/abandon`, new Blob([], { type: 'application/json' }));
       trackEvent('story_abandon', {
@@ -103,12 +96,8 @@
       });
     };
     window.addEventListener('pagehide', recordAbandonment);
-    /** @param {PageTransitionEvent} event */
-    const restorePage = (event) => { if (event.persisted && lifecycle) location.reload(); };
-    window.addEventListener('pageshow', restorePage);
     return () => {
       window.removeEventListener('pagehide', recordAbandonment);
-      window.removeEventListener('pageshow', restorePage);
       recordAbandonment();
     };
   });

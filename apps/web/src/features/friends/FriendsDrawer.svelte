@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Button, Modal } from '../../shared/ui';
-  import FriendsPanel from './FriendsPanel.svelte';
+  import LazyContent from '../../shared/ui/LazyContent.svelte';
+  const loadFriends = () => import('./FriendsPanel.svelte');
   let { locale, accountId, onAuthLost }: { locale: 'ko' | 'en'; accountId: string; onAuthLost: () => void } = $props();
   let open = $state(false);
   const titleId = $props.id();
@@ -16,7 +17,11 @@
 {#if open}
   <Modal open={true} placement="end" class="friend-drawer" labelledby={titleId} onClose={() => open = false} onclick={backdrop}>
     <div class="friend-title"><h2 id={titleId} class="heading-two">{label('친구', 'Friends')}</h2><Button variant="dismiss" aria-label={label('친구 목록 닫기', 'Close friends')} onclick={() => open = false}>×</Button></div>
-    <FriendsPanel {locale} {accountId} poll={true} onAuthLost={() => { open = false; onAuthLost(); }} />
+    <LazyContent load={loadFriends} {locale} embedded>
+      {#snippet children({ default: FriendsPanel })}
+        <FriendsPanel {locale} {accountId} poll={true} onAuthLost={() => { open = false; onAuthLost(); }} />
+      {/snippet}
+    </LazyContent>
   </Modal>
 {/if}
 <style>
