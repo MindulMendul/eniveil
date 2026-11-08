@@ -1,4 +1,5 @@
 import type { Scenario } from "@festival/shared";
+import { supportedSoloStory } from "@festival/shared";
 import type {
   StoryCatalog,
   StoryContent,
@@ -6,6 +7,9 @@ import type {
 } from "../../game/story-catalog";
 
 const scenarios: Scenario[] = [
+  { id: supportedSoloStory.id, version: 1, title: supportedSoloStory.title,
+    subtitle: '단서와 진술을 모아 범인을 밝혀내는 1인 추리극',
+    players: 1, minutes: 25, available: true, kind: 'original' },
   {
     id: "rehearsal",
     version: 1,

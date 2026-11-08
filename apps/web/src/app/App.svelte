@@ -441,7 +441,6 @@
       {connected}
       {copied}
       {locale}
-      onMode={(mode) => command("mode", undefined, mode)}
       onCopy={copyInviteLink}
       onCommand={command}
     />
