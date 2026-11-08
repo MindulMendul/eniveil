@@ -10,6 +10,7 @@ import { TracingInstrumentation } from "@grafana/faro-web-tracing";
 
 let faro: Faro | undefined;
 const allowedHosts = new Set([
+  "eniveil.com",
   "mindul-murder-mystery.duckdns.org",
   "qa-mindul-murder-mystery.duckdns.org",
 ]);
