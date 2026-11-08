@@ -224,6 +224,7 @@ export class Game {
     // End access to the room without rewriting the game's participant history.
     room.memberIds = room.memberIds.filter((id) => id !== guestId);
     const session = room.sessionId ? this.state.sessions[room.sessionId] : undefined;
+    const previousPhase = session?.phase, previouslyEnded = !!session?.endedAt;
     if (!room.memberIds.length) {
       if (session && !session.endedAt) session.endedAt = new Date().toISOString();
       delete this.state.rooms[room.id];
@@ -232,6 +233,9 @@ export class Game {
       if (session) this.revealWhenAllActiveVoted(room, session);
     }
     this.store.save();
+    if (session && (session.phase !== previousPhase || !!session.endedAt !== previouslyEnded)) {
+      return { sessionId: session.id, phase: session.phase, ended: !!session.endedAt };
+    }
   }
   private revealWhenAllActiveVoted(room: Room, session: Session) {
     if (session.phase === "voting" && room.memberIds.every((id) => !!session.votes[id])) {

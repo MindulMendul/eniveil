@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { Store } from "../../store";
 import { Game } from "../game/game";
 import { storyCatalog } from "../platform/stories/catalog";
+import { notifySessionExpiry } from "./session-expiry";
 import { ReconnectGrace, RECONNECT_GRACE_MS } from "./reconnect-grace";
 const stores: Store[] = [];
 afterEach(() => { for (const store of stores.splice(0)) store.close(); });
@@ -14,7 +15,8 @@ function setup(playing: boolean) {
   let now = 0;
   const timers: { at: number; fire: () => void; cancelled: boolean }[] = [];
   let changes = 0;
-  const presence = new ReconnectGrace(game, () => changes++, (fire, delay) => {
+  const notifications: { action: string; payload: object }[] = [];
+  const presence = new ReconnectGrace(game, (transition) => { changes++; notifySessionExpiry(transition, (action, payload) => notifications.push({action, payload})); }, (fire, delay) => {
     const timer = { at: now + delay, fire, cancelled: false };
     timers.push(timer);
     return () => { timer.cancelled = true; };
@@ -22,7 +24,7 @@ function setup(playing: boolean) {
   presence.connect(a.id); presence.connect(b.id);
   const room = game.create(a, "rehearsal"); game.join(b, room.code);
   if (playing) game.command(a, { type: "start", requestId: "start" });
-  return { game, a, b, room, presence, timers, get changes() { return changes; }, delay(ms: number) { now += ms; }, tick(ms: number) {
+  return { game, a, b, room, presence, timers, notifications, get changes() { return changes; }, delay(ms: number) { now += ms; }, tick(ms: number) {
     now += ms;
     for (const timer of timers.splice(0)) {
       if (timer.at <= now && !timer.cancelled) timer.fire();
@@ -45,6 +47,7 @@ for (const playing of [false, true]) {
     if (sessionId) {
       expect(s.game.state.sessions[sessionId].participants).toHaveLength(2);
       expect(s.game.state.sessions[sessionId].phase).toBe("briefing");
+      expect(s.notifications).toEqual([]);
       expect(() => s.game.join(s.b, s.room.code)).toThrow("진행");
     }
     expect(s.changes).toBe(1);
@@ -97,6 +100,7 @@ test('voting completes when the last missing voter expires and preserves partici
   s.game.command(s.b, { type: 'vote', requestId: 'vote', targetId: s.a.id });
   s.presence.disconnect(s.a.id); s.tick(60_000);
   expect(session.phase).toBe('reveal');
+  expect(s.notifications).toEqual([{action:'event',payload:{sessionId:session.id,phase:'reveal'}}]);
   expect(session.participants).toHaveLength(2);
   expect(s.room.hostId).toBe(s.b.id);
   s.game.command(s.b, { type: 'return', requestId: 'return' });
@@ -120,6 +124,7 @@ test('an empty running room ends its session without counting abandonment as com
   expect(s.game.state.rooms[s.room.id]).toBeUndefined();
   expect(session.endedAt).not.toBeNull();
   expect(session.phase).toBe('briefing');
+  expect(s.notifications).toEqual([{action:'end',payload:{sessionId:session.id}}]);
   const catalog = s.game.catalog({sort:'latest',limit:100,offset:0});
   expect(catalog.items.find(story => story.id === 'rehearsal')?.completedPlays).toBe(0);
 });

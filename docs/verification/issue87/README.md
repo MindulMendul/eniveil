@@ -56,3 +56,5 @@ The existing implementation also lets a started run continue from its pinned sou
 
 
 재실행은 자체 `DATABASE_PATH=:memory:` 서버에서만 한다. 두 스크립트에 `DISPOSABLE_TEST_SERVER=1`을 지정하고 `BASE_URL`은 정확한 loopback origin으로 지정한다. 브라우저 및 API 요청은 같은 origin으로 제한하고 redirect는 차단한다. QA/운영 URL은 브라우저 실행 전에 거절된다.
+
+`DISPOSABLE_TEST_SERVER=1`은 실행자가 직접 만든 임시 DB 서버라는 확인이며 원격 DB attestation은 아니다. persistent 로컬 서버에 이 플래그를 주면 데이터가 변경될 수 있다. 이번 검증은 에이전트가 직접 띄운 3212번 메모리 DB 서버에서 수행했다. 서버 자동 launcher는 제공하지 않는다.

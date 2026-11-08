@@ -13,7 +13,7 @@ export class ReconnectGrace {
   private pending = new Map<string, { cancel: () => void; expiresAt: number; roomId: string }>();
   constructor(
     private game: Pick<Game, "online" | "roomFor" | "expireConnection">,
-    private changed: () => void,
+    private changed: (transition: ReturnType<Game["expireConnection"]>) => void,
     private later: Schedule = schedule,
     private now: () => number = Date.now,
   ) {}
@@ -24,8 +24,7 @@ export class ReconnectGrace {
       pending.cancel();
       // Enforce the deadline even if a busy event loop delayed the timer callback.
       if (pending.expiresAt <= this.now()) {
-        this.game.expireConnection(guestId, pending.roomId);
-        this.changed();
+        this.changed(this.game.expireConnection(guestId, pending.roomId));
       }
     }
     this.pending.delete(guestId);
@@ -45,8 +44,7 @@ export class ReconnectGrace {
       // A cancelled callback must never expire a later connection or grace period.
       if (this.pending.get(guestId) !== entry) return;
       this.pending.delete(guestId);
-      this.game.expireConnection(guestId, roomId);
-      this.changed();
+      this.changed(this.game.expireConnection(guestId, roomId));
     }, RECONNECT_GRACE_MS);
   }
 }
