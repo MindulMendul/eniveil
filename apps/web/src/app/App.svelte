@@ -3,7 +3,6 @@
   import SoloRoomLifecycle from "../features/game/SoloRoomLifecycle.svelte";
   import LazyContent from "../shared/ui/LazyContent.svelte";
   import { shouldRecoverFocus } from "../shared/lib/focus-policy";
-  import FriendsDrawer from '../features/friends/FriendsDrawer.svelte';
   import NicknameField from "../features/account/NicknameField.svelte";
   import type { Guest } from "@festival/shared";
   import { Modal, Button, Panel, PageState } from "../shared/ui";
@@ -14,15 +13,18 @@
   import { clearSoloExit, matchesSoloExit, pendingSoloExit, type SoloExit } from "../shared/lib/solo-lifecycle";
   import { getLocaleFromPath, localePath, translate } from "../shared/lib";
 
-  import { EntryPage } from "../pages/entry";
-  import { LobbyPage } from "../pages/lobby";
-  import { RoomPage } from "../pages/room";
-  import { AppFooter } from "../widgets/app-footer";
   import LegalLinks from "../widgets/app-footer/ui/LegalLinks.svelte";
-  import { AppHeader } from "../widgets/app-header";
   import { ErrorNotice } from "../widgets/error-notice";
-  import { StoryPickerDialog } from "../widgets/story-picker";
 
+
+  const loadEntryPage = () => import("../pages/entry");
+  const loadFooter = () => import("../widgets/app-footer");
+  const loadHeader = () => import("../widgets/app-header");
+  const loadFriendsDrawer = () => import('../features/friends/FriendsDrawer.svelte');
+  const loadLobbyPage = () => import("../pages/lobby");
+  const loadRoomPage = () => import("../pages/room");
+  const loadStoryPicker = () => import("../widgets/story-picker");
+  const loadNicknameSetup = () => import("../pages/account/_NicknameSetup.svelte");
   const loadAccountPage = () => import("../pages/account/_MyPage.svelte");
   const loadSoloGame = () => import("../pages/solo");
   const loadGamePage = () => import("../pages/game");
@@ -516,7 +518,7 @@
 
 <div class="shell" bind:this={shell}>
   {#if !entryHome}
-    <AppHeader {snapshot} {connected} {locale} {t} accountType={account.accountType} onAccount={openAccount} onLocaleChange={changeLocale} />
+    <LazyContent load={loadHeader} {locale} embedded>{#snippet children({ AppHeader })}<AppHeader {snapshot} {connected} {locale} {t} accountType={account.accountType} onAccount={openAccount} onLocaleChange={changeLocale} />{/snippet}</LazyContent>
   {/if}
 
   {#if error}
@@ -531,7 +533,11 @@
   {:else if soloRecovery && snapshot}
     <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "The previous solo investigation has ended. Reconnect to return to your room." : "이전 1인 수사가 종료됐어. 연결을 확인한 뒤 같은 방으로 돌아가 줘."}</p><Button disabled={busy} onclick={() => void action(async () => { await reconcileSolo(); if (!socket || socket.readyState > 1) connect(); })}>{locale === "en" ? "Retry returning to room" : "방 복귀 다시 시도"}</Button></Panel></main>
   {:else if account.needsNickname}
-    <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
+    <LazyContent load={loadNicknameSetup} {locale}>
+      {#snippet children({ default: NicknameSetup })}
+        <NicknameSetup bind:nickname {locale} {busy} onRename={rename} onLogout={() => void logout()} />
+      {/snippet}
+    </LazyContent>
   {:else if currentPath === "/mypage" && snapshot}
     <LazyContent load={loadAccountPage} {locale}>
       {#snippet children({ default: MyPage })}
@@ -559,7 +565,7 @@
       {/snippet}
     </LazyContent>{/key}
   {:else if !snapshot}
-    <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
+    <LazyContent load={loadEntryPage} {locale}>{#snippet children({ EntryPage })}<EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />{/snippet}</LazyContent>
   {:else if room?.soloStarted && ownedSoloPlayId !== room.soloPlayId}
     <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Investigation in progress" : "수사 진행 중"}</h1><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
   {:else if room?.soloStarted}
@@ -569,7 +575,9 @@
       {/snippet}
     </LazyContent></main></SoloRoomLifecycle>{/key}
   {:else if !room}
-    <LobbyPage
+    <LazyContent load={loadLobbyPage} {locale}>
+      {#snippet children({ LobbyPage })}
+        {#if snapshot}<LobbyPage
       bind:code
       {snapshot}
       {busy}
@@ -577,9 +585,13 @@
       {t}
       onSelectMode={selectGameMode}
       onJoin={join}
-    />
+    />{/if}
+      {/snippet}
+    </LazyContent>
   {:else if !session}
-    <RoomPage
+    <LazyContent load={loadRoomPage} {locale}>
+      {#snippet children({ RoomPage })}
+        {#if snapshot}<RoomPage
       {snapshot}
       {room}
       {host}
@@ -590,7 +602,9 @@
       {locale}
       onCopy={copyInviteLink}
       onCommand={command}
-    />
+    />{/if}
+      {/snippet}
+    </LazyContent>
   {:else}
     <LazyContent load={loadGamePage} {locale}>
       {#snippet children({ GamePage })}
@@ -602,14 +616,17 @@
   {#if entryHome}
     <footer class="flex justify-center py-4 text-festival-muted"><LegalLinks {locale} /></footer>
   {:else}
-    <AppFooter {snapshot} {connected} {t} {locale} />
+    <LazyContent load={loadFooter} {locale} embedded>{#snippet children({ AppFooter })}<AppFooter {snapshot} {connected} {t} {locale} />{/snippet}</LazyContent>
   {/if}
 </div>
 
 {#if snapshot && account.accountType === 'google' && !room && !workshopPlayId && currentPath === '/'}
-  {#key snapshot.me.id}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={handleAuthLost} />{/key}
+  {#key snapshot.me.id}<LazyContent load={loadFriendsDrawer} {locale} embedded>{#snippet children({ default: FriendsDrawer })}{#if snapshot}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={handleAuthLost} />{/if}{/snippet}</LazyContent>{/key}
 {/if}
 
+{#if picker && snapshot}
+<LazyContent load={loadStoryPicker} {locale} embedded>
+{#snippet children({ StoryPickerDialog })}
 <StoryPickerDialog
   open={picker && snapshot !== null}
   {busy}
@@ -619,6 +636,9 @@
   onWorkshop={openWorkshop}
   onCreate={create}
 />
+{/snippet}
+</LazyContent>
+{/if}
 
 
 <Modal bind:element={loginDialog} class="workshop-login" onClose={() => { pendingWorkshopAction = undefined; pendingAuthDestination = undefined; }} labelledby="workshop-login-title">
