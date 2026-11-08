@@ -17,7 +17,12 @@ export async function convertToWebp(file: Blob): Promise<Blob> {
     const context = canvas.getContext('2d');
     if (!context) throw Error('unsupported');
     context.drawImage(bitmap, 0, 0);
-    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(result => result ? resolve(result) : reject(Error('encode')), 'image/webp', WEBP_QUALITY / 100));
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(result => {
+        if (result) resolve(result);
+        else reject(Error('encode'));
+      }, 'image/webp', WEBP_QUALITY / 100);
+    });
     if (blob.type !== 'image/webp') throw Error('unsupported');
     return blob;
   } finally { bitmap.close(); }
