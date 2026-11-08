@@ -20,7 +20,7 @@
 </script>
 
 <header class="header">
-  <a class="brand" href={localePath(locale)} aria-label={`${t("brand")} home`}>
+  <a class="brand" href={localePath(locale)} aria-label={`${t("brand")} ${locale === "en" ? "home" : "홈"}`}>
     <span class="emblem">S</span>
     <span>{t("brand")}<small class="brand-subtitle">{t("brandSubtitle")}</small></span>
   </a>

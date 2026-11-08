@@ -45,7 +45,7 @@
   }
   onMount(() => { void load(); });
 </script>
-<main class="main account-page">
+<main id="main-content" tabindex="-1" class="main account-page">
   <div class="page-heading"><div><p class="eyebrow">MY ACCOUNT</p><h1 class="heading-one">{label('마이페이지', 'My page')}</h1><p class="muted">{me.nickname} · {accountType === 'google' ? 'GOOGLE' : 'GUEST'}</p></div><Button variant="secondary" onclick={onWorkshop}>{label('창작마당으로', 'Workshop')} ↗</Button></div>
   {#if accountType === 'google'}<section class="panel"><h2 class="heading-two">{label('친구', 'Friends')}</h2>{#key me.id}<FriendsPanel {locale} accountId={me.id} />{/key}</section>{/if}
   <Panel><h2 class="heading-two">{label('닉네임 변경', 'Change nickname')}</h2>

@@ -19,6 +19,7 @@ const otherLocale = locale === "ko" ? "en" : "ko";
     <Metadata />
   </head>
   <body>
+    <a class="skip-link" href="#main-content">{locale === "en" ? "Skip to content" : "본문으로 건너뛰기"}</a>
     <div class="legal-shell">
       <header>
         <a href={localePath(locale)}>{translate(locale, "brand")}</a>
@@ -26,7 +27,7 @@ const otherLocale = locale === "ko" ? "en" : "ko";
           <a href={localePath(otherLocale, `/${policy}`)} lang={otherLocale} hreflang={otherLocale}>{translate(otherLocale, "languageName")}</a>
         </nav>
       </header>
-      <main>
+      <main id="main-content" tabindex="-1">
         <h1>{title}</h1>
         <p class="updated">{translate(locale, "legalUpdatedLabel")}: <time datetime={legalUpdatedAt}>{legalUpdatedAt}</time></p>
         <p>{document.introduction}</p>

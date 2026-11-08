@@ -72,6 +72,15 @@
     !!room && room.count === room.capacity && room.members.every((member) => member.online),
   );
 
+  let previousFocusKey = '';
+  $effect(() => {
+    const key = [locale, currentPath, snapshot?.me.id ?? '', room?.id ?? '', session?.phase ?? '', workshopPlayId ?? ''].join(':');
+    if (previousFocusKey && key !== previousFocusKey) void tick().then(() => {
+      if (!document.querySelector('dialog[open]')) document.getElementById('main-content')?.focus();
+    });
+    previousFocusKey = key;
+  });
+
   async function api(path: string, body?: unknown) {
     const response = await fetch(`/api${path}`, {
       method: body === undefined ? "GET" : "POST",
@@ -393,7 +402,7 @@
   {/if}
 
   {#if error}
-    <ErrorNotice message={error} onDismiss={() => (error = "")} />
+    <ErrorNotice message={error} {locale} onDismiss={() => (error = "")} />
   {/if}
   {#if soloEndedNotice}
     <p class="main" role="status">{locale === "en" ? "Your previous solo investigation ended when you left the page. You are back in the room; start a new investigation when ready." : "페이지를 떠나 이전 1인 수사가 종료됐어. 같은 방으로 돌아왔으니 준비되면 새 수사를 시작해 줘."}</p>
@@ -402,15 +411,15 @@
   {#if loading}
     <PageState kind="loading" message={t("workshopLoading")} />
   {:else if soloRecovery && snapshot}
-    <main class="main"><Panel><p role="status">{locale === "en" ? "The previous solo investigation has ended. Reconnect to return to your room." : "이전 1인 수사가 종료됐어. 연결을 확인한 뒤 같은 방으로 돌아가 줘."}</p><Button disabled={busy} onclick={() => void action(async () => { await reconcileSolo(); if (!socket || socket.readyState > 1) connect(); })}>{locale === "en" ? "Retry returning to room" : "방 복귀 다시 시도"}</Button></Panel></main>
+    <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "The previous solo investigation has ended. Reconnect to return to your room." : "이전 1인 수사가 종료됐어. 연결을 확인한 뒤 같은 방으로 돌아가 줘."}</p><Button disabled={busy} onclick={() => void action(async () => { await reconcileSolo(); if (!socket || socket.readyState > 1) connect(); })}>{locale === "en" ? "Retry returning to room" : "방 복귀 다시 시도"}</Button></Panel></main>
   {:else if account.needsNickname}
-    <main class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
+    <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
   {:else if currentPath === "/mypage" && snapshot}
     <MyPage me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />
   {:else if currentPath === "/workshop" && workshopPlayId && room}
-    <main class="main"><Panel><p role="status">{locale === "en" ? "Leave your room before starting a workshop story." : "참가 중인 방에서 나온 뒤 창작 작품을 시작해 줘."}</p><Button onclick={openWorkshop}>{locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"}</Button></Panel></main>
+    <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "Leave your room before starting a workshop story." : "참가 중인 방에서 나온 뒤 창작 작품을 시작해 줘."}</p><Button onclick={openWorkshop}>{locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"}</Button></Panel></main>
   {:else if currentPath === "/workshop" && workshopPlayId}
-    {#key workshopPlayId}<main class="main"><SoloGame {locale} storyId={workshopPlayId} onExit={openWorkshop} exitLabel={locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"} /></main>{/key}
+    {#key workshopPlayId}<main id="main-content" tabindex="-1" class="main"><SoloGame {locale} storyId={workshopPlayId} onExit={openWorkshop} exitLabel={locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"} /></main>{/key}
   {:else if currentPath === "/workshop"}
     <WorkshopPage {locale} onPlay={playWorkshopStory} loggedIn={snapshot !== null} onLogin={requestWorkshopLogin} onEdit={(id) => id ? openEditor(id) : createWorkshopStory()} />
   {:else if editorPath && snapshot}
@@ -418,9 +427,9 @@
   {:else if !snapshot}
     <EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />
   {:else if room?.soloStarted && ownedSoloPlayId !== room.soloPlayId}
-    <main class="main"><Panel><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
+    <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
   {:else if room?.soloStarted}
-    {#key room.soloPlayId}<main class="main"><SoloGame {locale} storyId={room.soloStory.id} roomLifecycle={{ roomId: room.id, soloPlayId: room.soloPlayId }} onLifecycleExit={soloPageExited} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>{/key}
+    {#key room.soloPlayId}<main id="main-content" tabindex="-1" class="main"><SoloGame {locale} storyId={room.soloStory.id} roomLifecycle={{ roomId: room.id, soloPlayId: room.soloPlayId }} onLifecycleExit={soloPageExited} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} /></main>{/key}
   {:else if !room}
     <LobbyPage
       bind:code

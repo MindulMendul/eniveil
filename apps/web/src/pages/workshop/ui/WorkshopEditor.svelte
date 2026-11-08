@@ -82,7 +82,7 @@
   }
 </script>
 <svelte:window onbeforeunload={(event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } }} />
-<main class="main editor">
+<main id="main-content" tabindex="-1" class="main editor">
   <Button class="text-button" onclick={back} variant="text">← {label('창작마당으로 돌아가기', 'Back to workshop')}</Button>
   <div class="page-heading"><div><p class="eyebrow">STORY SANDBOX</p><h1 class="heading-one">{storyId ? label('머미 수정하기', 'Edit story') : label('새 머미 만들기', 'Create a story')}</h1></div></div>
   <section class="panel"><h2 class="heading-two">{label('샌드박스', 'Sandbox')}</h2>
