@@ -9,6 +9,7 @@ import type { Game } from "../game/game";
 import type { ApiEnv } from "../http/env";
 
 import { ReconnectGrace } from "./reconnect-grace";
+import { notifySessionExpiry } from "./session-expiry";
 
 type TemporalAction = "start" | "event" | "end";
 
@@ -30,7 +31,10 @@ export function createLobbyRoutes(deps: {
       }
     }
   };
-  const presence = new ReconnectGrace(deps.game, broadcast);
+  const presence = new ReconnectGrace(deps.game, (transition) => {
+    notifySessionExpiry(transition, deps.notifyTemporal);
+    broadcast();
+  });
   const authenticate = (c: Context<ApiEnv>) =>
     deps.store.authenticate(getCookie(c, "festival_guest"));
 

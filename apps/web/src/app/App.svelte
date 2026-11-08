@@ -64,6 +64,9 @@
   let socket: WebSocket | undefined;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
+  let authGeneration = 0;
+  let authRequests = new AbortController();
+  const currentAuth = (generation: number) => !disposed && generation === authGeneration;
   const pending = new Map<string, ReturnType<typeof setTimeout>>();
 
   let room = $derived(snapshot?.room ?? null);
@@ -111,12 +114,15 @@
   });
 
   async function api(path: string, body?: unknown) {
+    const generation = authGeneration;
     const response = await fetch(`/api${path}`, {
+      signal: authRequests.signal,
       method: body === undefined ? "GET" : "POST",
       headers: body === undefined ? {} : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const data = await response.json();
+    if (!currentAuth(generation)) throw new DOMException("Cancelled account request", "AbortError");
     if (!response.ok) {
       throw Object.assign(new Error(data.error ?? "요청에 실패했어."), { status: response.status });
     }
@@ -125,25 +131,28 @@
 
   async function action(run: () => Promise<void>) {
     if (busy) return;
+    const generation = authGeneration;
     busy = true;
     error = "";
     try {
       await run();
     } catch (cause) {
-      error = cause instanceof Error ? cause.message : "연결을 확인해 줘.";
+      if (currentAuth(generation)) error = cause instanceof Error ? cause.message : "연결을 확인해 줘.";
     } finally {
-      busy = false;
+      if (currentAuth(generation)) busy = false;
     }
   }
 
-  function connect() {
-    if (disposed) return;
+  function connect(generation = authGeneration) {
+    if (!currentAuth(generation)) return;
     socket = new WebSocket(`${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/lobby/ws`);
     socket.onopen = () => {
+      if (!currentAuth(generation)) return;
       connected = true;
       error = "";
     };
     socket.onmessage = (message) => {
+      if (!currentAuth(generation)) return;
       try {
         const event = JSON.parse(message.data) as ServerEvent;
         if (event.type === "snapshot") {
@@ -171,6 +180,7 @@
       }
     };
     socket.onclose = () => {
+      if (!currentAuth(generation)) return;
       connected = false;
       for (const timeout of pending.values()) clearTimeout(timeout);
       pending.clear();
@@ -179,9 +189,12 @@
       if (!disposed) {
         reconnectTimer = setTimeout(async () => {
           try {
-            snapshot = await api("/lobby/state");
-            connect();
+            const next = await api("/lobby/state");
+            if (!currentAuth(generation)) return;
+            snapshot = next;
+            connect(generation);
           } catch (cause) {
+            if (!currentAuth(generation)) return;
             if ((cause as { status?: number }).status === 401) {
               snapshot = null;
               error = "게스트 로그인이 만료됐어.";
@@ -193,8 +206,26 @@
       }
     };
     socket.onerror = () => {
+      if (!currentAuth(generation)) return;
       error = "실시간 연결을 확인 중이야.";
     };
+  }
+
+  function handleAuthLost() {
+    authGeneration++;
+    authRequests.abort();
+    authRequests = new AbortController();
+    loading = false;
+    account = { me: null, accountType: null, needsNickname: false };
+    snapshot = null; picker = false; accountLoaded = false;
+    connected = false; busy = false; ownedSoloPlayId = null; soloStartRequest = null;
+    clearTimeout(reconnectTimer);
+    for (const timeout of pending.values()) clearTimeout(timeout);
+    pending.clear();
+    if (socket) {
+      socket.onclose = null; socket.onmessage = null; socket.onopen = null; socket.onerror = null;
+      socket.close(); socket = undefined;
+    }
   }
 
   function command(type: Command["type"], targetId?: string, mode?: "solo" | "multiplayer") {
@@ -266,23 +297,33 @@
   }
 
   async function loadAccount() {
-    account = await api("/platform/account");
+    const generation = authGeneration;
+    const nextAccount = await api("/platform/account");
+    if (!currentAuth(generation)) return;
+    account = nextAccount;
     if (account.me && !account.needsNickname) {
-      snapshot = await api("/lobby/state");
+      const next = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      snapshot = next;
       if (!accountLoaded) {
         soloRecovery = pendingSoloExit(sessionStorage, snapshot?.room ?? null);
         if (soloRecovery) await reconcileSolo();
+        if (!currentAuth(generation)) return;
       }
       accountLoaded = true;
-      if (!socket || socket.readyState > 1) connect();
+      if (!socket || socket.readyState > 1) connect(generation);
       resumeGoogleAction();
     }
   }
   async function reconcileSolo() {
     if (!soloRecovery) return;
+    const generation = authGeneration;
     const exit = soloRecovery;
     await api("/lobby/rooms/solo-exit", exit);
-    snapshot = await api("/lobby/state");
+    if (!currentAuth(generation)) return;
+    const next = await api("/lobby/state");
+    if (!currentAuth(generation)) return;
+    snapshot = next;
     clearSoloExit(sessionStorage, exit);
     soloRecovery = null;
     soloEndedNotice = true;
@@ -325,18 +366,28 @@
     await action(async () => {
       if (!authConfig.demo) throw Error(locale === "en" ? "Google sign-in is not configured. Please use guest sign-in." : "구글 로그인 설정이 필요해요. 게스트 로그인을 이용해 주세요.");
       rememberGoogleAction();
-      account = await api("/platform/auth/google/demo", {});
+      const generation = authGeneration;
+      const next = await api("/platform/auth/google/demo", {});
+      if (!currentAuth(generation)) return;
+      account = next;
       nickname = "";
       loginDialog?.close();
       await loadAccount();
     });
   }
   async function rename(next: string) {
-    await action(async () => { account = await api("/platform/account/nickname", { nickname: next }); await loadAccount(); });
+    await action(async () => {
+      const generation = authGeneration;
+      const nextAccount = await api("/platform/account/nickname", { nickname: next });
+      if (!currentAuth(generation)) return;
+      account = nextAccount; await loadAccount();
+    });
   }
   async function logout(remove = false) {
     await action(async () => {
+      const generation = authGeneration;
       await api(remove ? "/platform/account/delete" : "/platform/account/logout", {});
+      if (!currentAuth(generation)) return;
       sessionStorage.removeItem("festival_auth_return");
       if (socket) { socket.onclose = null; socket.close(); }
       clearTimeout(reconnectTimer);
@@ -347,28 +398,39 @@
     const resume = loginDialog?.open ? pendingWorkshopAction : undefined;
     pendingWorkshopAction = undefined;
     await action(async () => {
+      const generation = authGeneration;
       await api("/platform/guest", { nickname });
+      if (!currentAuth(generation)) return;
       await loadAccount();
+      if (!currentAuth(generation)) return;
       if (loginDialog?.open) {
         loginDialog.close();
         await tick();
-        resume?.();
+        if (currentAuth(generation)) resume?.();
       }
     });
   }
 
   async function create(scenarioId: string) {
     await action(async () => {
+      const generation = authGeneration;
       await api("/lobby/rooms", { scenarioId });
-      snapshot = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      const next = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      snapshot = next;
       picker = false;
     });
   }
 
   async function join(invite = code) {
     await action(async () => {
+      const generation = authGeneration;
       await api("/lobby/rooms/join", { code: invite });
-      snapshot = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      const next = await api("/lobby/state");
+      if (!currentAuth(generation)) return;
+      snapshot = next;
       code = "";
     });
   }
@@ -402,19 +464,26 @@
     };
     window.addEventListener("popstate", syncLocale);
     void (async () => {
+      const generation = authGeneration;
       try {
-        authConfig = await api("/platform/auth/config");
+        const config = await api("/platform/auth/config");
+        if (!currentAuth(generation)) return;
+        authConfig = config;
         const authError = new URLSearchParams(location.search).get("auth");
         if (authError) sessionStorage.removeItem("festival_auth_return");
         await loadAccount();
+        if (!currentAuth(generation)) return;
         if (authError) error = locale === "en" ? "Google sign-in was cancelled or failed. Please try again." : "구글 로그인이 취소되었거나 실패했어요. 다시 시도해 주세요.";
       } catch (cause) {
+        if (!currentAuth(generation)) return;
         if ((cause as { status?: number }).status !== 401) {
           error = "서버에 연결할 수 없어. 잠시 후 새로고침해 줘.";
         }
       } finally {
+        if (currentAuth(generation)) {
         code = new URLSearchParams(location.search).get("room") ?? "";
         loading = false;
+        }
       }
     })();
 
@@ -422,6 +491,8 @@
       focusObserver.disconnect();
       shell?.removeEventListener('focusin', rememberFocus);
       disposed = true;
+      authGeneration++;
+      authRequests.abort();
       window.removeEventListener("popstate", syncLocale);
       clearTimeout(reconnectTimer);
       for (const timeout of pending.values()) clearTimeout(timeout);
@@ -453,7 +524,7 @@
   {:else if account.needsNickname}
     <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Choose your nickname" : "닉네임을 정해 주세요"}</h1><form onsubmit={event => { event.preventDefault(); void rename(nickname); }}><NicknameField bind:value={nickname} {locale} {busy} /><Button type="submit" disabled={busy}>{locale === "en" ? "Save and continue" : "저장하고 시작하기"}</Button></form><Button variant="secondary" disabled={busy} onclick={() => void logout()}>{locale === "en" ? "Sign out" : "로그아웃"}</Button></Panel></main>
   {:else if currentPath === "/mypage" && snapshot}
-    <MyPage me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />
+    <MyPage onAuthLost={handleAuthLost} me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />
   {:else if currentPath === "/workshop" && workshopPlayId && room}
     <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "Leave your room before starting a workshop story." : "참가 중인 방에서 나온 뒤 창작 작품을 시작해 줘."}</p><Button onclick={openWorkshop}>{locale === "en" ? "Back to workshop" : "창작마당으로 돌아가기"}</Button></Panel></main>
   {:else if currentPath === "/workshop" && workshopPlayId}
@@ -503,11 +574,7 @@
 </div>
 
 {#if snapshot && account.accountType === 'google' && !room && !workshopPlayId && currentPath === '/'}
-  {#key snapshot.me.id}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={() => {
-    account = { me: null, accountType: null, needsNickname: false };
-    snapshot = null; picker = false; accountLoaded = false;
-    socket?.close();
-  }} />{/key}
+  {#key snapshot.me.id}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={handleAuthLost} />{/key}
 {/if}
 
 <StoryPickerDialog

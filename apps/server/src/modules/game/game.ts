@@ -80,7 +80,7 @@ export class Game {
                 },
                 clues:
                   session.phase === "briefing" ? [] : (story?.content.clues ?? []),
-                voteCount: Object.keys(session.votes).length,
+                voteCount: r.memberIds.filter((id) => !!session.votes[id]).length,
                 hasVoted: !!session.votes[me.id],
                 result:
                   session.phase === "reveal"
@@ -129,7 +129,7 @@ export class Game {
         players: new Set<string>(),
       };
       plays.started++;
-      if (session.endedAt) {
+      if (session.endedAt && session.phase === "reveal") {
         plays.completed++;
         for (const participant of session.participants) {
           plays.players.add(participant.id);
@@ -223,9 +223,24 @@ export class Game {
     if (!room || room.id !== roomId || (this.online.get(guestId) ?? 0) > 0) return;
     // End access to the room without rewriting the game's participant history.
     room.memberIds = room.memberIds.filter((id) => id !== guestId);
-    if (!room.memberIds.length) delete this.state.rooms[room.id];
-    else if (room.hostId === guestId) room.hostId = room.memberIds[0];
+    const session = room.sessionId ? this.state.sessions[room.sessionId] : undefined;
+    const previousPhase = session?.phase, previouslyEnded = !!session?.endedAt;
+    if (!room.memberIds.length) {
+      if (session && !session.endedAt) session.endedAt = new Date().toISOString();
+      delete this.state.rooms[room.id];
+    } else {
+      if (room.hostId === guestId) room.hostId = room.memberIds[0];
+      if (session) this.revealWhenAllActiveVoted(room, session);
+    }
     this.store.save();
+    if (session && (session.phase !== previousPhase || !!session.endedAt !== previouslyEnded)) {
+      return { sessionId: session.id, phase: session.phase, ended: !!session.endedAt };
+    }
+  }
+  private revealWhenAllActiveVoted(room: Room, session: Session) {
+    if (session.phase === "voting" && room.memberIds.every((id) => !!session.votes[id])) {
+      session.phase = "reveal";
+    }
   }
   command(me: Guest, command: Command) {
     const r = this.needRoom(me.id);
@@ -297,8 +312,7 @@ export class Game {
         if (!s.participants.some((p) => p.id === command.targetId))
           throw Error("투표 대상을 확인해 줘.");
         s.votes[me.id] = command.targetId;
-        if (Object.keys(s.votes).length === s.participants.length)
-          s.phase = "reveal";
+        this.revealWhenAllActiveVoted(r, s);
         break;
       case "return":
         host();
