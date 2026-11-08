@@ -23,6 +23,27 @@ const cmd = (type: "start" | "advance" | "return" | "leave") => ({
   type,
   requestId: crypto.randomUUID(),
 });
+test('story choice determines room capacity and solo execution without a mode choice', () => {
+  const { game, a, b } = setup();
+  const room = game.create(a, 'deokil-trading-murder');
+  expect(room.scenarioId).toBe('deokil-trading-murder');
+  expect(game.snapshot(a).room?.capacity).toBe(1);
+  expect(room.mode).toBe('solo');
+  expect(() => game.command(a, { type: 'mode', mode: 'multiplayer', requestId: crypto.randomUUID() })).toThrow();
+  expect(() => game.join(b, room.code)).toThrow();
+  game.command(a, cmd('start'));
+  expect(room.soloStarted).toBe(true);
+  expect(game.snapshot(a).room?.scenario.id).toBe('deokil-trading-murder');
+  game.command(a, { type: 'solo-return', requestId: crypto.randomUUID() });
+  game.command(a, cmd('leave'));
+  const multiplayer = game.create(a, 'rehearsal');
+  expect(multiplayer.mode).toBe('multiplayer');
+  expect(() => game.command(a, cmd('start'))).toThrow();
+  game.join(b, multiplayer.code);
+  game.command(a, cmd('start'));
+  expect(game.snapshot(a).room?.session).not.toBeNull();
+  expect(game.snapshot(a).room?.scenario.id).toBe('rehearsal');
+});
 test("room discovery follows vacancy and waiting status without hiding the member's room", () => {
   const { game, a, b, c } = setup();
   const room = game.create(a, "rehearsal");
