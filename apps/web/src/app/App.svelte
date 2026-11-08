@@ -456,7 +456,11 @@
 </div>
 
 {#if snapshot && account.accountType === 'google' && !room && !workshopPlayId && currentPath === '/'}
-  {#key snapshot.me.id}<FriendsDrawer {locale} />{/key}
+  {#key snapshot.me.id}<FriendsDrawer {locale} accountId={snapshot.me.id} onAuthLost={() => {
+    account = { me: null, accountType: null, needsNickname: false };
+    snapshot = null; picker = false; accountLoaded = false;
+    socket?.close();
+  }} />{/key}
 {/if}
 
 <StoryPickerDialog

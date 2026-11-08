@@ -2,10 +2,11 @@
   import { onMount, onDestroy } from 'svelte';
   import { Button, TextInput } from '../../shared/ui';
   type Person = { id: string; nickname: string; online?: boolean };
-  let { locale, poll = false, onAuthLost = () => {} }: { locale: 'ko' | 'en'; poll?: boolean; onAuthLost?: () => void } = $props();
+  let { locale, accountId, poll = false, onAuthLost = () => {} }: { locale: 'ko' | 'en'; accountId: string; poll?: boolean; onAuthLost?: () => void } = $props();
   const inputId = $props.id();
   const label = (ko: string, en: string) => locale === 'en' ? en : ko;
   let nickname = $state(''), error = $state(''), message = $state('');
+  let listError = $state('');
   let loading = $state(true), busy = $state(false), searched = $state(false);
   let friends = $state<Person[]>([]), incoming = $state<Person[]>([]), outgoing = $state<Person[]>([]), matches = $state<Person[]>([]);
   const controller = new AbortController();
@@ -14,7 +15,7 @@
   async function api(path = '', body?: object) {
     const response = await fetch('/api/friends' + path, {
       method: body ? 'POST' : 'GET', signal: controller.signal,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
+      headers: { 'X-Account-ID': accountId, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const data = await response.json();
@@ -32,9 +33,12 @@
       const data = await api();
       if (controller.signal.aborted || current !== generation) return;
       friends = data.friends; incoming = data.incoming; outgoing = data.outgoing;
+      listError = '';
     } catch (cause) {
-      if (!controller.signal.aborted && current === generation) { friends = []; incoming = []; outgoing = []; }
-      throw cause;
+      if (!controller.signal.aborted && current === generation) {
+        friends = []; incoming = []; outgoing = [];
+        listError = cause instanceof Error ? cause.message : label('목록을 갱신하지 못했어요.', 'Could not refresh the list.');
+      }
     } finally { if (!controller.signal.aborted && current === generation) loading = false; }
   }
   async function action(run: () => Promise<void>) {
@@ -47,8 +51,9 @@
   onMount(() => {
     void action(load);
     if (!poll) return;
+    let polling = false;
     const timer = setInterval(() => {
-      if (!busy) void load(true).catch(() => { if (!controller.signal.aborted) error = label('목록을 갱신하지 못했어요.', 'Could not refresh the list.'); });
+      if (!busy && !polling) { polling = true; void load(true).finally(() => { polling = false; }); }
     }, 15000);
     return () => clearInterval(timer);
   });
@@ -79,7 +84,7 @@
     <label for={inputId}>{label('친구 닉네임', 'Friend nickname')}</label>
     <div class="friend-search"><TextInput id={inputId} bind:value={nickname} oninput={() => { matches = []; searched = false; }} required maxlength={20} autocomplete="off" disabled={busy} /><Button type="submit" disabled={busy || !nickname.trim()}>{label('검색', 'Search')}</Button></div>
   </form>
-  {#if error}<p role="alert">{error}</p><Button variant="secondary" disabled={busy} onclick={() => void action(load)}>{label('목록 다시 불러오기', 'Reload list')}</Button>{/if}
+  {#if error || listError}<p role="alert">{error || listError}</p><Button variant="secondary" disabled={busy} onclick={() => void action(load)}>{label('목록 다시 불러오기', 'Reload list')}</Button>{/if}
   <p role="status">{message}</p>
   {#if searched}
     {#if !matches.length}<p role="status">{label('사용자를 찾을 수 없어요.', 'No matching accounts.')}</p>{/if}
@@ -99,7 +104,7 @@
       <h3>{label('친구', 'Friends')} ({friends.length})</h3>
       <ul>{#each friends as person (person.id)}<li>{person.nickname}</li>{/each}</ul>
     {/if}
-    {#if !friends.length && !error}<p>{label('친구가 없어요.', 'No friends yet.')}</p>{/if}
+    {#if !friends.length && !error && !listError}<p>{label('친구가 없어요.', 'No friends yet.')}</p>{/if}
     <Button variant="secondary" disabled={busy} onclick={() => void action(load)}>{label('새로고침', 'Refresh')}</Button>
   {/if}
 </div>

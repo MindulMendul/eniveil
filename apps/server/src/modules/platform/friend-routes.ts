@@ -26,6 +26,8 @@ export function createFriendRoutes(store: Store, options: { isOnline?: (id: stri
     const me = store.authenticate(getCookie(c, 'festival_guest'));
     if (!me) return c.json({ error: '계정 로그인이 필요해요.' }, 401);
     if (store.accountType(me.id) !== 'google') return c.json({ error: '계정 로그인이 필요해요.' }, 403);
+    const expectedAccount = c.req.header('x-account-id');
+    if (expectedAccount && expectedAccount !== me.id) return c.json({ error: '로그인 계정이 변경됐어요. 다시 로그인해 주세요.' }, 401);
     c.set('me', me);
     await next();
   });

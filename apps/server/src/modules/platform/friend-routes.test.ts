@@ -14,14 +14,15 @@ function fixture(path = ':memory:', isOnline?: (id: string) => boolean) {
   const app = new Hono(); app.route('/api/friends', createFriendRoutes(store, { isOnline }));
   app.onError((_error,c) => c.json({error:'Invalid input'},400));
   const account = (name: string) => { const me = store.googleAccount('google:' + name); store.rename(me,name); return {me,cookie:'festival_guest=' + store.issue(me.id)}; };
-  const request = (path: string, cookie = '', body?: object) => app.request('http://localhost/api/friends' + path, {
-    method: body ? 'POST' : 'GET', headers: {Cookie:cookie,'Content-Type':'application/json'}, ...(body ? {body:JSON.stringify(body)} : {}),
+  const request = (path: string, cookie = '', body?: object, headers: Record<string,string> = {}) => app.request('http://localhost/api/friends' + path, {
+    method: body ? 'POST' : 'GET', headers: {Cookie:cookie,'Content-Type':'application/json',...headers}, ...(body ? {body:JSON.stringify(body)} : {}),
   });
   return {store,request,account};
 }
 test('friend requests require accounts and recipient consent; protect against self, duplicates and third parties', async () => {
   const {store,request,account} = fixture(); const a=account('Alice'),b=account('Bobby'),c=account('Carol');
   expect((await request('')).status).toBe(401);
+  expect((await request('',a.cookie,undefined,{'X-Account-ID':b.me.id})).status).toBe(401);
   const guest=store.createGuest('Guest');
   expect((await request('', 'festival_guest='+store.issue(guest.id))).status).toBe(403);
   const search=await (await request('/search?nickname=ＡＬＩＣＥ',b.cookie)).json();

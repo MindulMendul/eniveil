@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Button, Modal } from '../../shared/ui';
   import FriendsPanel from './FriendsPanel.svelte';
-  let { locale }: { locale: 'ko' | 'en' } = $props();
+  let { locale, accountId, onAuthLost }: { locale: 'ko' | 'en'; accountId: string; onAuthLost: () => void } = $props();
   let open = $state(false);
   const titleId = $props.id();
   const label = (ko: string, en: string) => locale === 'en' ? en : ko;
@@ -16,7 +16,7 @@
 {#if open}
   <Modal open={true} placement="end" class="friend-drawer" labelledby={titleId} onClose={() => open = false} onclick={backdrop}>
     <div class="friend-title"><h2 id={titleId} class="heading-two">{label('친구', 'Friends')}</h2><Button variant="dismiss" aria-label={label('친구 목록 닫기', 'Close friends')} onclick={() => open = false}>×</Button></div>
-    <FriendsPanel {locale} poll={true} onAuthLost={() => open = false} />
+    <FriendsPanel {locale} {accountId} poll={true} onAuthLost={() => { open = false; onAuthLost(); }} />
   </Modal>
 {/if}
 <style>
