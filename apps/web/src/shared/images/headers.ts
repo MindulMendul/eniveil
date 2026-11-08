@@ -1,4 +1,4 @@
-import { IMAGE_MAX_PIXELS } from '@festival/shared/images';
+import { IMAGE_MAX_PIXELS, checkImageDimensions } from '@festival/shared/images';
 export const MAX_IMAGE_PIXELS = IMAGE_MAX_PIXELS;
 const jpegFrames = new Set([192, 193, 194, 195, 197, 198, 199, 201, 202, 203, 205, 206, 207]);
 
@@ -34,9 +34,7 @@ export function webpFilename(name: string): string {
 }
 
 
-export function checkDimensions(width: number, height: number) {
-  if (!width || !height || width * height > MAX_IMAGE_PIXELS) throw Error('dimensions');
-}
+export const checkDimensions = checkImageDimensions;
 
 /** Bounded metadata scan, before a decoder can allocate an oversized bitmap. */
 export function imageDimensions(bytes: Uint8Array, mime: string): { width: number; height: number } {
