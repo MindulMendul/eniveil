@@ -1,0 +1,43 @@
+---
+const enabled = /^GTM-[A-Z0-9]+$/.test(import.meta.env.PUBLIC_GTM_CONTAINER_ID?.trim() ?? '');
+const en = Astro.url.pathname.startsWith('/en');
+---
+{enabled && <aside class="analytics-choice" aria-label={en ? 'Analytics settings' : '분석 설정'}>
+  <button type="button" data-analytics-settings>{en ? 'Analytics settings' : '분석 설정'}</button>
+  <div data-analytics-choice hidden>
+    <p data-analytics-message>{en ? 'Allow analytics cookies to measure site usage?' : '사이트 이용 분석을 위한 쿠키를 허용할까요?'}</p>
+    <button type="button" data-analytics-deny>{en ? 'Deny' : '거부'}</button>
+    <button type="button" data-analytics-allow>{en ? 'Allow' : '허용'}</button>
+  </div>
+</aside>}
+<script>
+  import { analyticsConsent, initializeAnalytics, setAnalyticsConsent, trackPageView } from '../../analytics.js';
+  const choice = document.querySelector<HTMLElement>('[data-analytics-choice]');
+  if (choice) {
+    const button = (selector: string) => document.querySelector<HTMLButtonElement>(selector)!;
+    const settings = button('[data-analytics-settings]');
+    const allow = button('[data-analytics-allow]');
+    const deny = button('[data-analytics-deny]');
+    const message = document.querySelector<HTMLElement>('[data-analytics-message]')!;
+    const sync = () => {
+      const en = location.pathname === '/en' || location.pathname.startsWith('/en/');
+      settings.textContent = en ? 'Analytics settings' : '분석 설정';
+      settings.closest('aside')?.setAttribute('aria-label', settings.textContent);
+      allow.textContent = en ? 'Allow' : '허용'; deny.textContent = en ? 'Deny' : '거부';
+      message.textContent = en ? 'Allow analytics cookies to measure site usage?' : '사이트 이용 분석을 위한 쿠키를 허용할까요?';
+      trackPageView(en ? 'en' : 'ko');
+    };
+    choice.hidden = analyticsConsent() !== null;
+    settings.onclick = () => { choice.hidden = false; deny.focus(); };
+    const choose = (value: 'granted' | 'denied') => { setAnalyticsConsent(value); choice.hidden = true; settings.focus(); };
+    allow.onclick = () => choose('granted'); deny.onclick = () => choose('denied');
+    window.addEventListener('site:navigation', sync);
+    initializeAnalytics(); sync();
+  }
+</script>
+<style>
+  .analytics-choice{padding:1rem;position:relative;z-index:1;border-top:1px solid currentColor;font:inherit}
+  button{font:inherit;min-height:44px;padding:.5rem .75rem;cursor:pointer;margin:.25rem}
+  p{margin:.5rem 0;line-height:1.6}
+  [hidden]{display:none}
+</style>

@@ -1,5 +1,6 @@
 import { pageMetadata, pageSchema, serializeSchema, shareImage, siteOrigin } from './metadata';
 export function syncMetadata(pathname: string) {
+  window.dispatchEvent(new Event('site:navigation'));
   const m = pageMetadata(pathname), origin = siteOrigin(import.meta.env.PUBLIC_SITE_URL);
   const url = new URL(m.localized(m.en ? 'en' : 'ko'), origin).href;
   document.head.querySelectorAll('[data-site-meta]').forEach(node => node.remove());

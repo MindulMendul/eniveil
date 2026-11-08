@@ -1,7 +1,37 @@
-const configuredMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID?.trim();
-const measurementId = configuredMeasurementId && /^G-[A-Z0-9]+$/i.test(configuredMeasurementId)
-  ? configuredMeasurementId
-  : undefined;
+const configuredContainerId = import.meta.env.PUBLIC_GTM_CONTAINER_ID?.trim();
+const containerId = configuredContainerId && /^GTM-[A-Z0-9]+$/.test(configuredContainerId)
+  ? configuredContainerId : undefined;
+const consentKey = 'analytics-consent-v1';
+
+/** @returns {'granted' | 'denied' | null} */
+export function analyticsConsent() {
+  try {
+    const value = localStorage.getItem(consentKey);
+    return value === 'granted' || value === 'denied' ? value : null;
+  } catch { return null; }
+}
+
+/** @param {'granted' | 'denied'} value */
+export function setAnalyticsConsent(value) {
+  try { localStorage.setItem(consentKey, value); } catch { /* Session choice still applies. */ }
+  if (value === 'denied' && initialized) {
+    // Unloading a script cannot stop tags that already executed. Reload without GTM.
+    window.location.reload();
+    return;
+  }
+  sessionConsent = value;
+  if (value === 'granted') initializeAnalytics();
+}
+
+/** @type {'granted' | 'denied' | null} */
+let sessionConsent = null;
+const allowedParameters = new Set(['story_id','language','location_id','clue_id','suspect_id','question_type','selected','outcome','clue_count','play_duration_seconds','stage','hint_number','page_path','dwell_time_seconds','placement_id','campaign_id','creative_id']);
+
+/** @param {Record<string, string | number | boolean>} event */
+function pushEvent(event) {
+  const browserWindow = /** @type {Window & { dataLayer?: unknown[] }} */ (window);
+  browserWindow.dataLayer?.push(event);
+}
 
 /** @type {boolean} */
 let initialized = false;
@@ -28,38 +58,31 @@ function savePageDwell({ finish = false } = {}) {
   }
 }
 
-/**
- * Loads GA4 only when a public measurement ID is configured.
- * @returns {boolean} Whether analytics is available in this build.
- */
+/** Load GTM once, only after explicit analytics consent. */
 export function initializeAnalytics() {
-  if (initialized) return Boolean(measurementId);
-  if (!measurementId || typeof window === 'undefined') return false;
-
-  const browserWindow = /** @type {Window & { dataLayer?: unknown[], gtag?: (...args: unknown[]) => void }} */ (window);
-  browserWindow.dataLayer = browserWindow.dataLayer ?? [];
-  browserWindow.gtag = (...args) => browserWindow.dataLayer?.push(args);
-  browserWindow.gtag('js', new Date());
-  browserWindow.gtag('config', measurementId, { send_page_view: false });
-
+  if (initialized) return true;
+  if (!containerId || typeof window === 'undefined' || (sessionConsent ?? analyticsConsent()) !== 'granted') return false;
+  const browserWindow = /** @type {Window & { dataLayer?: unknown[] }} */ (window);
+  browserWindow.dataLayer ??= [];
+  browserWindow.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) savePageDwell();
     else if (activePage && !activePage.startedAt) activePage.startedAt = Date.now();
   });
   window.addEventListener('pagehide', () => savePageDwell({ finish: true }));
-
   const script = document.createElement('script');
   script.async = true;
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
+  script.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(containerId)}`;
   document.head.append(script);
-
   initialized = true;
+  trackPageView(window.location.pathname.startsWith('/en') ? 'en' : 'ko');
   return true;
 }
 
 /** @param {string} locale */
 export function trackPageView(locale) {
-  if (!measurementId || typeof window === 'undefined') return;
+  if (!initialized || typeof window === 'undefined') return;
+  if (activePage?.path === window.location.pathname) return;
   savePageDwell({ finish: true });
   activePage = {
     locale,
@@ -68,20 +91,21 @@ export function trackPageView(locale) {
     startedAt: document.hidden ? 0 : Date.now(),
     elapsedMs: 0,
   };
-  const browserWindow = /** @type {Window & { gtag?: (...args: unknown[]) => void }} */ (window);
-  browserWindow.gtag?.('event', 'page_view', {
-    page_title: document.title,
+  pushEvent({
+    event: 'page_view',
+    page_title: window.location.pathname,
     page_location: `${window.location.origin}${window.location.pathname}`,
     page_path: window.location.pathname,
+    page_referrer: '',
     language: locale,
   });
 }
 
 /** @param {string} eventName @param {Record<string, string | number | boolean>} [parameters] */
 export function trackEvent(eventName, parameters = {}) {
-  if (!measurementId || typeof window === 'undefined') return;
-  const browserWindow = /** @type {Window & { gtag?: (...args: unknown[]) => void }} */ (window);
-  browserWindow.gtag?.('event', eventName, parameters);
+  if (!initialized || typeof window === 'undefined') return;
+  const safe = Object.fromEntries(Object.entries(parameters).filter(([key]) => allowedParameters.has(key)));
+  pushEvent({ ...safe, event: eventName });
 }
 
 /** @param {string} placementId @param {string} [campaignId] @param {string} [creativeId] */
