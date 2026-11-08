@@ -42,3 +42,18 @@ test("a genuine tab exit remains retryable until confirmed and stale exits do no
   clearSoloExit(storage, exit);
   expect(pendingSoloExit(storage, room)).toBeNull();
 });
+
+
+test("stored exit data only restores the exact active server room and returns canonical fields", () => {
+  const storage = tabStorage();
+  for (const value of ["invalid json", "null", "42", "[]", "{}", JSON.stringify({ roomId }), JSON.stringify({ roomId, soloPlayId: 123 }), JSON.stringify({ roomId: "wrong", soloPlayId: attempt })]) {
+    storage.setItem("festival_solo_exit", value);
+    expect(pendingSoloExit(storage, room)).toBeNull();
+    if (value !== "invalid json") expect(storage.getItem("festival_solo_exit")).toBeNull();
+  }
+  storage.setItem("festival_solo_exit", JSON.stringify({ roomId, soloPlayId: attempt, extra: "ignored" }));
+  expect(pendingSoloExit(storage, room)).toEqual({ roomId, soloPlayId: attempt });
+  const legacy = { ...room, soloPlayId: null };
+  storage.setItem("festival_solo_exit", JSON.stringify({ roomId, soloPlayId: null }));
+  expect(pendingSoloExit(storage, legacy)).toEqual({ roomId, soloPlayId: null });
+});
