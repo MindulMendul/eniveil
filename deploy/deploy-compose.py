@@ -63,6 +63,26 @@ def wait_https(origin):
     raise RuntimeError(f'Public HTTPS health check failed: {last}')
 
 
+def ensure_build_space(docker_root):
+    minimum_free_bytes = 4 * 1024 ** 3
+    free_bytes = shutil.disk_usage(docker_root).free
+    if free_bytes < minimum_free_bytes:
+        print('Docker storage is low; pruning unused BuildKit cache.', file=sys.stderr)
+        run('docker','builder','prune','--all','--force')
+        free_bytes = shutil.disk_usage(docker_root).free
+    if free_bytes < minimum_free_bytes:
+        # Default image prune removes only dangling images unused by any container.
+        # Keep tagged release images and the running image pinned for rollback.
+        print('Docker storage is still low; pruning unused dangling images.', file=sys.stderr)
+        run('docker','image','prune','--force')
+        free_bytes = shutil.disk_usage(docker_root).free
+    if free_bytes < minimum_free_bytes:
+        raise RuntimeError(
+            f'Insufficient Docker storage for image build: {free_bytes} bytes free; '
+            f'{minimum_free_bytes} required after cache cleanup'
+        )
+
+
 def deploy(environment, sha):
     if not re.fullmatch('[a-f0-9]{40}', sha):
         raise ValueError('Expected a full commit SHA')
@@ -107,17 +127,7 @@ def deploy(environment, sha):
         command = ['docker','compose','-p',target['project'],'-f',str(file)]
         run(*command,'config','--quiet')
         docker_root = Path(run('docker','info','--format','{{.DockerRootDir}}',capture=True))
-        minimum_free_bytes = 4 * 1024 ** 3
-        free_bytes = shutil.disk_usage(docker_root).free
-        if free_bytes < minimum_free_bytes:
-            print('Docker storage is low; pruning unused BuildKit cache.', file=sys.stderr)
-            run('docker','builder','prune','--all','--force')
-            free_bytes = shutil.disk_usage(docker_root).free
-        if free_bytes < minimum_free_bytes:
-            raise RuntimeError(
-                f'Insufficient Docker storage for image build: {free_bytes} bytes free; '
-                f'{minimum_free_bytes} required after cache cleanup'
-            )
+        ensure_build_space(docker_root)
         run(*command,'build')
         # Back up the live databases before executing new application code.
         run(sys.executable,Path.home()/'mindul-ai-infra/ops/mindul_ops.py','backup')
