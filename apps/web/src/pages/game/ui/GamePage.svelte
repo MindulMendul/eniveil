@@ -20,7 +20,7 @@
   } = $props();
 </script>
 
-<main class="main">
+<main id="main-content" tabindex="-1" class="main">
   <div class="page-heading">
     <div>
       <p class="eyebrow">{room.title} · SESSION {session.id.slice(0, 6).toUpperCase()}</p>

@@ -89,7 +89,7 @@
   onDestroy(() => { disposed = true; clearTimeout(timer); request++; });
 </script>
 
-<main class="main workshop">
+<main id="main-content" tabindex="-1" class="main workshop">
   <div class="page-heading">
     <div><p class="eyebrow">COMMUNITY STORIES</p><h1 class="heading-one">{label('창작마당', 'Workshop')}</h1></div>
     <Button class="primary" onclick={() => edit()} variant="primary">＋ {label('새 머미 만들기', 'Create a story')}</Button>

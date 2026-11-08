@@ -28,7 +28,7 @@
   } = $props();
 </script>
 
-<main class="main">
+<main id="main-content" tabindex="-1" class="main">
   <p class="eyebrow">ROOM DETAILS</p>
   <div class="page-heading">
     <div>

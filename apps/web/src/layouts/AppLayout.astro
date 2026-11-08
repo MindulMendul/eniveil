@@ -18,6 +18,7 @@ const { locale = "ko" } = Astro.props;
     <Metadata />
   </head>
   <body class="m-0 min-h-screen bg-festival-bg font-sans text-festival-text font-normal font-synthesis-none">
+    <a class="skip-link" href="#main-content">{locale === "en" ? "Skip to content" : "본문으로 건너뛰기"}</a>
     <script>
       import { initRUM } from '../rum';
       initRUM();
