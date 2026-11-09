@@ -13,6 +13,7 @@
   let pinFor = $state<string | null>(null);
   const controller = new AbortController();
   let refreshing = false;
+  let dirty = false;
   async function request(path: string, body?: unknown) {
     const response = await fetch('/api/lobby' + path, { signal: controller.signal, method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
     const result = await response.json();
@@ -20,11 +21,14 @@
     return result;
   }
   async function refresh() {
-    if (refreshing) return;
+    if (refreshing) { dirty = true; return; }
     refreshing = true;
     try { const data = await request('/social'); friends = data.friends; invitations = data.invitations; notices = data.notices; }
     catch (cause) { if (!controller.signal.aborted) error = cause instanceof Error ? cause.message : '연결을 확인해 줘.'; }
-    finally { refreshing = false; }
+    finally {
+      refreshing = false;
+      if (dirty && !controller.signal.aborted) { dirty = false; void refresh(); }
+    }
   }
   async function act(path: string, body: unknown, entered = false) {
     if (busy) return;

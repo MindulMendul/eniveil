@@ -27,12 +27,27 @@ export function createLobbyRoutes(deps: {
       if (expires <= Date.now()) { ws.close(1008, "Expired"); continue; }
       try {
         ws.send(JSON.stringify({ type: "snapshot", data: deps.game.snapshot(guest) }));
-        ws.send(JSON.stringify({ type: "social-changed" }));
       } catch {
         /* close handler clears presence */
       }
     }
   };
+  const socialDirty = new Set<string>();
+  let socialTimer: ReturnType<typeof setTimeout> | undefined;
+  const socialChanged = (ids: string[]) => {
+    for (const id of ids) socialDirty.add(id);
+    if (socialTimer) return;
+    socialTimer = setTimeout(() => {
+      socialTimer = undefined;
+      const targets = new Set(socialDirty);
+      socialDirty.clear();
+      for (const [ws, entry] of sockets) if (targets.has(entry.guest.id) && entry.expires > Date.now()) {
+        try { ws.send(JSON.stringify({ type: "social-changed" })); } catch { /* close clears presence */ }
+      }
+    }, 100);
+    socialTimer.unref();
+  };
+  const availabilityChanged = (id: string) => socialChanged([id, ...deps.store.friendIds(id)]);
   const presence = new ReconnectGrace(deps.game, (transition) => {
     notifySessionExpiry(transition, deps.notifyTemporal);
     broadcast();
@@ -59,7 +74,7 @@ export function createLobbyRoutes(deps: {
     if (++bucket.count > 20) { c.header("Retry-After", "60"); return c.json({ error: "잠시 후 다시 시도해 줘." }, 429); }
     await next();
   });
-  app.route("/", socialRoutes(deps.store, deps.game, broadcast, id => [...sockets.values()].some(entry => entry.guest.id === id && entry.lobby && entry.expires > Date.now())));
+  app.route("/", socialRoutes(deps.store, deps.game, broadcast, id => [...sockets.values()].some(entry => entry.guest.id === id && entry.lobby && entry.expires > Date.now()), socialChanged));
   app.get("/stories", (c) => {
     const query = c.req.query();
     const integer = (key: string, fallback: number, min: number, max: number) => {
@@ -99,12 +114,14 @@ export function createLobbyRoutes(deps: {
   app.post("/rooms", async (c) => {
     const { scenarioId, access, pin } = createRoomSchema.parse(await c.req.json());
     const room = deps.game.create(c.get("guest"), scenarioId, access, pin);
+    availabilityChanged(c.get("guest").id);
     broadcast();
     return c.json({ roomId: room.id }, 201);
   });
   app.post("/rooms/join", async (c) => {
     const { code, pin } = joinRoomSchema.parse(await c.req.json());
     const room = deps.game.join(c.get("guest"), code, pin);
+    availabilityChanged(c.get("guest").id);
     broadcast();
     return c.json({ roomId: room.id });
   });
@@ -132,6 +149,7 @@ export function createLobbyRoutes(deps: {
           connection = ws;
           sockets.set(ws, { guest, lobby: false, expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
           presence.connect(guest.id);
+          availabilityChanged(guest.id);
           broadcast();
         },
         onMessage(event, ws) {
@@ -153,13 +171,15 @@ export function createLobbyRoutes(deps: {
             requestId = command.requestId;
             if (command.type === "presence") {
               const entry = connection ? sockets.get(connection) : undefined;
-              if (entry) entry.lobby = command.lobby;
-              broadcast();
+              if (!entry || entry.lobby === command.lobby) return;
+              entry.lobby = command.lobby;
+              availabilityChanged(guest.id);
               return;
             }
             const room = deps.game.needRoom(guest.id);
             const previousSessionId = room.sessionId;
             deps.game.command(guest, command);
+            if (["start", "return", "leave", "solo-return", "mode"].includes(command.type)) availabilityChanged(guest.id);
             const sessionId = room.sessionId ?? previousSessionId;
             if (command.type === "start" && sessionId) {
               deps.notifyTemporal("start", { sessionId });
@@ -189,6 +209,7 @@ export function createLobbyRoutes(deps: {
         onClose(_event, ws) {
           if (connection && sockets.delete(connection)) {
             presence.disconnect(guest.id);
+            availabilityChanged(guest.id);
             broadcast();
           }
         },

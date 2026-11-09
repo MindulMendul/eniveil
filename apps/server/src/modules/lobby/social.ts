@@ -5,7 +5,7 @@ import type { Game } from '../game/game';
 import type { Store } from '../../store';
 
 type Invite = { id: string; roomId: string; hostId: string; targetId: string; expires: number; status: 'pending' | 'accepted' | 'declined' };
-export function socialRoutes(store: Store, game: Game, broadcast: () => void, inLobby: (id: string) => boolean = () => true) {
+export function socialRoutes(store: Store, game: Game, broadcast: () => void, inLobby: (id: string) => boolean = () => true, changed: (ids: string[]) => void = () => {}) {
   const app = new Hono<ApiEnv>();
   const invites = new Map<string, Invite>();
   const notices = new Map<string, { id: string; text: string; expires: number }[]>();
@@ -24,9 +24,14 @@ export function socialRoutes(store: Store, game: Game, broadcast: () => void, in
   app.get('/social', c => {
     prune();
     const me = c.get('guest');
+    const counts = new Map<string, number>();
+    for (const session of Object.values(game.state.sessions)) {
+      if (!session.endedAt || session.phase !== 'reveal' || !session.participants.some(p => p.id === me.id)) continue;
+      for (const id of new Set(session.participants.map(p => p.id))) if (id !== me.id) counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
     const friends = store.friendIds(me.id).map(id => game.state.guests[id]).filter((other): other is NonNullable<typeof other> => !!other).map(other => ({
       ...other, online: (game.online.get(other.id) ?? 0) > 0, available: waiting(other.id),
-      gamesTogether: Object.values(game.state.sessions).filter(s => s.endedAt && s.phase === 'reveal' && s.participants.some(p => p.id === me.id) && s.participants.some(p => p.id === other.id)).length,
+      gamesTogether: counts.get(other.id) ?? 0,
     }));
     return c.json({ friends, invitations: [...invites.values()].filter(i => i.targetId === me.id && i.status === 'pending').map(i => ({ id: i.id, host: game.state.guests[i.hostId]?.nickname, room: game.summary(game.state.rooms[i.roomId]), expires: i.expires })), notices: notices.get(me.id) ?? [] });
   });
@@ -43,7 +48,7 @@ export function socialRoutes(store: Store, game: Game, broadcast: () => void, in
     if (existing) return c.json({ id: existing.id });
     const invite: Invite = { id: crypto.randomUUID(), roomId: room.id, hostId: me.id, targetId, status: 'pending', expires: Date.now() + 120000 };
     invites.set(invite.id, invite);
-    broadcast();
+    changed([me.id, targetId]);
     return c.json({ id: invite.id }, 201);
   });
   app.post('/invitations/:id/respond', async c => {
@@ -64,12 +69,14 @@ export function socialRoutes(store: Store, game: Game, broadcast: () => void, in
       const list = notices.get(invite.hostId) ?? [];
       notices.set(invite.hostId, [...list.slice(-19), { id: invite.id, text: `${me.nickname}님이 초대를 거절했습니다.`, expires: Date.now() + 300000 }]);
     }
-    broadcast();
+    if (accept) broadcast();
+    changed([me.id, invite.hostId, ...store.friendIds(me.id)]);
     return c.json({ ok: true });
   });
   app.post('/notices/:id/dismiss', c => {
     const me = c.get('guest');
     notices.set(me.id, (notices.get(me.id) ?? []).filter(n => n.id !== c.req.param('id')));
+    changed([me.id]);
     return c.json({ ok: true });
   });
   return app;

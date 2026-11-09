@@ -101,11 +101,12 @@ export class Game {
             : null,
       };
     }
+    const friendIds = this.store.friendIds ? new Set(this.store.friendIds(me.id)) : null;
     return {
       me,
       scenarios: this.storyCatalog.list(),
       rooms: Object.values(this.state.rooms)
-        .filter((room) => this.joinError(room) === null && (room.access !== "friends" || !!this.store.areFriends?.(room.hostId, me.id)))
+        .filter((room) => this.joinError(room) === null && (room.access !== "friends" || (friendIds ? friendIds.has(room.hostId) : !!this.store.areFriends?.(room.hostId, me.id))))
         .map((room) => this.summary(room)),
       room,
     };
@@ -222,7 +223,16 @@ export class Game {
     if (r.memberIds.includes(me.id)) return r;
     if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
     if (r.access === "friends" && !this.store.areFriends?.(r.hostId, me.id)) throw Error("방장의 친구만 입장할 수 있어.");
-    if (r.access === "secret" && (!r.pinHash || !timingSafeEqual(Buffer.from(r.pinHash), Buffer.from(this.hashPin(r.code, pin ?? ""))))) throw Error("PIN을 확인해 줘.");
+    if (r.access === "secret") {
+      const now = Date.now();
+      if (r.pinFailures && r.pinFailures.until <= now) delete r.pinFailures;
+      if (r.pinFailures && r.pinFailures.count >= 10) throw Error("PIN 입력이 잠겼어. 10분 뒤 다시 시도해 줘.");
+      if (!r.pinHash || !timingSafeEqual(Buffer.from(r.pinHash), Buffer.from(this.hashPin(r.code, pin ?? "")))) {
+        r.pinFailures = { count: (r.pinFailures?.count ?? 0) + 1, until: r.pinFailures?.until ?? now + 600000 };
+        this.store.save();
+        throw Error("PIN을 확인해 줘.");
+      }
+    }
     const error = this.joinError(r);
     if (error) throw new Error(error);
     r.memberIds.push(me.id);

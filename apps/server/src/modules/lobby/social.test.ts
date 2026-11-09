@@ -132,3 +132,19 @@ test('shared game count includes completed games once and excludes unfinished on
     }
   } finally { store.close(); }
 });
+
+test('secret room locks after ten failed guesses across different accounts and unlocks after cooldown', () => {
+  const {store,game,host,friend} = setup();
+  try {
+    const room = game.create(host,'rehearsal','secret','0001');
+    for (let i=0;i<10;i++) {
+      const attacker = store.createGuest(`Guess${i}`);
+      expect(() => game.join(attacker,room.code,'9999')).toThrow('PIN을 확인');
+    }
+    expect(room.pinFailures?.count).toBe(10);
+    expect(() => game.join(friend,room.code,'0001')).toThrow('잠겼어');
+    room.pinFailures!.until = Date.now() - 1;
+    game.join(friend,room.code,'0001');
+    expect(room.memberIds).toHaveLength(2);
+  } finally { store.close(); }
+});
