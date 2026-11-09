@@ -1,3 +1,4 @@
+import { allowsPlayAnalytics } from './shared/analytics/consent';
 import {
   ErrorsInstrumentation,
   initializeFaro,
@@ -9,6 +10,7 @@ import {
 import { TracingInstrumentation } from "@grafana/faro-web-tracing";
 
 let faro: Faro | undefined;
+let watchingConsent = false;
 const allowedHosts = new Set([
   "eniveil.com",
   "mindul-murder-mystery.duckdns.org",
@@ -16,6 +18,18 @@ const allowedHosts = new Set([
 ]);
 
 export function initRUM() {
+  if (!watchingConsent) {
+    watchingConsent = true;
+    window.addEventListener('consent:changed', event => {
+      const pending = (event as CustomEvent).detail?.pending;
+      if (!allowsPlayAnalytics()) {
+        faro?.pause();
+        if (faro && !pending) window.location.reload();
+      } else if (faro) faro.unpause();
+      else initRUM();
+    });
+  }
+  if (!allowsPlayAnalytics()) return;
   const collectorUrl = (import.meta.env.PUBLIC_FARO_COLLECTOR_URL as string | undefined) || `${location.origin}/telemetry/collect`;
   if (
     faro ||
@@ -48,6 +62,7 @@ export function initRUM() {
         }),
       ],
       beforeSend(item) {
+        if (!allowsPlayAnalytics()) return null;
         // Strip user identity and all path/query data: room URLs may contain invite codes.
         const { user: _user, page: _page, ...meta } = item.meta ?? {};
         item.meta = { ...meta, page: { url: `${location.origin}/` } };
@@ -61,6 +76,7 @@ export function initRUM() {
 }
 
 export function rumEvent(name: string, attributes: Record<string, string> = {}) {
+  if (!allowsPlayAnalytics()) return;
   try {
     faro?.api.pushEvent(name, attributes);
   } catch {

@@ -69,10 +69,13 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
         .status,
     ).toBe(403);
     const guest = async (nickname: string) => {
-      const r = await req("/api/platform/guest", "", { nickname });
+      const preference = await req('/api/platform/consent', '', {version:2,scope:'full'});
+      expect(preference.status).toBe(200);
+      const consentCookie = preference.headers.get('set-cookie')!.split(';')[0]!;
+      const r = await req("/api/platform/guest", consentCookie, { nickname });
       expect(r.status).toBe(201);
       return {
-        cookie: r.headers.get("set-cookie")!.split(";")[0],
+        cookie: consentCookie + "; " + r.headers.get("set-cookie")!.split(";")[0],
         me: ((await r.json()) as { me: { id: string; nickname: string } }).me,
       };
     };

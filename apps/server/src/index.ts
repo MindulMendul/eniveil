@@ -12,6 +12,7 @@ import { SQLiteStoryRunStore } from "./infrastructure/sqlite/story-run-store";
 import { SQLiteWorkshopStore } from "./infrastructure/sqlite/workshop-store";
 import { PlayStoryCatalog } from "./modules/platform/stories/play-catalog";
 import { StorySessionService } from "./modules/game/story-session-service";
+import { ConsentService } from "./modules/platform/consent";
 import { createAccountRoutes } from "./modules/platform/account-routes";
 import { createFriendRoutes } from "./modules/platform/friend-routes";
 import { createPlatformRoutes } from "./modules/platform/routes";
@@ -27,7 +28,8 @@ export const store = new Store(
   process.env.DATABASE_PATH ?? "./data/festival.sqlite",
 );
 export const game = new Game(store, storyCatalog);
-const storyRunStore = new SQLiteStoryRunStore(store.db);
+const collectionConsent = new ConsentService(store, owner => lobby.disconnect(owner));
+const storyRunStore = new SQLiteStoryRunStore(store.db, { collection: { allows: collectionConsent.acceptsRecord, recorded: collectionConsent.recorded } });
 const workshopStore = new SQLiteWorkshopStore(store.db);
 const playCatalog = new PlayStoryCatalog(fileStoryCatalog, workshopStore);
 const storySessions = new StorySessionService(playCatalog, storyRunStore);
@@ -78,10 +80,12 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-const lobby = createLobbyRoutes({ store, game, notifyTemporal });
+const lobby = createLobbyRoutes({ store, game, notifyTemporal, canUse: collectionConsent.permitsRequest });
 const google = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.APP_ORIGIN
   ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, origin: new URL(process.env.APP_ORIGIN).origin }
   : undefined;
+app.use("/api/*", collectionConsent.middleware);
+app.route("/api/platform", collectionConsent.routes(production));
 app.route("/api/platform", createAccountRoutes({ store, production, google, onLogout: lobby.disconnect, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
 app.route('/api/friends', createFriendRoutes(store, { isOnline: id => (game.online.get(id) ?? 0) > 0 }));
 app.route("/api/platform", createPlatformRoutes({

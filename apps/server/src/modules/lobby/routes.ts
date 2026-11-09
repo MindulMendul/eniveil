@@ -18,13 +18,14 @@ export function createLobbyRoutes(deps: {
   store: Store;
   game: Game;
   notifyTemporal: (action: TemporalAction, payload: object) => void;
+  canUse?: (c: Context) => boolean;
 }) {
   const app = new Hono<ApiEnv>();
   const { upgradeWebSocket, websocket } = createBunWebSocket();
-  const sockets = new Map<WSContext, { guest: Guest; expires: number; lobby: boolean }>();
+  const sockets = new Map<WSContext, { guest: Guest; expires: number; lobby: boolean; canUse: () => boolean }>();
   const broadcast = () => {
-    for (const [ws, { guest, expires }] of sockets) {
-      if (expires <= Date.now()) { ws.close(1008, "Expired"); continue; }
+    for (const [ws, { guest, expires, canUse }] of sockets) {
+      if (expires <= Date.now() || !canUse()) { ws.close(1008, "Expired"); continue; }
       try {
         ws.send(JSON.stringify({ type: "snapshot", data: deps.game.snapshot(guest) }));
       } catch {
@@ -147,7 +148,7 @@ export function createLobbyRoutes(deps: {
       return {
         onOpen(_event, ws) {
           connection = ws;
-          sockets.set(ws, { guest, lobby: false, expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
+          sockets.set(ws, { guest, lobby: false, canUse: () => !deps.canUse || deps.canUse(c), expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
           presence.connect(guest.id);
           availabilityChanged(guest.id);
           broadcast();
@@ -155,7 +156,7 @@ export function createLobbyRoutes(deps: {
         onMessage(event, ws) {
           let requestId: string | undefined;
           try {
-            if (!authenticate(c)) {
+            if (!authenticate(c) || (deps.canUse && !deps.canUse(c))) {
               ws.close(1008, "Expired");
               return;
             }

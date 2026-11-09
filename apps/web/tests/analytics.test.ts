@@ -1,57 +1,50 @@
 import { expect, test } from 'bun:test';
 import { runInNewContext } from 'node:vm';
-
-async function analytics(id: string, stored: string | null = null, options: { failSet?: boolean; failRemove?: boolean } = {}) {
-  const bundle = await Bun.build({entrypoints:[new URL('../src/analytics.js',import.meta.url).pathname],target:'browser',format:'cjs',define:{'import.meta.env.PUBLIC_GTM_CONTAINER_ID':JSON.stringify(id)}});
-  const scripts: any[] = [], listeners: Record<string,(event?: any)=>void> = {}; let reloads = 0;
-  const location = {pathname:'/',origin:'https://example.com',search:'?code=SECRET',hash:'#SECRET',reload:()=>{reloads++}};
-  const window: any = {location,addEventListener:(name:string,fn:(event?: any)=>void)=>listeners[name]=fn};
-  const context = {module:{exports:{} as any},window,document:{title:'Private title',hidden:false,addEventListener:(name:string,fn:(event?: any)=>void)=>listeners[name]=fn,createElement:()=>({}),head:{append:(s:any)=>scripts.push(s)}},localStorage:{getItem:()=>stored,setItem:(_key:string,value:string)=>{if(options.failSet) throw Error('storage'); stored=value},removeItem:()=>{if(options.failRemove) throw Error('storage'); stored=null}},Date};
-  runInNewContext(await bundle.outputs[0]!.text(),context);
-  return {api:context.module.exports,window,scripts,listeners,reloads:()=>reloads,stored:()=>stored};
+async function analytics(id='GTM-56Q5K95G') {
+ const bundle=await Bun.build({entrypoints:[new URL('../src/analytics.js',import.meta.url).pathname],target:'browser',format:'cjs',define:{'import.meta.env.PUBLIC_GTM_CONTAINER_ID':JSON.stringify(id)}});
+ const scripts:any[]=[],listeners:Record<string,((e:any)=>void)[]>={};let stored:any=null,reloads=0,fail=false,persist=true;
+ const on=(name:string,fn:(e:any)=>void)=>{(listeners[name]??=[]).push(fn)};
+ class CustomEvent {constructor(public type:string,public options:any={}){}get detail(){return this.options.detail}}
+ const window:any={location:{pathname:'/',origin:'https://example.com',reload:()=>reloads++},addEventListener:on,dispatchEvent:(e:CustomEvent)=>listeners[e.type]?.forEach(fn=>fn(e))};
+ const context={module:{exports:{} as any},window,CustomEvent,Date,
+  localStorage:{getItem:()=> 'granted',setItem:()=>{throw Error('blocked')}},
+  document:{hidden:false,addEventListener:on,createElement:()=>({}),head:{append:(s:any)=>scripts.push(s)}},
+  fetch:async(_url:string,init:any={})=>{if(fail)throw Error('network');if(init.method==='POST'){const b=JSON.parse(init.body);const value={...b,updatedAt:new Date().toISOString(),accountId:null};if(persist)stored=value;return{ok:true,json:async()=>({consent:value})}}return{ok:true,json:async()=>({consent:stored})}}
+ };
+ runInNewContext(await bundle.outputs[0]!.text(),context);
+ return{api:context.module.exports,window,scripts,reloads:()=>reloads,setFail:(v:boolean)=>fail=v,setPersist:(v:boolean)=>persist=v};
 }
 
-test('GTM never loads or emits before consent; granting loads once and sanitizes SPA pages', async()=>{
- const {api,window,scripts}=await analytics('GTM-56Q5K95G');
- expect(api.initializeAnalytics()).toBe(false);api.trackPageView('ko');api.trackEvent('story_start');expect(scripts).toHaveLength(0);expect(window.dataLayer).toBeUndefined();
- api.setAnalyticsConsent('granted');api.initializeAnalytics();expect(scripts).toHaveLength(1);expect(scripts[0].src).toBe('https://www.googletagmanager.com/gtm.js?id=GTM-56Q5K95G');
- api.trackPageView('ko');expect(window.dataLayer.filter((e:any)=>e.event==='page_view')).toHaveLength(1);
- window.location.pathname='/en/workshop';api.trackPageView('en');
- const page=window.dataLayer.at(-1);expect(page.page_location).toBe('https://example.com/en/workshop');expect(page.page_referrer).toBe('');expect(page.page_title).toBe('/en/workshop');expect(page.language).toBe('en');
- api.trackEvent('story_start',{story_id:'public-story',language:'en',answer:'SECRET',email:'private@example.com',clue_id:'SECRET-CLUE',suspect_id:'SECRET-SUSPECT',location_id:'SECRET-LOCATION'});
- expect(window.dataLayer.at(-1)).toEqual({event:'story_start',story_id:'public-story',language:'en'});
- expect(JSON.stringify(window.dataLayer)).not.toContain('SECRET');expect(window.gtag).toBeUndefined();
+test('legacy grant is not expanded; explicit basic enables one GTM and sanitizes events',async()=>{
+ const f=await analytics();expect(f.api.initializeAnalytics()).toBe(false);await f.api.syncCollectionConsent();expect(f.api.initializeAnalytics()).toBe(false);
+ await f.api.saveCollectionConsent('basic');expect(f.api.initializeAnalytics()).toBe(true);f.api.initializeAnalytics();expect(f.scripts).toHaveLength(1);
+ f.api.trackPageView('ko');expect(f.window.dataLayer.filter((e:any)=>e.event==='page_view')).toHaveLength(1);
+ f.window.location.pathname='/en/';f.api.trackPageView('en');expect(f.window.dataLayer.at(-1).page_location).toBe('https://example.com/en/');
+ f.api.trackEvent('story_start',{story_id:'story',language:'en',answer:'SECRET',email:'SECRET',clue_id:'SECRET'});
+ expect(f.window.dataLayer.at(-1)).toEqual({event:'story_start',story_id:'story',language:'en'});expect(JSON.stringify(f.window.dataLayer)).not.toContain('SECRET');
+ expect(f.api.collectionConsent().scope).toBe('basic');expect(f.window.gtag).toBeUndefined();
+ const before=f.window.dataLayer.length;f.api.trackEvent('ad_click',{campaign_id:'marketing'});expect(f.window.dataLayer).toHaveLength(before);
+ expect(f.window.dataLayer[0][2]).toMatchObject({ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
 });
 
-test('missing/invalid containers and denied consent cannot initialize; saved consent can', async()=>{
- for(const id of ['', 'G-OLD', 'GTM-<script>']){const {api,scripts}=await analytics(id,'granted');expect(api.initializeAnalytics()).toBe(false);expect(scripts).toHaveLength(0)}
- const denied=await analytics('GTM-56Q5K95G','denied');expect(denied.api.initializeAnalytics()).toBe(false);
- const allowed=await analytics('GTM-56Q5K95G','granted');expect(allowed.api.initializeAnalytics()).toBe(true);expect(allowed.scripts).toHaveLength(1);
+test('full to basic preserves GA; withdrawal immediately blocks events and unloads external tags',async()=>{
+ const f=await analytics();await f.api.saveCollectionConsent('full');f.api.initializeAnalytics();expect(f.api.collectionConsent().scope).toBe('full');
+ await f.api.saveCollectionConsent('basic');expect(f.reloads()).toBe(0);expect(f.api.collectionConsent().scope).toBe('basic');
+ await f.api.saveCollectionConsent('none');const before=f.window.dataLayer.length;f.api.trackEvent('story_start');expect(f.window.dataLayer).toHaveLength(before);expect(f.reloads()).toBe(1);
 });
 
-
-test('withdrawal stops events and reloads other tabs', async()=>{
- const current=await analytics('GTM-56Q5K95G','granted');current.api.initializeAnalytics();
- current.listeners.storage({key:'analytics-consent-v1',newValue:'denied'});
- expect(current.reloads()).toBe(1);const before=current.window.dataLayer.length;
- current.api.trackEvent('story_start',{story_id:'x'});expect(current.window.dataLayer).toHaveLength(before);
+test('unavailable server or blocked preference cookie never produces a grant; local cache is not authoritative',async()=>{
+ const f=await analytics();f.setFail(true);await expect(f.api.saveCollectionConsent('full')).rejects.toThrow('network');expect(f.api.initializeAnalytics()).toBe(false);
+ f.setFail(false);f.setPersist(false);await expect(f.api.saveCollectionConsent('full')).rejects.toThrow('consent-storage');expect(f.api.initializeAnalytics()).toBe(false);expect(f.scripts).toHaveLength(0);
 });
 
-test('storage failures do not silently restore a prior grant', async()=>{
- const blocked=await analytics('GTM-56Q5K95G','granted',{failSet:true,failRemove:true});
- blocked.api.initializeAnalytics();const before=blocked.window.dataLayer.length;
- expect(blocked.api.setAnalyticsConsent('denied')).toBe(false);expect(blocked.reloads()).toBe(0);
- blocked.api.trackEvent('story_start',{story_id:'x'});expect(blocked.window.dataLayer).toHaveLength(before);
- const fallback=await analytics('GTM-56Q5K95G','granted',{failSet:true});fallback.api.initializeAnalytics();
- expect(fallback.api.setAnalyticsConsent('denied')).toBe(true);expect(fallback.stored()).toBeNull();expect(fallback.reloads()).toBe(1);
- const grant=await analytics('GTM-56Q5K95G',null,{failSet:true});expect(grant.api.setAnalyticsConsent('granted')).toBe(false);expect(grant.scripts).toHaveLength(0);
+test('scope choices remain usable without a configured GTM container',async()=>{
+ for(const id of ['', 'G-OLD','GTM-<script>']){const f=await analytics(id);await f.api.saveCollectionConsent('full');expect(f.api.initializeAnalytics()).toBe(false);expect(f.api.collectionConsent().scope).toBe('full');expect(f.scripts).toHaveLength(0)}
 });
 
 
-test('withdrawal does not send a final dwell event during pagehide', async()=>{
- const current=await analytics('GTM-56Q5K95G','granted');current.api.initializeAnalytics();
- await new Promise(resolve=>setTimeout(resolve,1050));
- expect(current.api.setAnalyticsConsent('denied')).toBe(true);
- const before=current.window.dataLayer.length;current.listeners.pagehide();
- expect(current.window.dataLayer).toHaveLength(before);expect(current.reloads()).toBe(1);
+test('background account/connection refresh cannot invalidate an in-flight explicit choice',async()=>{
+ const f=await analytics();await f.api.saveCollectionConsent('full');f.api.initializeAnalytics();
+ const choice=f.api.saveCollectionConsent('basic');const background=f.api.syncCollectionConsent(true);
+ await Promise.all([choice,background]);expect(f.api.collectionConsent().scope).toBe('basic');expect(f.reloads()).toBe(0);expect(f.scripts).toHaveLength(1);
 });

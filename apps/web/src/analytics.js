@@ -1,47 +1,11 @@
+import { allowsGA } from './shared/analytics/consent';
 const configuredContainerId = import.meta.env.PUBLIC_GTM_CONTAINER_ID?.trim();
 const containerId = configuredContainerId && /^GTM-[A-Z0-9]+$/.test(configuredContainerId)
   ? configuredContainerId : undefined;
-const consentKey = 'analytics-consent-v1';
-
-/** @returns {'granted' | 'denied' | null} */
-export function analyticsConsent() {
-  try {
-    const value = localStorage.getItem(consentKey);
-    return value === 'granted' || value === 'denied' ? value : null;
-  } catch { return null; }
-}
-
-/** @param {'granted' | 'denied'} value */
-export function setAnalyticsConsent(value) {
-  try {
-    localStorage.setItem(consentKey, value);
-  } catch {
-    // Stop app events immediately; never reload into a previously saved grant.
-    if (value === 'denied') {
-      sessionConsent = 'denied';
-      try {
-        localStorage.removeItem(consentKey);
-        if (localStorage.getItem(consentKey) === null) {
-          if (initialized) window.location.reload();
-          return true;
-        }
-      } catch { /* The UI reports that the choice could not be saved. */ }
-    }
-    return false;
-  }
-  sessionConsent = value;
-  if (value === 'denied' && initialized) {
-    // Unloading a script cannot stop tags that already executed. Reload without GTM.
-    window.location.reload();
-    return true;
-  }
-  if (value === 'granted') initializeAnalytics();
-  return true;
-}
-
-/** @type {'granted' | 'denied' | null} */
-let sessionConsent = null;
-const allowedParameters = new Set(['story_id','language','question_type','selected','outcome','clue_count','play_duration_seconds','stage','hint_number','page_path','dwell_time_seconds','placement_id','campaign_id','creative_id']);
+// Legacy analytics-consent-v1 is deliberately not imported as an expanded grant.
+export { syncCollectionConsent, saveCollectionConsent, collectionConsent } from './shared/analytics/consent';
+export const analyticsConsent = () => allowsGA() ? 'granted' : 'denied';
+const allowedParameters = new Set(['story_id','language','question_type','selected','outcome','clue_count','play_duration_seconds','stage','hint_number','page_path','dwell_time_seconds']);
 
 /** @param {Record<string, string | number | boolean>} event */
 function pushEvent(event) {
@@ -76,21 +40,22 @@ function savePageDwell({ finish = false } = {}) {
 
 /** Load GTM once, only after explicit analytics consent. */
 export function initializeAnalytics() {
-  if (initialized) return (sessionConsent ?? analyticsConsent()) === 'granted';
-  if (!containerId || typeof window === 'undefined' || (sessionConsent ?? analyticsConsent()) !== 'granted') return false;
+  if (initialized) return analyticsConsent() === 'granted';
+  if (!containerId || typeof window === 'undefined' || analyticsConsent() !== 'granted') return false;
   const browserWindow = /** @type {Window & { dataLayer?: unknown[] }} */ (window);
   browserWindow.dataLayer ??= [];
+  /** @param {...unknown} _args */
+  function googleConsent(..._args) { browserWindow.dataLayer?.push(arguments); }
+  googleConsent('consent', 'default', {analytics_storage:'granted',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
   browserWindow.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) savePageDwell();
     else if (activePage && !activePage.startedAt) activePage.startedAt = Date.now();
   });
   window.addEventListener('pagehide', () => savePageDwell({ finish: true }));
-  window.addEventListener('storage', (event) => {
-    if ((event.key === consentKey && event.newValue !== 'granted') || event.key === null) {
-      sessionConsent = 'denied';
-      window.location.reload();
-    }
+  window.addEventListener('consent:changed', (event) => {
+    if (!allowsGA()) activePage = null;
+    if (!(/** @type {CustomEvent} */ (event)).detail?.pending && !allowsGA()) window.location.reload();
   });
   const script = document.createElement('script');
   script.async = true;
@@ -103,7 +68,7 @@ export function initializeAnalytics() {
 
 /** @param {string} locale */
 export function trackPageView(locale) {
-  if (!initialized || typeof window === 'undefined' || (sessionConsent ?? analyticsConsent()) !== 'granted') return;
+  if (!initialized || typeof window === 'undefined' || analyticsConsent() !== 'granted') return;
   if (activePage?.path === window.location.pathname) return;
   savePageDwell({ finish: true });
   activePage = {
@@ -125,25 +90,10 @@ export function trackPageView(locale) {
 
 /** @param {string} eventName @param {Record<string, string | number | boolean>} [parameters] */
 export function trackEvent(eventName, parameters = {}) {
-  if (!initialized || typeof window === 'undefined' || (sessionConsent ?? analyticsConsent()) !== 'granted') return;
+  if (!initialized || typeof window === 'undefined' || analyticsConsent() !== 'granted') return;
+  if (!/^(page_dwell|story_start|story_abandon|story_attempt_end|case_location_open|case_clue_open|case_question|case_evidence_present|case_accusation_evidence_select|case_hint_view)$/.test(eventName)) return;
   const safe = Object.fromEntries(Object.entries(parameters).filter(([key]) => allowedParameters.has(key)));
   pushEvent({ ...safe, event: eventName });
 }
 
-/** @param {string} placementId @param {string} [campaignId] @param {string} [creativeId] */
-export function trackAdImpression(placementId, campaignId = '', creativeId = '') {
-  trackEvent('ad_impression', {
-    placement_id: placementId,
-    ...(campaignId ? { campaign_id: campaignId } : {}),
-    ...(creativeId ? { creative_id: creativeId } : {}),
-  });
-}
-
-/** @param {string} placementId @param {string} [campaignId] @param {string} [creativeId] */
-export function trackAdClick(placementId, campaignId = '', creativeId = '') {
-  trackEvent('ad_click', {
-    placement_id: placementId,
-    ...(campaignId ? { campaign_id: campaignId } : {}),
-    ...(creativeId ? { creative_id: creativeId } : {}),
-  });
-}
+// Advertising collection is not included in either consent scope.

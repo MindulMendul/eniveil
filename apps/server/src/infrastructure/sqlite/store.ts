@@ -151,6 +151,12 @@ export class Store {
       this.db.transaction(() => {
         this.db.query("DELETE FROM credentials WHERE guest_id=?").run(me.id);
         if (remove) {
+          if (this.db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='collection_consents'").get()) {
+            if (this.db.query("SELECT 1 FROM sqlite_master WHERE name='story_run_events'").get()) this.db.query("DELETE FROM story_run_events WHERE id IN (SELECT id FROM collection_records WHERE kind='event' AND token IN (SELECT token FROM collection_consents WHERE owner=?))").run(me.id);
+            if (this.db.query("SELECT 1 FROM sqlite_master WHERE name='story_rum_vitals'").get()) this.db.query("DELETE FROM story_rum_vitals WHERE id IN (SELECT id FROM collection_records WHERE kind='vital' AND token IN (SELECT token FROM collection_consents WHERE owner=?))").run(me.id);
+            this.db.query('DELETE FROM collection_records WHERE token IN (SELECT token FROM collection_consents WHERE owner=?)').run(me.id);
+            this.db.query('DELETE FROM collection_consents WHERE owner=?').run(me.id);
+          }
           if (this.db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='friend_connections'").get())
             this.db.query('DELETE FROM friend_connections WHERE sender_id=? OR recipient_id=?').run(me.id, me.id);
           if (this.db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='workshop_drafts'").get()) {

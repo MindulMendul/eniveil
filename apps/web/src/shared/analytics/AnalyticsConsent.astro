@@ -1,60 +1,99 @@
 ---
-const enabled = /^GTM-[A-Z0-9]+$/.test(import.meta.env.PUBLIC_GTM_CONTAINER_ID?.trim() ?? '');
-const en = Astro.url.pathname.startsWith('/en');
+import { consentCopy } from './copy';
+const en = Astro.url.pathname === '/en' || Astro.url.pathname.startsWith('/en/');
+const copy = consentCopy[en ? 'en' : 'ko'];
 ---
-{enabled && <aside class="analytics-choice" aria-label={en ? 'Analytics and advertising settings' : '분석 및 광고 설정'}>
-  <button type="button" data-analytics-settings aria-controls="analytics-choice-panel" aria-expanded="false">{en ? 'Analytics and advertising settings' : '분석 및 광고 설정'}</button>
-  <div id="analytics-choice-panel" data-analytics-choice hidden>
-    <p data-analytics-message>{en ? 'Allow analytics and advertising tags?' : '분석 및 광고 태그 사용에 동의하시나요?'}</p>
-    <a data-analytics-privacy href={en ? '/en/privacy/' : '/privacy/'}>{en ? 'Privacy policy' : '개인정보 처리방침'}</a>
-    <button type="button" data-analytics-deny>{en ? 'Deny' : '거부'}</button>
-    <button type="button" data-analytics-allow>{en ? 'Allow' : '허용'}</button>
-    <p data-analytics-error role="alert" hidden></p>
+<aside class="collection-settings" aria-label={copy.settings}>
+  <button type="button" data-collection-settings data-consent-copy="settings" aria-haspopup="dialog">{copy.settings}</button>
+</aside>
+<dialog id="collection-dialog" class="modal ui-modal collection-dialog" aria-labelledby="collection-title" aria-describedby="collection-intro">
+  <div class="collection-body">
+  <h2 id="collection-title" tabindex="-1" data-consent-copy="title">{copy.title}</h2>
+  <p id="collection-intro" data-consent-copy="intro">{copy.intro}</p>
+  <section aria-labelledby="collection-basic-title">
+    <h3 id="collection-basic-title" data-consent-copy="basicTitle">{copy.basicTitle}</h3>
+    <p data-collection-basic data-consent-copy="basic">{copy.basic}</p>
+  </section>
+  <section aria-labelledby="collection-full-title">
+    <h3 id="collection-full-title" data-consent-copy="fullTitle">{copy.fullTitle}</h3>
+    <p data-collection-full data-consent-copy="full">{copy.full}</p>
+  </section>
+  <p data-collection-retention data-consent-copy="retention">{copy.retention}</p>
+  <a data-collection-privacy data-consent-copy="privacy" href={en ? '/en/privacy/' : '/privacy/'}>{copy.privacy}</a>
+  <a data-collection-account href={en ? '/en/mypage/' : '/mypage/'}>{en ? 'Account settings, sign out or delete account' : '계정 관리·로그아웃·탈퇴'}</a>
+  <p data-collection-current role="status"></p>
+  <p data-collection-error role="alert" hidden></p>
   </div>
-</aside>}
+  <div class="collection-actions">
+    <button type="button" data-collection-choice="none" data-consent-copy="noneButton">{copy.noneButton}</button>
+    <button type="button" data-collection-choice="basic" data-consent-copy="basicButton">{copy.basicButton}</button>
+    <button type="button" data-collection-choice="full" data-consent-copy="fullButton">{copy.fullButton}</button>
+  </div>
+</dialog>
 <script>
-  import { analyticsConsent, initializeAnalytics, setAnalyticsConsent, trackPageView } from '../../analytics.js';
-  const choice = document.querySelector<HTMLElement>('[data-analytics-choice]');
-  if (choice) {
-    const button = (selector: string) => document.querySelector<HTMLButtonElement>(selector)!;
-    const settings = button('[data-analytics-settings]');
-    const allow = button('[data-analytics-allow]');
-    const deny = button('[data-analytics-deny]');
-    const message = document.querySelector<HTMLElement>('[data-analytics-message]')!;
-    const error = document.querySelector<HTMLElement>('[data-analytics-error]')!;
-    const privacy = document.querySelector<HTMLAnchorElement>('[data-analytics-privacy]')!;
-    let failedChoice: 'granted' | 'denied' | null = null;
-    const updateError = (en: boolean) => {
-      error.textContent = failedChoice === 'granted'
-        ? (en ? 'Your choice could not be saved. Enable browser storage or try again.' : '선택을 저장할 수 없습니다. 브라우저 저장소를 허용하거나 다시 시도해 주세요.')
-        : (en ? 'Your choice could not be saved. Close all site tabs, then clear the saved consent in browser site data before returning.' : '선택을 저장할 수 없습니다. 사이트의 모든 탭을 닫고 다시 방문하기 전에 브라우저 사이트 데이터에서 저장된 동의를 삭제해 주세요.');
-    };
-    const sync = () => {
-      const en = location.pathname === '/en' || location.pathname.startsWith('/en/');
-      settings.textContent = en ? 'Analytics and advertising settings' : '분석 및 광고 설정';
-      settings.closest('aside')?.setAttribute('aria-label', settings.textContent);
-      allow.textContent = en ? 'Allow' : '허용'; deny.textContent = en ? 'Deny' : '거부';
-      message.textContent = en ? 'Allow analytics and advertising tags?' : '분석 및 광고 태그 사용에 동의하시나요?';
-      privacy.textContent = en ? 'Privacy policy' : '개인정보 처리방침';
-      privacy.href = en ? '/en/privacy/' : '/privacy/';
-      updateError(en);
-      trackPageView(en ? 'en' : 'ko');
-    };
-    choice.hidden = analyticsConsent() !== null;
-    settings.setAttribute('aria-expanded', String(!choice.hidden));
-    settings.onclick = () => { choice.hidden = false; settings.setAttribute('aria-expanded', 'true'); deny.focus(); };
-    const choose = (value: 'granted' | 'denied') => {
-      if (!setAnalyticsConsent(value)) { failedChoice = value; updateError(location.pathname === '/en' || location.pathname.startsWith('/en/')); error.hidden = false; return; }
-      failedChoice = null; error.hidden = true; choice.hidden = true; settings.setAttribute('aria-expanded', 'false'); settings.focus();
-    };
-    allow.onclick = () => choose('granted'); deny.onclick = () => choose('denied');
-    window.addEventListener('site:navigation', sync);
-    initializeAnalytics(); sync();
-  }
+  import { consentCopy } from './copy';
+  import { collectionConsent, saveCollectionConsent, syncCollectionConsent, watchCollectionConsent } from './consent';
+  import { initializeAnalytics, trackPageView } from '../../analytics.js';
+  import type { ConsentScope } from '@festival/shared/consent';
+  const dialog = document.querySelector<HTMLDialogElement>('#collection-dialog')!;
+  const settings = document.querySelector<HTMLButtonElement>('[data-collection-settings]')!;
+  const buttons = [...dialog.querySelectorAll<HTMLButtonElement>('[data-collection-choice]')];
+  const error = dialog.querySelector<HTMLElement>('[data-collection-error]')!;
+  let busy = false;
+  let opener: HTMLElement | null = null;
+  const isEnglish = () => location.pathname === '/en' || location.pathname.startsWith('/en/');
+  const open = () => { if (!dialog.open) { opener = document.activeElement instanceof HTMLElement ? document.activeElement : null; dialog.showModal(); dialog.querySelector<HTMLElement>('#collection-title')!.focus(); } };
+  const close = () => { dialog.close(); (opener?.isConnected && opener !== document.body ? opener : settings).focus(); };
+  const update = (prompt = false) => {
+    const copy = consentCopy[isEnglish() ? 'en' : 'ko'];
+    for (const node of document.querySelectorAll<HTMLElement>('[data-consent-copy]')) node.textContent = copy[node.dataset.consentCopy as keyof typeof copy];
+    settings.closest('aside')?.setAttribute('aria-label', copy.settings);
+    dialog.querySelector<HTMLAnchorElement>('[data-collection-privacy]')!.href = isEnglish() ? '/en/privacy/' : '/privacy/';
+    const accountLink = dialog.querySelector<HTMLAnchorElement>('[data-collection-account]')!;
+    accountLink.href = isEnglish() ? '/en/mypage/' : '/mypage/'; accountLink.textContent = isEnglish() ? 'Account settings, sign out or delete account' : '계정 관리·로그아웃·탈퇴';
+    const scope = collectionConsent()?.scope;
+    const en = isEnglish();
+    const names = en ? {none:'Not collected',basic:'Basic only',full:'Full collection'} : {none:'수집 안 함',basic:'기본 수집',full:'전체 수집'};
+    dialog.querySelector<HTMLElement>('[data-collection-current]')!.textContent = scope ? `${en ? 'Current choice' : '현재 선택'}: ${names[scope]}` : '';
+    initializeAnalytics();
+    if (prompt && !scope) open();
+  };
+  settings.onclick = open;
+  window.addEventListener('consent:required', open);
+  for (const button of buttons) button.onclick = async () => {
+    if (busy) return; busy = true; error.hidden = true; buttons.forEach(b => b.disabled = true);
+    try { await saveCollectionConsent(button.dataset.collectionChoice as ConsentScope); close(); }
+    catch { error.textContent = isEnglish() ? 'Your choice could not be saved. Allow site cookies and retry. If withdrawing, close all site tabs until it is saved; previously loaded external tags may still run.' : '선택을 저장할 수 없습니다. 사이트 쿠키를 허용하고 다시 시도해 주세요. 철회 중이라면 저장될 때까지 모든 사이트 탭을 닫아 주세요. 이미 실행된 외부 태그는 계속 실행될 수 있습니다.'; error.hidden = false; }
+    finally { busy = false; buttons.forEach(b => b.disabled = false); }
+  };
+  dialog.addEventListener('cancel', event => { event.preventDefault(); if (!busy) close(); });
+  dialog.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const focusable = [...dialog.querySelectorAll<HTMLElement>('a[href],button:not(:disabled)')];
+    const first = focusable[0], last = focusable.at(-1);
+    if (event.shiftKey && (document.activeElement === first || document.activeElement?.id === 'collection-title')) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  });
+  window.addEventListener('consent:changed', event => { if (!(event as CustomEvent).detail?.pending) update(true); });
+  window.addEventListener('site:navigation', () => { update(); trackPageView(isEnglish() ? 'en' : 'ko'); });
+  watchCollectionConsent();
+  void syncCollectionConsent().catch(() => { error.textContent = isEnglish() ? 'Could not load your preferences. Data collection is paused. Please try again.' : '설정을 불러오지 못해 데이터 수집을 중단했습니다. 다시 시도해 주세요.'; error.hidden = false; open(); });
 </script>
 <style>
-  .analytics-choice{padding:var(--spacing-4);position:relative;z-index:1;border-top:1px solid currentColor;font:inherit}
-  button{font:inherit;min-height:44px;padding:var(--spacing-2) var(--spacing-3);cursor:pointer;margin:var(--spacing-1)}
-  p{margin:var(--spacing-2) 0;line-height:1.6}
+  .collection-settings{padding:var(--spacing-4);border-top:var(--border-thin) solid var(--color-festival-line)}
+  .collection-dialog{width:min(44rem,calc(100% - var(--spacing-6)));padding:var(--spacing-6);overflow:hidden}
+  .collection-dialog[open]{display:flex;flex-direction:column}
+  .collection-body{overflow:auto;min-height:0;overscroll-behavior:contain}
+  .collection-dialog::backdrop{background:var(--color-festival-modal-backdrop)}
+  h2{font-size:var(--typography-size-control-6);line-height:1.4;margin-bottom:var(--spacing-4)}
+  h3{font-size:1.1rem;line-height:1.5;margin:0 0 var(--spacing-2)}
+  p{line-height:1.7;margin:var(--spacing-3) 0}
+  section{padding:var(--spacing-4);margin:var(--spacing-4) 0;border:var(--border-thin) solid var(--color-festival-line)}
+  .collection-body>a{display:inline-flex;align-items:center;min-height:44px;margin-right:var(--spacing-3);max-width:100%}
+  .collection-actions{flex-shrink:0;display:flex;flex-wrap:wrap;gap:var(--spacing-3);margin-top:var(--spacing-4)}
+  button{font:inherit;min-height:44px;padding:var(--spacing-3) var(--spacing-4);border:var(--border-thin) solid var(--color-festival-line);background:var(--color-festival-panel);color:var(--color-festival-text);cursor:pointer}
+  button:disabled{opacity:.6;cursor:wait}
+  [data-collection-choice="full"]{background:var(--color-festival-gold);color:var(--color-festival-bg)}
   [hidden]{display:none}
+  @media(max-width:480px){.collection-dialog{padding:var(--spacing-4)}.collection-actions{flex-direction:column}.collection-actions button{width:100%}}
 </style>
