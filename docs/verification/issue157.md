@@ -114,3 +114,6 @@
 - `367d064` dev 통합 커밋 `61017b0`의 소개 페이지 충돌 해결은 공통 스타일과 AnalyticsConsent import를 모두 보존했다. 신규 분석 동의 컴포넌트 패딩도 같은 크기의 spacing 변수로 연결했다.
 - 최종 `bash scripts/codex/verify.sh --browser`: check/build 및 106 tests / 5,312 assertions 통과. `test:e2e` 부재로 wrapper 마지막 단계는 여전히 exit 1이다.
 - GTM 설정이 있는 실제 Chromium ko/en × 320/1280에서 소개 본문 `32px 20px`, 동의 영역 `16px`, 거부 버튼 `8px 12px` 계산값 확인. 거부 후 6개 대표 경로와 게스트 로그인·작품 필터 회귀를 재검증했고 가로 넘침·pageerror는 없었다. 최초 시도는 Astro 개발 도구막대가 거부 버튼을 가려 실패했으며 도구막대만 테스트 스타일로 숨겨 재검증했다.
+
+- Qodo의 같은 동의 버튼 규칙에 남은 마진 리터럴 지적을 반영해 버튼은 spacing-1, 문단은 spacing-2로 연결했다. 기존 4px / 8px 값은 유지한다.
+- 마진 수정 후 최종 정적 빌드를 별도 임시 HTTP 서버로 제공해 Chromium ko/en × 320/1280에서 버튼 margin 4px·padding 8px 12px, 문단 margin 8px 0px, 동의 영역 padding 16px 및 거부·가로 넘침 없음을 검증했다. 임시 서버는 검사 종료 시 정리했다. 최종 기본 검사도 106 tests / 5,312 assertions로 다시 통과했다.
