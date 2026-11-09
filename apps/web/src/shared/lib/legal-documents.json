@@ -92,7 +92,7 @@
         {
           "title": "데이터 수집 범위 변경",
           "paragraphs": [
-            "선택은 이 브라우저와 현재 계정에 30일간 적용합니다. 첫 로그인 계정과 연결하고, 이후 계정 변경·다른 기기에는 동의를 자동 이전하지 않습니다. 기존 분석 동의를 전체 동의로 간주하지 않습니다. 개인정보 안내와 데이터 수집 설정·로그아웃·탈퇴는 동의 전에도 이용할 수 있습니다.",
+            "로그인 전 선택은 15분간 유효합니다. 전체 동의 후 5분 안에 로그인하면 해당 계정과 이 브라우저에 연결해 30일간 적용합니다. 이후 계정 변경·다른 기기에는 동의를 자동 이전하지 않습니다. 기존 분석 동의를 전체 동의로 간주하지 않습니다. 개인정보 안내와 데이터 수집 설정·로그아웃·탈퇴는 동의 전에도 이용할 수 있습니다.",
             "전체 수집의 추가 분석 기록은 30일 보관 후 정기 삭제합니다. 기본 수집 전환·철회 시 해당 동의에 연결된 추가 기록을 즉시 삭제하고 이후 이용을 제한합니다. 게임 진행·작성한 평점 등 운영 데이터는 해당 서비스의 보관 정책을 따릅니다. GA·Faro로 이미 전송된 정보는 각 분석 시스템의 보관·삭제 설정에 따르며, 이 설정 변경이 과거 전송 데이터를 자동 삭제하지는 않습니다."
           ]
         }
@@ -192,7 +192,7 @@
         {
           "title": "Changing collection scope",
           "paragraphs": [
-            "The choice applies to this browser and current account for 30 days. It links to your first sign-in and does not automatically transfer to later accounts or other devices. Legacy analytics consent does not become full consent. Privacy information, collection settings, sign-out and account deletion remain accessible without full consent.",
+            "Before sign-in, the choice lasts 15 minutes. Signing in within 5 minutes of full consent links it to that account and browser for 30 days. It does not automatically transfer to later accounts or other devices. Legacy analytics consent does not become full consent. Privacy information, collection settings, sign-out and account deletion remain accessible without full consent.",
             "Additional full-scope records are retained for 30 days and periodically removed. Switching to Basic or withdrawing immediately deletes additional records linked to that choice and restricts further service use. Operational game state and submitted ratings follow their service retention policies. Data previously sent to GA or Faro follows each system's retention and deletion settings; changing this preference does not automatically delete previously transmitted data."
           ]
         }

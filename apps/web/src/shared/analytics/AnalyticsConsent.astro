@@ -4,6 +4,8 @@ const en = Astro.url.pathname === '/en' || Astro.url.pathname.startsWith('/en/')
 const copy = consentCopy[en ? 'en' : 'ko'];
 ---
 <aside class="collection-settings" aria-label={copy.settings}>
+  <p data-collection-sync-status role="status" hidden></p>
+  <button type="button" data-collection-retry hidden>{en ? 'Retry preferences' : '설정 다시 확인'}</button>
   <button type="button" data-collection-settings data-consent-copy="settings" aria-haspopup="dialog">{copy.settings}</button>
 </aside>
 <dialog id="collection-dialog" class="modal ui-modal collection-dialog" aria-labelledby="collection-title" aria-describedby="collection-intro">
@@ -32,7 +34,7 @@ const copy = consentCopy[en ? 'en' : 'ko'];
 </dialog>
 <script>
   import { consentCopy } from './copy';
-  import { collectionConsent, saveCollectionConsent, syncCollectionConsent, watchCollectionConsent } from './consent';
+  import { collectionConsent, consentProblem, saveCollectionConsent, syncCollectionConsent, watchCollectionConsent } from './consent';
   import { initializeAnalytics, trackPageView } from '../../analytics.js';
   import type { ConsentScope } from '@festival/shared/consent';
   const dialog = document.querySelector<HTMLDialogElement>('#collection-dialog')!;
@@ -58,11 +60,19 @@ const copy = consentCopy[en ? 'en' : 'ko'];
     initializeAnalytics();
     if (prompt && !scope) open();
   };
+  const syncStatus = document.querySelector<HTMLElement>('[data-collection-sync-status]')!;
+  const retry = document.querySelector<HTMLButtonElement>('[data-collection-retry]')!;
+  const showProblem = () => {
+    const message = isEnglish() ? 'Preferences could not be confirmed. Browser analytics are paused. Retry to confirm; a failed withdrawal has not yet been confirmed by the server.' : '설정을 확인하지 못해 브라우저 분석 전송을 일시 중단했습니다. 다시 확인해 주세요. 철회 저장 실패 시 서버의 동의 변경을 아직 확인하지 못한 상태입니다.';
+    error.textContent = message; error.hidden = false;
+    syncStatus.textContent = message; syncStatus.hidden = false; retry.hidden = false;
+  };
+  retry.onclick = () => { void syncCollectionConsent(true).catch(showProblem); };
   settings.onclick = open;
   window.addEventListener('consent:required', open);
   for (const button of buttons) button.onclick = async () => {
     if (busy) return; busy = true; error.hidden = true; buttons.forEach(b => b.disabled = true);
-    try { await saveCollectionConsent(button.dataset.collectionChoice as ConsentScope); close(); }
+    try { await saveCollectionConsent(button.dataset.collectionChoice as ConsentScope); if (consentProblem()) { showProblem(); open(); } else close(); }
     catch { error.textContent = isEnglish() ? 'Your choice could not be saved. Allow site cookies and retry. If withdrawing, close all site tabs until it is saved; previously loaded external tags may still run.' : '선택을 저장할 수 없습니다. 사이트 쿠키를 허용하고 다시 시도해 주세요. 철회 중이라면 저장될 때까지 모든 사이트 탭을 닫아 주세요. 이미 실행된 외부 태그는 계속 실행될 수 있습니다.'; error.hidden = false; }
     finally { busy = false; buttons.forEach(b => b.disabled = false); }
   };
@@ -74,7 +84,12 @@ const copy = consentCopy[en ? 'en' : 'ko'];
     if (event.shiftKey && (document.activeElement === first || document.activeElement?.id === 'collection-title')) { event.preventDefault(); last?.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   });
-  window.addEventListener('consent:changed', event => { if (!(event as CustomEvent).detail?.pending) update(true); });
+  window.addEventListener('consent:changed', event => {
+    const detail = (event as CustomEvent).detail;
+    if (detail?.pending) return;
+    if (detail?.error) { showProblem(); if (!collectionConsent() || consentProblem() === 'unsaved-restriction') open(); return; }
+    syncStatus.hidden = true; retry.hidden = true; error.hidden = true; update(true);
+  });
   window.addEventListener('site:navigation', () => { update(); trackPageView(isEnglish() ? 'en' : 'ko'); });
   watchCollectionConsent();
   void syncCollectionConsent().catch(() => { error.textContent = isEnglish() ? 'Could not load your preferences. Data collection is paused. Please try again.' : '설정을 불러오지 못해 데이터 수집을 중단했습니다. 다시 시도해 주세요.'; error.hidden = false; open(); });

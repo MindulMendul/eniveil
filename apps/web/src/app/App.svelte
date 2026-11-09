@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { allowsPlayAnalytics } from "../shared/analytics/consent";
+  import { allowsService } from "../shared/analytics/consent";
   import { WORKSHOP_AUTHORING_ENABLED } from "@festival/shared/features";
   import RoomSocial from "../features/friends/RoomSocial.svelte";
   import EntryIntro from "../pages/entry/ui/EntryIntro.svelte";
@@ -148,7 +148,7 @@
     const data = await response.json();
     if (!currentAuth(generation)) throw new DOMException("Cancelled account request", "AbortError");
     if (!response.ok) {
-      if (data.code === 'FULL_CONSENT_REQUIRED') window.dispatchEvent(new Event('consent:required'));
+      if (data.code === 'FULL_CONSENT_REQUIRED') { window.dispatchEvent(new Event('consent:account')); window.dispatchEvent(new Event('consent:required')); }
       throw Object.assign(new Error(data.code === 'FULL_CONSENT_REQUIRED' ? (locale === 'en' ? 'Full consent is required to use this service.' : '서비스 이용에는 전체 동의가 필요합니다.') : data.error ?? "요청에 실패했어."), { status: response.status, code: data.code });
     }
     return data;
@@ -213,7 +213,7 @@
       pending.clear();
       soloStartRequest = null;
       busy = false;
-      if (!disposed && allowsPlayAnalytics()) {
+      if (!disposed && allowsService()) {
         reconnectTimer = setTimeout(async () => {
           try {
             const next = await api("/lobby/state");
@@ -330,7 +330,7 @@
     const nextAccount = await api("/platform/account");
     if (!currentAuth(generation)) return;
     account = nextAccount;
-    if (account.me && !account.needsNickname) {
+    if (account.me && !account.needsNickname && allowsService()) {
       const next = await api("/lobby/state");
       if (!currentAuth(generation)) return;
       snapshot = next;
@@ -391,7 +391,7 @@
     } catch { /* Ignore an invalid saved destination; never navigate to an arbitrary URL. */ }
   }
   async function googleLogin() {
-    if (!allowsPlayAnalytics()) { window.dispatchEvent(new Event('consent:required')); return; }
+    if (!allowsService()) { window.dispatchEvent(new Event('consent:required')); return; }
     if (authConfig.google) { rememberGoogleAction(); location.assign(`/api/platform/auth/google?locale=${locale}`); return; }
     await action(async () => {
       if (!authConfig.demo) throw Error(locale === "en" ? "Google sign-in is not configured. Please use guest sign-in." : "구글 로그인 설정이 필요해요. 게스트 로그인을 이용해 주세요.");
@@ -425,7 +425,7 @@
     });
   }
   async function login() {
-    if (!allowsPlayAnalytics()) { window.dispatchEvent(new Event('consent:required')); return; }
+    if (!allowsService()) { window.dispatchEvent(new Event('consent:required')); return; }
     const resume = loginDialog?.open ? pendingWorkshopAction : undefined;
     pendingWorkshopAction = undefined;
     await action(async () => {
@@ -486,8 +486,9 @@
 
   onMount(() => {
     const syncCollectionState = (event: Event) => {
-      if ((event as CustomEvent).detail?.pending) return;
-      if (allowsPlayAnalytics()) { void action(loadAccount); return; }
+      const detail = (event as CustomEvent).detail;
+      if ((detail?.pending || detail?.error) && !detail?.restricting && !detail?.forceUnload) return;
+      if (allowsService()) { void action(loadAccount); return; }
       if (socket) { socket.onclose = null; socket.close(); }
       clearTimeout(reconnectTimer);
       snapshot = null;

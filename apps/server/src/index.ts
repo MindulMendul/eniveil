@@ -28,7 +28,7 @@ export const store = new Store(
   process.env.DATABASE_PATH ?? "./data/festival.sqlite",
 );
 export const game = new Game(store, storyCatalog);
-const collectionConsent = new ConsentService(store, owner => lobby.disconnect(owner));
+const collectionConsent = new ConsentService(store, token => lobby.disconnectConsent(token), production);
 const storyRunStore = new SQLiteStoryRunStore(store.db, { collection: { allows: collectionConsent.acceptsRecord, recorded: collectionConsent.recorded } });
 const workshopStore = new SQLiteWorkshopStore(store.db);
 const playCatalog = new PlayStoryCatalog(fileStoryCatalog, workshopStore);
@@ -80,12 +80,12 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-const lobby = createLobbyRoutes({ store, game, notifyTemporal, canUse: collectionConsent.permitsRequest });
+const lobby = createLobbyRoutes({ store, game, notifyTemporal, consentGrant: collectionConsent.connectionGrant });
 const google = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.APP_ORIGIN
   ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, origin: new URL(process.env.APP_ORIGIN).origin }
   : undefined;
 app.use("/api/*", collectionConsent.middleware);
-app.route("/api/platform", collectionConsent.routes(production));
+app.route("/api/platform", collectionConsent.routes());
 app.route("/api/platform", createAccountRoutes({ store, production, google, onLogout: lobby.disconnect, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
 app.route('/api/friends', createFriendRoutes(store, { isOnline: id => (game.online.get(id) ?? 0) > 0 }));
 app.route("/api/platform", createPlatformRoutes({

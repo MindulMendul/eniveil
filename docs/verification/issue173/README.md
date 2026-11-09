@@ -2,7 +2,7 @@
 
 최종 정책은 **전체 동의 후 로그인·플레이**, 목적은 **게임 품질·난이도·개인 실력 지표만**이다. 기본은 GA만 허용하고 서비스 이용은 제한한다. 광고 이벤트는 전송하지 않고 Google 광고 관련 consent는 denied다. 난이도/MMR 계산·표시 자체는 이번 작업에 포함하지 않았다.
 
-타입·빌드·기본 verify, 단위123 tests/5,429 assertions + HTML 통합1 test/15 assertions, 합계124 tests/5,444 assertions 통과. 배포 설정 Python13 tests 통과. `--browser` 래퍼는 test:e2e 부재로 exit1이며 실제 Chromium 검증으로 보완했다.
+타입·빌드·기본 verify, 단위129 tests/5,480 assertions + HTML 통합1 test/15 assertions, 합계130 tests/5,495 assertions 통과. 배포 설정 Python13 tests 통과. `--browser` 래퍼는 test:e2e 부재로 exit1이며 실제 Chromium 검증으로 보완했다.
 
 ## 실제 브라우저
 

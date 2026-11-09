@@ -50,12 +50,15 @@ export function initializeAnalytics() {
   browserWindow.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) savePageDwell();
-    else if (activePage && !activePage.startedAt) activePage.startedAt = Date.now();
+    else if (allowsGA() && activePage && !activePage.startedAt) activePage.startedAt = Date.now();
   });
   window.addEventListener('pagehide', () => savePageDwell({ finish: true }));
   window.addEventListener('consent:changed', (event) => {
-    if (!allowsGA()) activePage = null;
-    if (!(/** @type {CustomEvent} */ (event)).detail?.pending && !allowsGA()) window.location.reload();
+    const detail = (/** @type {CustomEvent} */ (event)).detail;
+    googleConsent('consent','update',{analytics_storage:allowsGA()?'granted':'denied',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
+    if (detail?.pending || detail?.error) { savePageDwell(); return; }
+    if (!allowsGA()) { activePage = null; window.location.reload(); }
+    else if (activePage && !activePage.startedAt && !document.hidden) activePage.startedAt = Date.now();
   });
   const script = document.createElement('script');
   script.async = true;

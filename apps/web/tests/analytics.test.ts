@@ -2,17 +2,21 @@ import { expect, test } from 'bun:test';
 import { runInNewContext } from 'node:vm';
 async function analytics(id='GTM-56Q5K95G') {
  const bundle=await Bun.build({entrypoints:[new URL('../src/analytics.js',import.meta.url).pathname],target:'browser',format:'cjs',define:{'import.meta.env.PUBLIC_GTM_CONTAINER_ID':JSON.stringify(id)}});
+ let now=Date.now();
+ class Clock extends Date{static now(){return now}}
+ const session=new Map<string,string>();
  const scripts:any[]=[],listeners:Record<string,((e:any)=>void)[]>={};let stored:any=null,reloads=0,fail=false,persist=true;
  const on=(name:string,fn:(e:any)=>void)=>{(listeners[name]??=[]).push(fn)};
  class CustomEvent {constructor(public type:string,public options:any={}){}get detail(){return this.options.detail}}
  const window:any={location:{pathname:'/',origin:'https://example.com',reload:()=>reloads++},addEventListener:on,dispatchEvent:(e:CustomEvent)=>listeners[e.type]?.forEach(fn=>fn(e))};
- const context={module:{exports:{} as any},window,CustomEvent,Date,
+ const context={module:{exports:{} as any},window,CustomEvent,Date:Clock,
   localStorage:{getItem:()=> 'granted',setItem:()=>{throw Error('blocked')}},
+  sessionStorage:{getItem:(key:string)=>session.get(key)??null,setItem:(key:string,value:string)=>session.set(key,value),removeItem:(key:string)=>session.delete(key)},
   document:{hidden:false,addEventListener:on,createElement:()=>({}),head:{append:(s:any)=>scripts.push(s)}},
-  fetch:async(_url:string,init:any={})=>{if(fail)throw Error('network');if(init.method==='POST'){const b=JSON.parse(init.body);const value={...b,updatedAt:new Date().toISOString(),accountId:null};if(persist)stored=value;return{ok:true,json:async()=>({consent:value})}}return{ok:true,json:async()=>({consent:stored})}}
+  fetch:async(_url:string,init:any={})=>{if(fail)throw Error('network');if(init.method==='POST'){const b=JSON.parse(init.body);const value={...b,updatedAt:new Date(now).toISOString(),accountId:null};if(persist)stored=value;return{ok:true,json:async()=>({consent:value})}}return{ok:true,json:async()=>({consent:stored})}}
  };
  runInNewContext(await bundle.outputs[0]!.text(),context);
- return{api:context.module.exports,window,scripts,reloads:()=>reloads,setFail:(v:boolean)=>fail=v,setPersist:(v:boolean)=>persist=v};
+ return{api:context.module.exports,window,scripts,listeners,document:context.document,advance:(ms:number)=>{now+=ms},reloads:()=>reloads,setFail:(v:boolean)=>fail=v,setPersist:(v:boolean)=>persist=v};
 }
 
 test('legacy grant is not expanded; explicit basic enables one GTM and sanitizes events',async()=>{
@@ -47,4 +51,25 @@ test('background account/connection refresh cannot invalidate an in-flight expli
  const f=await analytics();await f.api.saveCollectionConsent('full');f.api.initializeAnalytics();
  const choice=f.api.saveCollectionConsent('basic');const background=f.api.syncCollectionConsent(true);
  await Promise.all([choice,background]);expect(f.api.collectionConsent().scope).toBe('basic');expect(f.reloads()).toBe(0);expect(f.scripts).toHaveLength(1);
+});
+
+
+test('transient background read failure pauses analytics without reloading the game',async()=>{
+ const f=await analytics();await f.api.saveCollectionConsent('full');f.api.initializeAnalytics();f.setFail(true);
+ await expect(f.api.syncCollectionConsent(true)).rejects.toThrow('network');expect(f.reloads()).toBe(0);expect(f.api.initializeAnalytics()).toBe(false);
+ f.setFail(false);await f.api.syncCollectionConsent(true);expect(f.api.initializeAnalytics()).toBe(true);expect(f.reloads()).toBe(0);expect(f.scripts).toHaveLength(1);
+});
+
+test('failed withdrawal unloads tags and a later read cannot silently restore them',async()=>{
+ const f=await analytics();await f.api.saveCollectionConsent('full');f.api.initializeAnalytics();f.setFail(true);
+ await expect(f.api.saveCollectionConsent('none')).rejects.toThrow('network');expect(f.reloads()).toBe(1);
+ f.setFail(false);await f.api.syncCollectionConsent(true);expect(f.api.initializeAnalytics()).toBe(false);
+ await f.api.saveCollectionConsent('none');expect(f.api.collectionConsent().scope).toBe('none');
+});
+
+test('page dwell survives a consent refocus check without a duplicate page view',async()=>{
+ const f=await analytics();await f.api.saveCollectionConsent('basic');f.api.initializeAnalytics();f.advance(5000);
+ await f.api.syncCollectionConsent(true);f.advance(2000);f.listeners.pagehide[0]({});
+ expect(f.window.dataLayer.filter((e:any)=>e.event==='page_view')).toHaveLength(1);
+ expect(f.window.dataLayer.find((e:any)=>e.event==='page_dwell')?.dwell_time_seconds).toBe(7);
 });

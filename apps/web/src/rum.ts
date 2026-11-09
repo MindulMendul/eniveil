@@ -21,10 +21,11 @@ export function initRUM() {
   if (!watchingConsent) {
     watchingConsent = true;
     window.addEventListener('consent:changed', event => {
-      const pending = (event as CustomEvent).detail?.pending;
+      const detail = (event as CustomEvent).detail;
+      const transient = detail?.pending || detail?.error;
       if (!allowsPlayAnalytics()) {
         faro?.pause();
-        if (faro && !pending) window.location.reload();
+        if (faro && !transient) window.location.reload();
       } else if (faro) faro.unpause();
       else initRUM();
     });
