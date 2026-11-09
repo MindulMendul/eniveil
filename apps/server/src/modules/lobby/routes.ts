@@ -8,6 +8,7 @@ import type { Store } from "../../store";
 import type { Game } from "../game/game";
 import type { ApiEnv } from "../http/env";
 
+import { socialRoutes } from "./social";
 import { ReconnectGrace } from "./reconnect-grace";
 import { notifySessionExpiry } from "./session-expiry";
 
@@ -20,12 +21,13 @@ export function createLobbyRoutes(deps: {
 }) {
   const app = new Hono<ApiEnv>();
   const { upgradeWebSocket, websocket } = createBunWebSocket();
-  const sockets = new Map<WSContext, { guest: Guest; expires: number }>();
+  const sockets = new Map<WSContext, { guest: Guest; expires: number; lobby: boolean }>();
   const broadcast = () => {
     for (const [ws, { guest, expires }] of sockets) {
       if (expires <= Date.now()) { ws.close(1008, "Expired"); continue; }
       try {
         ws.send(JSON.stringify({ type: "snapshot", data: deps.game.snapshot(guest) }));
+        ws.send(JSON.stringify({ type: "social-changed" }));
       } catch {
         /* close handler clears presence */
       }
@@ -45,6 +47,19 @@ export function createLobbyRoutes(deps: {
     c.header("Cache-Control", "no-store");
     await next();
   });
+  const pinAttempts = new Map<string, { count: number; until: number }>();
+  app.use("*", async (c, next) => {
+    if (c.req.method !== "POST" || !(c.req.path.endsWith("/rooms/join") || c.req.path.endsWith("/respond"))) return next();
+    const now = Date.now();
+    for (const [id, value] of pinAttempts) if (value.until <= now) pinAttempts.delete(id);
+    const id = c.get("guest").id;
+    const bucket = pinAttempts.get(id) ?? { count: 0, until: now + 60000 };
+    if (pinAttempts.size >= 4096 && !pinAttempts.has(id)) return c.json({ error: "잠시 후 다시 시도해 줘." }, 429);
+    pinAttempts.set(id, bucket);
+    if (++bucket.count > 20) { c.header("Retry-After", "60"); return c.json({ error: "잠시 후 다시 시도해 줘." }, 429); }
+    await next();
+  });
+  app.route("/", socialRoutes(deps.store, deps.game, broadcast, id => [...sockets.values()].some(entry => entry.guest.id === id && entry.lobby && entry.expires > Date.now())));
   app.get("/stories", (c) => {
     const query = c.req.query();
     const integer = (key: string, fallback: number, min: number, max: number) => {
@@ -82,14 +97,14 @@ export function createLobbyRoutes(deps: {
   });
   app.get("/state", (c) => c.json(deps.game.snapshot(c.get("guest"))));
   app.post("/rooms", async (c) => {
-    const { scenarioId } = createRoomSchema.parse(await c.req.json());
-    const room = deps.game.create(c.get("guest"), scenarioId);
+    const { scenarioId, access, pin } = createRoomSchema.parse(await c.req.json());
+    const room = deps.game.create(c.get("guest"), scenarioId, access, pin);
     broadcast();
     return c.json({ roomId: room.id }, 201);
   });
   app.post("/rooms/join", async (c) => {
-    const { code } = joinRoomSchema.parse(await c.req.json());
-    const room = deps.game.join(c.get("guest"), code);
+    const { code, pin } = joinRoomSchema.parse(await c.req.json());
+    const room = deps.game.join(c.get("guest"), code, pin);
     broadcast();
     return c.json({ roomId: room.id });
   });
@@ -115,7 +130,7 @@ export function createLobbyRoutes(deps: {
       return {
         onOpen(_event, ws) {
           connection = ws;
-          sockets.set(ws, { guest, expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
+          sockets.set(ws, { guest, lobby: false, expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
           presence.connect(guest.id);
           broadcast();
         },
@@ -136,6 +151,12 @@ export function createLobbyRoutes(deps: {
               throw Error("올바르지 않은 메시지야.");
             const command = commandSchema.parse(JSON.parse(event.data));
             requestId = command.requestId;
+            if (command.type === "presence") {
+              const entry = connection ? sockets.get(connection) : undefined;
+              if (entry) entry.lobby = command.lobby;
+              broadcast();
+              return;
+            }
             const room = deps.game.needRoom(guest.id);
             const previousSessionId = room.sessionId;
             deps.game.command(guest, command);

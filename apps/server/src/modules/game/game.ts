@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type {
   Command,
   Guest,
@@ -31,6 +32,7 @@ export class Game {
   summary(r: Room): RoomSummary {
     const s = this.storyCatalog.get(r.scenarioId)!.scenario;
     return {
+      access: r.access ?? "public",
       id: r.id,
       code: r.code,
       title: r.mode === "solo" ? supportedSoloStory.title : s.title,
@@ -103,7 +105,7 @@ export class Game {
       me,
       scenarios: this.storyCatalog.list(),
       rooms: Object.values(this.state.rooms)
-        .filter((room) => this.joinError(room) === null)
+        .filter((room) => this.joinError(room) === null && (room.access !== "friends" || !!this.store.areFriends?.(room.hostId, me.id)))
         .map((room) => this.summary(room)),
       room,
     };
@@ -184,7 +186,9 @@ export class Game {
       offset: query.offset,
     };
   }
-  create(me: Guest, scenarioId: string) {
+  create(me: Guest, scenarioId: string, access: import("@festival/shared").RoomAccess = "public", pin?: string) {
+    if (!["public", "friends", "secret"].includes(access)) throw Error("방 종류를 확인해 줘.");
+    if (access === "secret" && !/^\d{4}$/.test(pin ?? "")) throw Error("숫자 4자리 PIN을 입력해 줘.");
     if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
     const scenario = this.storyCatalog
       .list()
@@ -198,6 +202,8 @@ export class Game {
       id: crypto.randomUUID(),
       code,
       hostId: me.id,
+      access,
+      ...(access === "secret" ? { pinHash: this.hashPin(code, pin!) } : {}),
       scenarioId,
       mode: scenarioId === supportedSoloStory.id ? 'solo' : 'multiplayer',
       memberIds: [me.id],
@@ -207,11 +213,16 @@ export class Game {
     this.store.save();
     return r;
   }
-  join(me: Guest, code: string) {
+  private hashPin(code: string, pin: string) {
+    return createHash("sha256").update(code + ":" + pin).digest("hex");
+  }
+  join(me: Guest, code: string, pin?: string) {
     const r = Object.values(this.state.rooms).find((r) => r.code === code);
     if (!r) throw Error("초대 코드에 해당하는 방이 없어.");
     if (r.memberIds.includes(me.id)) return r;
     if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
+    if (r.access === "friends" && !this.store.areFriends?.(r.hostId, me.id)) throw Error("방장의 친구만 입장할 수 있어.");
+    if (r.access === "secret" && (!r.pinHash || !timingSafeEqual(Buffer.from(r.pinHash), Buffer.from(this.hashPin(r.code, pin ?? ""))))) throw Error("PIN을 확인해 줘.");
     const error = this.joinError(r);
     if (error) throw new Error(error);
     r.memberIds.push(me.id);

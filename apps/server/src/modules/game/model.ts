@@ -1,6 +1,8 @@
 import type { Guest } from "@festival/shared";
 
 export type Room = {
+  access?: import("@festival/shared").RoomAccess;
+  pinHash?: string;
   id: string;
   code: string;
   hostId: string;

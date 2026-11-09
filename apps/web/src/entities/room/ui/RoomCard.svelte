@@ -15,6 +15,7 @@
     <span class="eyebrow section-eyebrow">{room.status === "playing" ? "IN PROGRESS" : "WAITING"}</span>
     <span class="muted">{room.count} / {room.capacity}명</span>
   </div>
+  <p class="muted">{room.access === "secret" ? "비밀방 · PIN 필요" : room.access === "friends" ? "친구방" : "공개방"}</p>
   <h3 class="heading-three room-title">{room.title}</h3>
   <p class="muted">초대 코드 <strong>{room.code}</strong></p>
   <Button

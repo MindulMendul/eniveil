@@ -1,5 +1,6 @@
 <script lang="ts">
   import { WORKSHOP_AUTHORING_ENABLED } from "@festival/shared/features";
+  import RoomSocial from "../features/friends/RoomSocial.svelte";
   import EntryIntro from "../pages/entry/ui/EntryIntro.svelte";
   import SoloRoomLifecycle from "../features/game/SoloRoomLifecycle.svelte";
   import LazyContent from "../shared/ui/LazyContent.svelte";
@@ -37,6 +38,8 @@
   let authConfig = $state({ google: false, demo: false });
   let nickname = $state("");
   let code = $state("");
+  let pendingJoin = $state<string | null>(null);
+  let joinPin = $state("");
   let error = $state("");
   let busy = $state(false);
   let connected = $state(false);
@@ -79,6 +82,11 @@
   const currentAuth = (generation: number) => !disposed && generation === authGeneration;
   const pending = new Map<string, ReturnType<typeof setTimeout>>();
 
+  let lobbyPresence = $derived(currentPath === "/" && !workshopPlayId && !snapshot?.room);
+  $effect(() => {
+    const lobby = lobbyPresence;
+    if (connected && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "presence", lobby, requestId: crypto.randomUUID() }));
+  });
   let room = $derived(snapshot?.room ?? null);
   let session = $derived(room?.session ?? null);
   let host = $derived(room?.hostId === snapshot?.me.id);
@@ -165,6 +173,7 @@
       if (!currentAuth(generation)) return;
       try {
         const event = JSON.parse(message.data) as ServerEvent;
+        if (event.type === "social-changed") { window.dispatchEvent(new Event("room-social-changed")); return; }
         if (event.type === "snapshot") {
           snapshot = event.data;
           if (ownedSoloPlayId !== snapshot.room?.soloPlayId) ownedSoloPlayId = null;
@@ -227,7 +236,7 @@
     authRequests = new AbortController();
     loading = false;
     account = { me: null, accountType: null, needsNickname: false };
-    snapshot = null; picker = false; accountLoaded = false;
+    snapshot = null; picker = false; pendingJoin = null; joinPin = ""; accountLoaded = false;
     connected = false; busy = false; ownedSoloPlayId = null; soloStartRequest = null;
     clearTimeout(reconnectTimer);
     for (const timeout of pending.values()) clearTimeout(timeout);
@@ -423,10 +432,10 @@
     });
   }
 
-  async function create(scenarioId: string) {
+  async function create(scenarioId: string, access: "public" | "friends" | "secret" = "public", pin?: string) {
     await action(async () => {
       const generation = authGeneration;
-      await api("/lobby/rooms", { scenarioId });
+      await api("/lobby/rooms", { scenarioId, access, pin });
       if (!currentAuth(generation)) return;
       const next = await api("/lobby/state");
       if (!currentAuth(generation)) return;
@@ -436,14 +445,22 @@
   }
 
   async function join(invite = code) {
+    const target = snapshot?.rooms.find(r => r.code === invite);
+    if (target?.access === "secret" || !target) { pendingJoin = invite; joinPin = ""; return; }
+    await enterRoom(invite);
+  }
+
+  async function enterRoom(invite: string, pin?: string) {
     await action(async () => {
       const generation = authGeneration;
-      await api("/lobby/rooms/join", { code: invite });
+      await api("/lobby/rooms/join", { code: invite, ...(pin ? { pin } : {}) });
       if (!currentAuth(generation)) return;
       const next = await api("/lobby/state");
       if (!currentAuth(generation)) return;
       snapshot = next;
       code = "";
+      pendingJoin = null;
+      joinPin = "";
     });
   }
 
@@ -624,6 +641,10 @@
     </LazyContent>
   {/if}
 
+  {#if snapshot}
+  {#key snapshot.me.id}<RoomSocial {snapshot} onEntered={async () => { snapshot = await api("/lobby/state"); currentPath = "/"; history.pushState({}, "", localePath(locale)); }} />{/key}
+{/if}
+
   {#if entryHome}
     <footer class="flex justify-center py-4 text-festival-muted"><LegalLinks {locale} /></footer>
   {:else}
@@ -679,3 +700,15 @@
   gap:var(--spacing-4);
   margin-top:var(--spacing-4)}
 </style>
+
+{#if pendingJoin && snapshot}
+  <Modal open labelledby="room-pin-title" onClose={() => { pendingJoin = null; joinPin = ''; }}>
+    <h2 id="room-pin-title">방 입장</h2>
+    <form onsubmit={event => { event.preventDefault(); if (pendingJoin) void enterRoom(pendingJoin, joinPin || undefined); }}>
+      <label>비밀방 PIN · 공개방은 비워 두세요<input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" bind:value={joinPin} /></label>
+      <Button type="submit" disabled={busy}>입장</Button>
+      <Button variant="secondary" onclick={() => pendingJoin = null}>취소</Button>
+      {#if error}<p role="alert">{error}</p>{/if}
+    </form>
+  </Modal>
+{/if}
