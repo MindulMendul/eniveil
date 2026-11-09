@@ -13,6 +13,8 @@ export type Room = {
   mode?: "solo" | "multiplayer";
   soloStarted?: boolean;
   soloPlayId?: string | null;
+  /** Members who are ready to start a multiplayer game; cleared on host change, reconnect and game start. */
+  readyIds?: string[];
 };
 
 export type Session = {

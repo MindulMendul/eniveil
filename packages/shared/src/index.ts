@@ -35,6 +35,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("presence"), lobby: z.boolean(), requestId: z.string().max(80) }),
   z.object({ type: z.literal("mode"), mode: z.enum(["solo", "multiplayer"]), requestId: z.string().max(80) }),
   z.object({ type: z.literal("solo-return"), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("ready"), ready: z.boolean(), requestId: z.string().max(80) }),
   z.object({ type: z.literal("start"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("advance"), requestId: z.string().max(80) }),
   z.object({
@@ -67,7 +68,7 @@ export type RoomSummary = {
   capacity: number;
   status: "waiting" | "playing";
 };
-export type Member = Guest & { online: boolean };
+export type Member = Guest & { online: boolean; ready: boolean };
 export type SessionView = {
   id: string;
   scenarioVersion: number;

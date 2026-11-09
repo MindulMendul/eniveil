@@ -17,5 +17,6 @@
     </small>
   </div>
   {#if member.id === hostId}<span class="tag gold">방장</span>{/if}
+  {#if member.ready}<span class="tag">준비 완료</span>{/if}
   <span class:live={member.online} class="dot member-status"></span>
 </div>

@@ -118,6 +118,8 @@ test('shared game count includes completed games once and excludes unfinished on
   try {
     game.create(host,'rehearsal');
     game.join(friend,game.needRoom(host.id).code);
+    game.command(host,{type:'ready',ready:true,requestId:'ready-host'});
+    game.command(friend,{type:'ready',ready:true,requestId:'ready-friend'});
     game.command(host,{type:'start',requestId:'start'});
     const before = await (await req(host,'/social')).json() as {friends:{id:string;gamesTogether:number}[]};
     expect(before.friends.find(f=>f.id===friend.id)?.gamesTogether).toBe(0);

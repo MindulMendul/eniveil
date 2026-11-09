@@ -7,7 +7,7 @@
   import { shouldRecoverFocus } from "../shared/lib/focus-policy";
   import NicknameField from "../features/account/NicknameField.svelte";
   import type { Guest } from "@festival/shared";
-  import { Modal, Button, Panel, PageState } from "../shared/ui";
+  import { Modal, Button, Panel, PageState, Toast } from "../shared/ui";
   import { syncMetadata } from "../shared/seo/client";
   import { pageMetadata } from "../shared/seo/metadata";
   import { onMount, tick } from "svelte";
@@ -91,8 +91,12 @@
   let session = $derived(room?.session ?? null);
   let host = $derived(room?.hostId === snapshot?.me.id);
   let canStart = $derived(
-    !!room && room.count === room.capacity && room.members.every((member) => member.online),
+    !!room && room.count === room.capacity && room.members.every((member) => member.online && (room.mode === "solo" || member.ready)),
   );
+  let notice = $state("");
+  let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+  let lastRoomStatus: { id: string; status: string } | null = null;
+  let wasReadyToStart = false;
 
   let shell = $state<HTMLDivElement>();
   let previousMain: HTMLElement | null = null;
@@ -247,7 +251,48 @@
     }
   }
 
-  function command(type: Command["type"], targetId?: string, mode?: "solo" | "multiplayer") {
+  function announce(message: string) {
+    notice = message;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => (notice = ""), 3000);
+  }
+
+  /** Browser alerts only matter when the page is hidden; the in-page toast covers the visible case. */
+  function notifyWhileAway(body: string, tag: string) {
+    if (!document.hidden || !("Notification" in window) || Notification.permission !== "granted") return;
+    new Notification("eniveil", { body, tag });
+  }
+
+  function setReady(ready: boolean) {
+    if (ready && "Notification" in window && Notification.permission === "default") void Notification.requestPermission().catch(() => {});
+    command("ready", undefined, undefined, ready);
+  }
+
+  $effect(() => {
+    // Fires once per waiting → playing transition for members who did not press start.
+    const current = room ? { id: room.id, status: room.status } : null;
+    const previous = lastRoomStatus;
+    lastRoomStatus = current;
+    if (current && previous?.id === current.id && previous.status === "waiting" && current.status === "playing" && !host) {
+      const message = locale === "en" ? "The game has started. Join the story." : "게임이 시작됐어. 이야기에 참여해 줘.";
+      announce(message);
+      notifyWhileAway(message, `start-${current.id}`);
+    }
+  });
+
+  $effect(() => {
+    // The host hears once when every member, including the host, is ready to start.
+    const ready = !!room && host && room.mode === "multiplayer" && room.status === "waiting" && canStart;
+    const previous = wasReadyToStart;
+    wasReadyToStart = ready;
+    if (ready && !previous) {
+      const message = locale === "en" ? "Everyone is ready. You can start the game." : "모든 참가자가 준비했어. 시작할 수 있어.";
+      announce(message);
+      notifyWhileAway(message, `ready-${room?.id}`);
+    }
+  });
+
+  function command(type: Command["type"], targetId?: string, mode?: "solo" | "multiplayer", ready?: boolean) {
     if (!connected || busy || !socket) return;
     if (type === "start") soloEndedNotice = false;
     error = "";
@@ -263,7 +308,7 @@
         error = "응답이 지연됐어. 현재 상태를 확인하고 다시 시도해 줘.";
       }, 8000),
     );
-    socket.send(JSON.stringify({ type, requestId, ...(targetId ? { targetId } : {}), ...(mode ? { mode } : {}) }));
+    socket.send(JSON.stringify({ type, requestId, ...(targetId ? { targetId } : {}), ...(mode ? { mode } : {}), ...(ready === undefined ? {} : { ready }) }));
   }
 
   function changeLocale(next: "ko" | "en") {
@@ -552,6 +597,7 @@
   {#if error}
     <ErrorNotice message={error} {locale} onDismiss={() => (error = "")} />
   {/if}
+  {#if notice}<Toast message={notice} />{/if}
   {#if soloEndedNotice}
     <p class="main" role="status">{locale === "en" ? "Your previous solo investigation ended when you left the page. You are back in the room; start a new investigation when ready." : "페이지를 떠나 이전 1인 수사가 종료됐어. 같은 방으로 돌아왔으니 준비되면 새 수사를 시작해 줘."}</p>
   {/if}
@@ -630,6 +676,7 @@
       {locale}
       onCopy={copyInviteLink}
       onCommand={command}
+      onReady={setReady}
     />{/if}
       {/snippet}
     </LazyContent>

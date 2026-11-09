@@ -14,6 +14,7 @@
     onCopy,
     locale,
     onCommand,
+    onReady,
   }: {
     snapshot: Snapshot;
     room: RoomView;
@@ -25,7 +26,9 @@
     locale: "ko" | "en";
     onCopy: () => void;
     onCommand: (type: Command["type"], targetId?: string) => void;
+    onReady: (ready: boolean) => void;
   } = $props();
+  let myReady = $derived(room.members.find((member) => member.id === snapshot.me.id)?.ready ?? false);
 </script>
 
 <main id="main-content" tabindex="-1" class="main">
@@ -76,8 +79,13 @@
       {/if}
       <Panel>
         <p class="muted">
-          {room.mode === "solo" ? (locale === "en" ? "Your solo room is ready. Start whenever you like." : "1인 방이 준비됐어. 다른 참가자를 기다리지 않고 시작할 수 있어.") : canStart ? "모든 참가자가 모였어. 이야기를 시작해도 좋아." : "필요한 인원이 모두 접속하면 시작할 수 있어."}
+          {room.mode === "solo" ? (locale === "en" ? "Your solo room is ready. Start whenever you like." : "1인 방이 준비됐어. 다른 참가자를 기다리지 않고 시작할 수 있어.") : canStart ? "모든 참가자가 준비했어. 이야기를 시작해도 좋아." : "필요한 인원이 모두 접속하고 준비하면 시작할 수 있어."}
         </p>
+        {#if room.mode === "multiplayer" && !room.session}
+          <Button variant="secondary" disabled={busy || !connected} onclick={() => onReady(!myReady)}>
+            {myReady ? "준비 취소" : "준비하기"}
+          </Button>
+        {/if}
         {#if host}
           <Button disabled={!canStart || !connected || busy} onclick={() => onCommand("start")}>
             게임 시작 <span>→</span>

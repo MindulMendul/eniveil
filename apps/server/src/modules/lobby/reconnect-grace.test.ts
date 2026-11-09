@@ -23,7 +23,11 @@ function setup(playing: boolean) {
   }, () => now);
   presence.connect(a.id); presence.connect(b.id);
   const room = game.create(a, "rehearsal"); game.join(b, room.code);
-  if (playing) game.command(a, { type: "start", requestId: "start" });
+  if (playing) {
+    game.command(a, { type: "ready", ready: true, requestId: "ready-a" });
+    game.command(b, { type: "ready", ready: true, requestId: "ready-b" });
+    game.command(a, { type: "start", requestId: "start" });
+  }
   return { game, a, b, room, presence, timers, notifications, get changes() { return changes; }, delay(ms: number) { now += ms; }, tick(ms: number) {
     now += ms;
     for (const timer of timers.splice(0)) {

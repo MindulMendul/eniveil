@@ -121,15 +121,17 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     expect((await req(exitPath, b.cookie, { roomId, soloPlayId: null })).status).toBe(400);
     expect((await req(exitPath, a.cookie, { roomId, soloPlayId: null }, "https://evil.invalid")).status).toBe(403);
     expect((await req(exitPath, a.cookie, { roomId: "bad", soloPlayId: null })).status).toBe(400);
-    const send = async (client: typeof aa, type: string, targetId?: string, mode?: "solo" | "multiplayer") => {
+    const send = async (client: typeof aa, type: string, targetId?: string, mode?: "solo" | "multiplayer", ready?: boolean) => {
       const requestId = crypto.randomUUID();
-      client.ws.send(JSON.stringify({ type, requestId, targetId, mode }));
+      client.ws.send(JSON.stringify({ type, requestId, targetId, mode, ready }));
       await wait(() =>
         client.events.some(
           (e) => e.type === "ack" && e.requestId === requestId,
         ),
       );
     };
+    await send(aa, "ready", undefined, undefined, true);
+    await send(bb, "ready", undefined, undefined, true);
     await send(aa, "start");
     await wait(() => !!bb.latest.room?.session);
     expect(aa.latest.room!.session!.role.name).not.toBe(

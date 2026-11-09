@@ -69,6 +69,7 @@ export class Game {
         members: r.memberIds.map((id) => ({
           ...this.state.guests[id],
           online: (this.online.get(id) ?? 0) > 0,
+          ready: (r.readyIds ?? []).includes(id),
         })),
         session:
           session && participant
@@ -250,13 +251,26 @@ export class Game {
       if (session && !session.endedAt) session.endedAt = new Date().toISOString();
       delete this.state.rooms[room.id];
     } else {
-      if (room.hostId === guestId) room.hostId = room.memberIds[0];
+      room.readyIds = (room.readyIds ?? []).filter((id) => id !== guestId);
+      if (room.hostId === guestId) this.setHost(room, room.memberIds[0]);
       if (session) this.revealWhenAllActiveVoted(room, session);
     }
     this.store.save();
     if (session && (session.phase !== previousPhase || !!session.endedAt !== previouslyEnded)) {
       return { sessionId: session.id, phase: session.phase, ended: !!session.endedAt };
     }
+  }
+  /** A new host has not confirmed readiness for the room they now control. */
+  private setHost(room: Room, guestId: string) {
+    room.hostId = guestId;
+    room.readyIds = (room.readyIds ?? []).filter((id) => id !== guestId);
+  }
+  /** Called when a member reconnects: only that member's readiness is cleared. */
+  clearReady(guestId: string) {
+    const room = this.roomFor(guestId);
+    if (!room?.readyIds?.includes(guestId)) return;
+    room.readyIds = room.readyIds.filter((id) => id !== guestId);
+    this.store.save();
   }
   private revealWhenAllActiveVoted(room: Room, session: Session) {
     if (session.phase === "voting" && room.memberIds.every((id) => !!session.votes[id])) {
@@ -270,6 +284,15 @@ export class Game {
       if (r.hostId !== me.id) throw Error("방장만 진행할 수 있어.");
     };
     switch (command.type) {
+      case "ready": {
+        if (r.mode === "solo") throw Error("1인 모드에서는 준비가 필요 없어.");
+        if (s || r.soloStarted) throw Error("게임 시작 전에만 준비할 수 있어.");
+        const ready = new Set(r.readyIds ?? []);
+        if (command.ready) ready.add(me.id);
+        else ready.delete(me.id);
+        r.readyIds = [...ready];
+        break;
+      }
       case "mode":
         host();
         if (r.scenarioId === supportedSoloStory.id && command.mode !== 'solo') throw Error('선택한 작품은 1인 플레이만 지원해.');
@@ -298,6 +321,8 @@ export class Game {
           r.memberIds.some((id) => !this.online.get(id))
         )
           throw Error("모든 참가자가 접속해야 시작할 수 있어.");
+        if (r.memberIds.some((id) => !(r.readyIds ?? []).includes(id)))
+          throw Error("모든 참가자가 준비해야 시작할 수 있어.");
         const ids = [...r.memberIds];
         for (let i = ids.length - 1; i > 0; i--) {
           const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
@@ -318,6 +343,7 @@ export class Game {
         };
         this.state.sessions[session.id] = session;
         r.sessionId = session.id;
+        r.readyIds = [];
         break;
       }
       case "advance":
@@ -345,8 +371,9 @@ export class Game {
       case "leave":
         if (s || r.soloStarted) throw Error("게임 중에는 퇴장할 수 없어. 재접속할 수 있어.");
         r.memberIds = r.memberIds.filter((id) => id !== me.id);
+        r.readyIds = (r.readyIds ?? []).filter((id) => id !== me.id);
         if (!r.memberIds.length) delete this.state.rooms[r.id];
-        else if (r.hostId === me.id) r.hostId = r.memberIds[0];
+        else if (r.hostId === me.id) this.setHost(r, r.memberIds[0]);
         break;
     }
     this.store.save();

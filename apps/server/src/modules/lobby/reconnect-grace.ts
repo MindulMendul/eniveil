@@ -12,13 +12,15 @@ const schedule: Schedule = (expire, delay) => {
 export class ReconnectGrace {
   private pending = new Map<string, { cancel: () => void; expiresAt: number; roomId: string }>();
   constructor(
-    private game: Pick<Game, "online" | "roomFor" | "expireConnection">,
+    private game: Pick<Game, "online" | "roomFor" | "expireConnection" | "clearReady">,
     private changed: (transition: ReturnType<Game["expireConnection"]>) => void,
     private later: Schedule = schedule,
     private now: () => number = Date.now,
   ) {}
 
   connect(guestId: string) {
+    // A reconnect after a full disconnect clears this member's readiness; the seat itself is kept.
+    if (!this.game.online.get(guestId)) this.game.clearReady(guestId);
     const pending = this.pending.get(guestId);
     if (pending) {
       pending.cancel();

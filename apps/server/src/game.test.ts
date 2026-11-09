@@ -19,6 +19,12 @@ function setup() {
   }
   return { store, game, a, b, c };
 }
+/** Every current member of the room marks themselves ready, as the multiplayer start rule requires. */
+const readyAll = (game: Game, host: { id: string }) => {
+  const room = game.roomFor(host.id)!;
+  if (room.mode === "solo") return;
+  for (const id of room.memberIds) game.command(game.state.guests[id], { type: "ready", ready: true, requestId: crypto.randomUUID() });
+};
 const cmd = (type: "start" | "advance" | "return" | "leave") => ({
   type,
   requestId: crypto.randomUUID(),
@@ -31,6 +37,7 @@ test('story choice determines room capacity and solo execution without a mode ch
   expect(room.mode).toBe('solo');
   expect(() => game.command(a, { type: 'mode', mode: 'multiplayer', requestId: crypto.randomUUID() })).toThrow();
   expect(() => game.join(b, room.code)).toThrow();
+  readyAll(game, a);
   game.command(a, cmd('start'));
   expect(room.soloStarted).toBe(true);
   expect(game.snapshot(a).room?.scenario.id).toBe('deokil-trading-murder');
@@ -40,6 +47,7 @@ test('story choice determines room capacity and solo execution without a mode ch
   expect(multiplayer.mode).toBe('multiplayer');
   expect(() => game.command(a, cmd('start'))).toThrow();
   game.join(b, multiplayer.code);
+  readyAll(game, a);
   game.command(a, cmd('start'));
   expect(game.snapshot(a).room?.session).not.toBeNull();
   expect(game.snapshot(a).room?.scenario.id).toBe('rehearsal');
@@ -54,6 +62,7 @@ test("room discovery follows vacancy and waiting status without hiding the membe
   game.command(b, cmd("leave"));
   expect(game.snapshot(c).rooms.map((item) => item.id)).toEqual([room.id]);
   game.join(b, room.code);
+  readyAll(game, a);
   game.command(a, cmd("start"));
   // Even a persisted playing room with a vacant seat must not be advertised.
   room.memberIds.pop();
@@ -64,6 +73,7 @@ test("room discovery hides an active solo room even when its member disconnects"
   const { game, a, b } = setup();
   const room = game.create(a, "rehearsal");
   game.command(a, { type: "mode", mode: "solo", requestId: "solo" });
+  readyAll(game, a);
   game.command(a, cmd("start"));
   room.memberIds = [];
   expect(game.snapshot(b).rooms).toEqual([]);
@@ -78,6 +88,7 @@ test("only a full connected room can start; host authorization and duplicate sta
   game.online.set(b.id, 0);
   expect(() => game.command(a, cmd("start"))).toThrow("접속");
   game.online.set(b.id, 1);
+  readyAll(game, a);
   game.command(a, cmd("start"));
   expect(() => game.command(a, cmd("start"))).toThrow("이미");
   expect(Object.keys(game.state.sessions)).toHaveLength(1);
@@ -86,6 +97,7 @@ test("personalized secrets, private ballots, complete game, return, replay", () 
   const { game, a, b, c } = setup();
   const room = game.create(a, "rehearsal");
   game.join(b, room.code);
+  readyAll(game, a);
   game.command(a, cmd("start"));
   const first = room.sessionId!;
   expect(() => game.join(c, room.code)).toThrow("진행");
@@ -111,6 +123,7 @@ test("personalized secrets, private ballots, complete game, return, replay", () 
   expect(room.sessionId).toBeNull();
   expect(game.state.sessions[first].endedAt).not.toBeNull();
   expect(game.state.sessions[first].participants).toHaveLength(2);
+  readyAll(game, a);
   game.command(a, cmd("start"));
   expect(room.sessionId).not.toBe(first);
 });
@@ -146,6 +159,7 @@ test("database survives process restart with role assignments and guest identity
   const token = store.issue("a");
   const room = game.create(a, "rehearsal");
   game.join(b, room.code);
+  readyAll(game, a);
   game.command(a, cmd("start"));
   const id = room.sessionId!;
   const restored = new Store(path);
@@ -163,6 +177,7 @@ test("host can open a one-person room, start alone and return to multiplayer", (
   expect(game.snapshot(a).room!.soloStory).toEqual({ id: "deokil-trading-murder", title: "덕일상사 살인사건" });
   expect(game.snapshot(a).room!.scenario.id).toBe("rehearsal");
   expect(() => game.join(b, room.code)).toThrow("가득");
+  readyAll(game, a);
   game.command(a, cmd("start"));
   expect(game.snapshot(a).room!.soloStarted).toBe(true);
   expect(game.snapshot(a).room!.soloPlayId).toBeString();
@@ -177,6 +192,7 @@ test("host can open a one-person room, start alone and return to multiplayer", (
   expect(game.snapshot(a).room!.capacity).toBe(2);
   expect(game.snapshot(a).room!.title).toBe("사라진 축제 초대장");
   game.join(b, room.code);
+  readyAll(game, a);
   game.command(a, cmd("start"));
   expect(game.snapshot(a).room!.session).not.toBeNull();
 });
@@ -188,6 +204,7 @@ test("solo page exit ends only the host's matching room attempt, including after
   expect(() => game.endSolo(b, room.id, null)).toThrow("방장");
   game.command(b, cmd("leave"));
   game.command(a, { type: "mode", mode: "solo", requestId: "solo" });
+  readyAll(game, a);
   game.command(a, cmd("start"));
   const firstAttempt = room.soloPlayId!;
   expect(() => game.endSolo(a, crypto.randomUUID(), firstAttempt)).toThrow("현재 방");
@@ -197,6 +214,7 @@ test("solo page exit ends only the host's matching room attempt, including after
   expect(reloaded.snapshot(a).room!.status).toBe("waiting");
   expect(reloaded.snapshot(a).room!.soloPlayId).toBeNull();
   reloaded.online.set(a.id, 1);
+  readyAll(reloaded, a);
   reloaded.command(a, cmd("start"));
   expect(room.soloPlayId).not.toBe(firstAttempt);
   reloaded.endSolo(a, room.id, firstAttempt);
