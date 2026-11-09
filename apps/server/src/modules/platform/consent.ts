@@ -28,9 +28,9 @@ export class ConsentService {
     this.retentionTimer.unref();
   }
   dispose() { clearInterval(this.retentionTimer); }
-  private find(token: string) { return this.store.db.query('SELECT * FROM collection_consents WHERE token=?').get(token) as RecordRow | null; }
+  private lookup(token: string) { return this.store.db.query('SELECT * FROM collection_consents WHERE token=?').get(token) as RecordRow | null; }
   private row(token: string, owner: string | null): RecordRow | null {
-    const row = this.find(token);
+    const row = this.lookup(token);
     return row?.owner === owner && row.version === CONSENT_VERSION && expires(row) > Date.now() ? row : null;
   }
   private eraseRecords(token: string) {
@@ -82,7 +82,7 @@ export class ConsentService {
     this.newChoices++; return true;
   }
   private save(ctx: RequestConsent, scope: ConsentScope, raw: string) {
-    const previous = this.find(ctx.token);
+    const previous = this.lookup(ctx.token);
     const matching = this.row(ctx.token,ctx.owner);
     const token = hash(raw);
     this.store.db.transaction(() => {
@@ -105,7 +105,7 @@ export class ConsentService {
       if (!body || typeof body !== 'object' || Array.isArray(body) || body.version !== CONSENT_VERSION || !consentScopes.includes(body.scope)) return c.json({error:'Invalid consent choice'},400);
       const ctx = this.context.getStore();
       if (!ctx) return c.json({error:'Consent context unavailable'},503);
-      if (!this.find(ctx.token) && !this.canCreate(ctx.owner)) { c.header('Retry-After','60'); return c.json({error:'Too many new consent choices; try again shortly'},429); }
+      if (!this.lookup(ctx.token) && !this.canCreate(ctx.owner)) { c.header('Retry-After','60'); return c.json({error:'Too many new consent choices; try again shortly'},429); }
       const raw = crypto.randomUUID() + crypto.randomUUID();
       const saved = this.save(ctx,body.scope,raw);
       setCookie(c,cookieName,raw,{httpOnly:true,secure:this.production,sameSite:'Lax',path:'/',maxAge:ctx.owner === null ? ANONYMOUS_CONSENT_MAX_AGE : CONSENT_MAX_AGE});

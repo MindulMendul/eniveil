@@ -22,11 +22,45 @@ async function checkFailure(browser, kind) {
     assert.equal(status, 403);
   } finally { await context.unrouteAll({ behavior: 'wait' }); await context.close(); }
 }
+async function checkLoadedWithdrawal(browser) {
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  try {
+    await installBrowserRequestGuard(context, origin);
+    const page = await context.newPage();
+    await context.route('https://www.googletagmanager.com/**', route => route.fulfill({ body: '/* local stub */', contentType: 'text/javascript' }));
+    await page.goto(origin + '/');
+    await page.locator('[data-collection-choice=full]').click();
+    await page.locator('#collection-dialog').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.querySelector('script[src*="googletagmanager"]'));
+    const documentToken = await page.evaluate(() => (window.__testDocument = 'same')); 
+    await page.route('**/api/platform/consent', route => route.request().method() === 'GET' ? route.fulfill({ status: 503, body: '{}' }) : route.fallback());
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.locator('[data-collection-retry]:not([hidden])').waitFor();
+    assert.equal(await page.locator('script[src*="googletagmanager"]').count(), 1);
+    assert.equal(await page.evaluate(() => window.__testDocument), documentToken);
+    await page.unroute('**/api/platform/consent');
+    await page.locator('[data-collection-retry]').click();
+    await page.locator('[data-collection-settings]').click();
+    await page.route('**/api/platform/consent', route => route.request().method() === 'POST' ? route.fulfill({ status: 503, body: '{}' }) : route.fallback());
+    const reload = page.waitForEvent('load');
+    await page.locator('[data-collection-choice=none]').click();
+    await reload;
+    await page.locator('#collection-dialog[open]').waitFor();
+    await page.locator('[data-collection-error]:not([hidden])').waitFor();
+    assert.equal(await page.locator('script[src*="googletagmanager"]').count(), 0);
+    assert.equal(await page.evaluate(async () => (await (await fetch('/api/platform/consent')).json()).consent.scope), 'full');
+    await page.unroute('**/api/platform/consent');
+    await page.locator('[data-collection-choice=none]').click();
+    await page.locator('#collection-dialog').waitFor({ state: 'hidden' });
+    assert.equal(await page.evaluate(async () => (await (await fetch('/api/platform/consent')).json()).consent.scope), 'none');
+  } finally { await context.unrouteAll({ behavior: 'wait' }); await context.close(); }
+}
 async function main() {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] });
   try {
     await Promise.all(['cookie', 'network'].map(kind => checkFailure(browser, kind)));
-    console.log('PASS blocked cookie and failed consent save: no grant, no GA, service blocked');
+    await checkLoadedWithdrawal(browser);
+    console.log('PASS passive read failure and failed withdrawal recovery; blocked cookie and failed consent save: no grant, no GA, service blocked');
   } finally { await browser.close(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

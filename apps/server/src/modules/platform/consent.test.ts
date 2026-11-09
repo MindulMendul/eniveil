@@ -47,7 +47,7 @@ test('withdrawal preserves operational state but removes browser grant even afte
  await f.req('/event',jar,{});expect(f.count('collection_records')).toBe(1);
  const anonymous=jar.split('; ').filter(x=>!x.startsWith('festival_guest=')).join('; ');const declined=await f.choose('none',anonymous);
  expect((await read(await f.req('/consent',declined))).consent?.scope).toBe('none');expect(f.count('collection_records')).toBe(0);expect(f.count('story_runs')).toBe(1);
- expect(f.revoked.length).toBe(1);
+ expect(f.revoked).toHaveLength(1);
 });
 
 test('service API requires full consent regardless of client controls',async()=>{
@@ -83,7 +83,7 @@ test('no-cookie creation is rate limited and short-lived; existing users can sti
 
 test('revoking one browser does not revoke another browser for the same account',async()=>{
  const f=fixture();const a=f.account();const first=await f.choose('full',a.auth),second=await f.choose('full',a.auth);
- await f.choose('basic',first);expect((await read(await f.req('/consent',second))).consent?.scope).toBe('full');expect(f.revoked.length).toBe(1);
+ await f.choose('basic',first);expect((await read(await f.req('/consent',second))).consent?.scope).toBe('full');expect(f.revoked).toHaveLength(1);
 });
 
 

@@ -2,9 +2,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { installBrowserRequestGuard } = require('../test-target-guard.cjs');
 const origin = process.env.BASE_URL || 'http://127.0.0.1:3273';
-const output = process.env.OUTPUT_DIR || '/tmp/eniveil-consent-173';
+const output = process.env.OUTPUT_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'eniveil-consent-173-')); 
 fs.mkdirSync(output, { recursive: true });
 async function request(page, path, body) {
   return page.evaluate(async ({ path, body }) => {
