@@ -14,7 +14,7 @@ QA의 canonical과 sitemap은 QA 도메인을 사용한다. 런타임 APP_ORIGIN
 이미 빌드된 HTML 메타데이터가 바뀌지는 않는다.
 
 ```sh
-PUBLIC_SITE_URL=https://qa-mindul-murder-mystery.duckdns.org bun run build
+PUBLIC_SITE_URL=https://qa-mindul-murder-mystery.duckdns.org PUBLIC_INDEXABLE=false bun run build
 ```
 
 GEO는 검색 시스템이 읽을 수 있는 구조화된 페이지 정보를 제공하는 범위다.
