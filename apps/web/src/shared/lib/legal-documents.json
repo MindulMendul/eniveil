@@ -1,7 +1,7 @@
 {
   "ko": {
     "terms": {
-      "introduction": "이 약관은 MindulMendul(운영자)이 제공하는 스토리 아카이브의 인터랙티브 작품, 멀티플레이 및 창작마당 이용에 적용됩니다. 이용 전 약관과 개인정보처리방침을 확인해 주세요.",
+      "introduction": "이 약관은 MindulMendul(운영자)이 제공하는 애니베일의 인터랙티브 작품, 멀티플레이 및 창작마당 이용에 적용됩니다. 이용 전 약관과 개인정보처리방침을 확인해 주세요.",
       "sections": [
         {
           "title": "1. 서비스와 게스트 이용",
@@ -45,7 +45,7 @@
       ]
     },
     "privacy": {
-      "introduction": "MindulMendul(운영자)은 스토리 아카이브 운영을 위해 아래 정보를 처리합니다. 이 문서는 현재 서비스에서 사용하는 게스트 인증, 게임·창작마당 저장 및 선택적으로 설정되는 분석 도구를 설명합니다.",
+      "introduction": "MindulMendul(운영자)은 애니베일 운영을 위해 아래 정보를 처리합니다. 이 문서는 현재 서비스에서 사용하는 게스트 인증, 게임·창작마당 저장 및 선택적으로 설정되는 분석 도구를 설명합니다.",
       "sections": [
         {
           "title": "1. 처리 항목과 목적",
@@ -94,7 +94,7 @@
   },
   "en": {
     "terms": {
-      "introduction": "These terms apply to the interactive stories, multiplayer features and workshop in Story Archive, operated by MindulMendul (the operator). Please read these terms and the Privacy Policy before using the service.",
+      "introduction": "These terms apply to the interactive stories, multiplayer features and workshop in Eniveil, operated by MindulMendul (the operator). Please read these terms and the Privacy Policy before using the service.",
       "sections": [
         {
           "title": "1. Service and guest access",
@@ -138,7 +138,7 @@
       ]
     },
     "privacy": {
-      "introduction": "MindulMendul (the operator) processes the information below to operate Story Archive. This policy describes the current guest authentication, game and workshop storage, and analytics tools that may be configured for a deployment.",
+      "introduction": "MindulMendul (the operator) processes the information below to operate Eniveil. This policy describes the current guest authentication, game and workshop storage, and analytics tools that may be configured for a deployment.",
       "sections": [
         {
           "title": "1. Information and purposes",

@@ -600,3 +600,19 @@ test('only managed thumbnails are exposed; legacy external URLs remain stored wi
   expect(updated.status).toBe(200);
   expect((await f.list()).items.find(row => row.id === item.id)?.thumbnailUrl).toBe(MANAGED_IMAGES.invitation);
 });
+
+
+test('stored legacy share images remain visible without accepting legacy paths for new writes', async () => {
+  const f = fixture();
+  const owner = f.guest('작성자');
+  for (const [legacy, current] of [
+    ['/og/story-archive-ko-v2.webp', MANAGED_IMAGES.ogKo],
+    ['/og/story-archive-en-v2.webp', MANAGED_IMAGES.ogEn],
+  ]) {
+    const item = f.workshop.create(owner, { package: f.source, published: true, difficulty: null, thumbnailUrl: legacy });
+    expect((await f.list()).items.find(row => row.id === item.id)?.thumbnailUrl).toBe(current);
+    expect(f.workshop.get(item.id)?.thumbnailUrl).toBe(legacy);
+    const result = await f.request(`/drafts/${item.id}`, {method:'PUT', cookie:owner.cookie, body:{package:f.source, published:true, thumbnailUrl:legacy}});
+    expect(result.status).toBe(400);
+  }
+});

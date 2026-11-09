@@ -236,7 +236,7 @@
   }
 </script>
 
-<svelte:head><title>{storyPackage?.story.title ?? '덕일상사 살인사건'} · 이상한 축제</title></svelte:head>
+<svelte:head><title>{storyPackage?.story.title ?? '덕일상사 살인사건'} · 애니베일</title></svelte:head>
 
 {#if storyLoadError}<p class="mx-auto mb-4 max-w-[960px] border border-red-700/50 bg-festival-panel px-5 py-3 text-sm text-red-300" role="alert">{storyLoadError}</p>{/if}
 {#if exitMessage}<p class="mx-auto mb-4 max-w-[960px] text-sm text-festival-muted" role="status">{exitMessage}</p>{/if}

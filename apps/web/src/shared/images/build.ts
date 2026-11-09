@@ -9,8 +9,8 @@ const sourceRoot = new URL('../../../assets/images/', import.meta.url);
 const assets = [
   ['story-invitation.svg', MANAGED_IMAGES.invitation],
   ['favicon.png', MANAGED_IMAGES.favicon],
-  ['story-archive-ko.png', MANAGED_IMAGES.ogKo],
-  ['story-archive-en.png', MANAGED_IMAGES.ogEn],
+  ['eniveil-ko.png', MANAGED_IMAGES.ogKo],
+  ['eniveil-en.png', MANAGED_IMAGES.ogEn],
 ] as const;
 
 /** Source art is private to the build; only actual WebP bytes enter public/. */

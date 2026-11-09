@@ -1,4 +1,9 @@
-import { managedImagePath } from '@festival/shared/images';
+import { MANAGED_IMAGES, managedImagePath } from '@festival/shared/images';
+
+const legacyThumbnails = new Map<string, string>([
+  ['/og/story-archive-ko-v2.webp', MANAGED_IMAGES.ogKo],
+  ['/og/story-archive-en-v2.webp', MANAGED_IMAGES.ogEn],
+]);
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { storyPackageSchema, type Guest } from "@festival/shared";
@@ -177,7 +182,7 @@ export function createWorkshopRoutes(deps: {
         playerCount: story.playerCount,
         estimatedMinutes: story.estimatedMinutes,
         author: entry.author,
-        thumbnailUrl: managedImagePath(entry.thumbnailUrl),
+        thumbnailUrl: managedImagePath(entry.thumbnailUrl) ?? (entry.thumbnailUrl ? legacyThumbnails.get(entry.thumbnailUrl) ?? null : null),
         difficulty: entry.difficulty,
         published: entry.published,
         publishedAt: entry.publishedAt,
