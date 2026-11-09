@@ -15,6 +15,8 @@
 - 기존 shortcut에서 쓰이던 1.25·7.5·11.25·13.5 스케일을 DTCG에 명시했다. 값은 기존 quarter-rem 스케일과 동일하며 새 임의 픽셀 크기는 도입하지 않았다.
 - 이미지 카드의 외곽 0, fieldset/list 초기화, inline 텍스트 링크의 수평 0, 중앙 정렬 dismiss의 수직 0은 유지했다. Card/Panel/Modal에 추가 padding wrapper를 만들지 않았다.
 
+최신 dev 통합 중 추가된 `shared/analytics/AnalyticsConsent.astro`도 추가 조사했다(최종 67개 파일). 분석 동의 영역과 버튼의 기존 16px / 8px 12px 패딩을 spacing-4 / spacing-2·3 변수로 연결했다. 분석 동의 기능·노출 정책은 유지한다.
+
 ## 파일별 결과
 
 | 소스 (`apps/web/src/` 기준) | 판단·조치 |
@@ -61,6 +63,7 @@
 | `pages/workshop/ui/WorkshopPage.svelte` | story-card padding:0은 의도적. card-content spacing-5, 필터·통계·상세·즐겨찾기 패딩 정상. |
 | `pages/workshop.astro` | 라우트·앱 조립·메타데이터. 위임한 레이아웃/컴포넌트가 여백 소유, wrapper에 중복 패딩 추가 안 함. |
 | `shared/seo/Metadata.astro` | 라우트·앱 조립·메타데이터. 위임한 레이아웃/컴포넌트가 여백 소유, wrapper에 중복 패딩 추가 안 함. |
+| `shared/analytics/AnalyticsConsent.astro` | dev 통합 후 추가 조사. 동의 영역·버튼 패딩을 동일 값 spacing 토큰으로 교체. |
 | `shared/ui/Badge.svelte` | tag 패딩 유지. |
 | `shared/ui/Button.svelte` | tab 기본 패딩 보완. primary/secondary/scenario 정상, text는 수평 0·dismiss는 수직 0과 최소 터치 크기 의도 유지. |
 | `shared/ui/CallToAction.svelte` | primary/secondary 재사용. |
@@ -105,3 +108,9 @@
 
 ![소개 페이지 수정 전](issue157/before-about-320.png)
 ![소개 페이지 수정 후](issue157/after-about-320.png)
+
+### 최신 dev 통합 후 추가 검증
+
+- `367d064` dev 통합 커밋 `61017b0`의 소개 페이지 충돌 해결은 공통 스타일과 AnalyticsConsent import를 모두 보존했다. 신규 분석 동의 컴포넌트 패딩도 같은 크기의 spacing 변수로 연결했다.
+- 최종 `bash scripts/codex/verify.sh --browser`: check/build 및 106 tests / 5,312 assertions 통과. `test:e2e` 부재로 wrapper 마지막 단계는 여전히 exit 1이다.
+- GTM 설정이 있는 실제 Chromium ko/en × 320/1280에서 소개 본문 `32px 20px`, 동의 영역 `16px`, 거부 버튼 `8px 12px` 계산값 확인. 거부 후 6개 대표 경로와 게스트 로그인·작품 필터 회귀를 재검증했고 가로 넘침·pageerror는 없었다. 최초 시도는 Astro 개발 도구막대가 거부 버튼을 가려 실패했으며 도구막대만 테스트 스타일로 숨겨 재검증했다.
