@@ -45,3 +45,7 @@ bun run build
 내부 패키지명 `@festival/*`, 기본 데이터베이스 `festival.sqlite`, 세션 쿠키
 `festival_guest` 및 기존 저장 키는 기존 배포와 사용자 세션을 유지하기 위해 남긴다.
 이 식별자를 변경할 때는 별도의 데이터·세션 이행과 롤백 계획이 필요하다.
+
+## 공식 주소와 QA 검색 정책
+
+운영 기본 origin은 `https://eniveil.com`이다. 페이지별 canonical/hreflang/OG URL/JSON-LD/사이트맵은 동일 PUBLIC_SITE_URL을 사용한다. QA는 QA 전용 origin을 쓰고 `PUBLIC_INDEXABLE=false`로 빌드하여 noindex/nofollow·robots 차단·빈 사이트맵을 제공한다. 운영자의 이름과 문의 경로는 shared/lib/site-identity.ts에서 관리한다. 확인되지 않은 공식 SNS나 임의 sameAs는 추가하지 않는다.

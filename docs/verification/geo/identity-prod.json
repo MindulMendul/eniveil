@@ -1,0 +1,66 @@
+[
+  {
+    "en": false,
+    "width": 320,
+    "js": false,
+    "canonical": "https://eniveil.com/about/",
+    "indexable": true,
+    "axe": null
+  },
+  {
+    "en": false,
+    "width": 320,
+    "js": true,
+    "canonical": "https://eniveil.com/about/",
+    "indexable": true,
+    "axe": 0
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "js": false,
+    "canonical": "https://eniveil.com/about/",
+    "indexable": true,
+    "axe": null
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "js": true,
+    "canonical": "https://eniveil.com/about/",
+    "indexable": true,
+    "axe": 0
+  },
+  {
+    "en": true,
+    "width": 320,
+    "js": false,
+    "canonical": "https://eniveil.com/en/about/",
+    "indexable": true,
+    "axe": null
+  },
+  {
+    "en": true,
+    "width": 320,
+    "js": true,
+    "canonical": "https://eniveil.com/en/about/",
+    "indexable": true,
+    "axe": 0
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "js": false,
+    "canonical": "https://eniveil.com/en/about/",
+    "indexable": true,
+    "axe": null
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "js": true,
+    "canonical": "https://eniveil.com/en/about/",
+    "indexable": true,
+    "axe": 0
+  }
+]

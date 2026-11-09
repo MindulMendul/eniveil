@@ -33,6 +33,9 @@ class ComposeDeploymentTests(unittest.TestCase):
         self.assertEqual(web['environment']['APP_ORIGIN'], 'https://eniveil.com')
         self.assertEqual(web['build']['args']['PUBLIC_SITE_URL'], 'https://eniveil.com')
         self.assertEqual(deployment.TARGETS['qa']['origin'], 'https://qa-mindul-murder-mystery.duckdns.org')
+        self.assertEqual(web['build']['args']['PUBLIC_INDEXABLE'], 'true')
+        qa = deployment.definition(Path('/source'), deployment.TARGETS['qa'], 'b'*40)
+        self.assertEqual(qa['services']['festival-qa']['build']['args']['PUBLIC_INDEXABLE'], 'false')
 
     def test_invalid_commit_is_rejected_before_touching_server(self):
         with self.assertRaises(ValueError):

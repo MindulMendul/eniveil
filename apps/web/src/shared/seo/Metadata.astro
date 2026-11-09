@@ -1,6 +1,6 @@
 ---
 import { MANAGED_IMAGES } from '@festival/shared/images';
-import { pageMetadata, pageSchema, serializeSchema, shareImage, siteOrigin } from './metadata';
+import { indexingAllowed, pageMetadata, pageSchema, serializeSchema, shareImage, siteOrigin } from './metadata';
 const meta = pageMetadata(Astro.url.pathname);
 const origin = siteOrigin(import.meta.env.PUBLIC_SITE_URL);
 const image = shareImage(meta.en, origin);
@@ -10,7 +10,7 @@ const schema = pageSchema(Astro.url.pathname, origin);
 <title>{meta.title}</title>
 <link rel="icon" href={MANAGED_IMAGES.favicon} type="image/webp" />
 <meta data-site-meta name="description" content={meta.description} />
-<meta data-site-meta name="robots" content={meta.indexable ? 'index,follow' : 'noindex,nofollow'} />
+<meta data-site-meta name="robots" content={meta.indexable && indexingAllowed(import.meta.env.PUBLIC_INDEXABLE) ? 'index,follow' : 'noindex,nofollow'} />
 {meta.indexable && <>
   <link data-site-meta rel="canonical" href={canonical} />
   <link data-site-meta rel="alternate" hreflang="ko" href={new URL(meta.localized('ko'), origin).href} />
