@@ -1,3 +1,9 @@
+import { MANAGED_IMAGES, managedImagePath } from '@festival/shared/images';
+
+const legacyThumbnails = new Map<string, string>([
+  ['/og/story-archive-ko-v2.webp', MANAGED_IMAGES.ogKo],
+  ['/og/story-archive-en-v2.webp', MANAGED_IMAGES.ogEn],
+]);
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { storyPackageSchema, type Guest } from "@festival/shared";
@@ -54,15 +60,7 @@ function parseQuery(query: Record<string, string>) {
 }
 
 function safeThumbnail(value: unknown): value is string | null | undefined {
-  if (value === null || value === undefined) return true;
-  if (typeof value !== "string" || value.length > 2048 || /[\\\u0000-\u001f\u007f]/.test(value)) return false;
-  if (/^\/(?!\/)/.test(value)) return true;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && !url.username && !url.password;
-  } catch {
-    return false;
-  }
+  return value === null || value === undefined || managedImagePath(value) !== null;
 }
 
 function parseDraft(value: unknown):
@@ -74,7 +72,7 @@ function parseDraft(value: unknown):
   if (Object.keys(input).some((key) => !["package", "thumbnailUrl", "difficulty", "published"].includes(key)))
     return { success: false, status: 400, error: "허용되지 않은 작품 정보야." };
   if (!safeThumbnail(input.thumbnailUrl))
-    return { success: false, status: 400, error: "썸네일은 HTTPS 주소나 사이트 안의 경로로 입력해 줘." };
+    return { success: false, status: 400, error: "관리되는 WebP 이미지 경로를 선택해 줘." };
   if (input.difficulty !== undefined && input.difficulty !== null && (
     typeof input.difficulty !== "string" || !["easy", "normal", "hard"].includes(input.difficulty)
   ))
@@ -184,7 +182,7 @@ export function createWorkshopRoutes(deps: {
         playerCount: story.playerCount,
         estimatedMinutes: story.estimatedMinutes,
         author: entry.author,
-        thumbnailUrl: entry.thumbnailUrl,
+        thumbnailUrl: managedImagePath(entry.thumbnailUrl) ?? (entry.thumbnailUrl ? legacyThumbnails.get(entry.thumbnailUrl) ?? null : null),
         difficulty: entry.difficulty,
         published: entry.published,
         publishedAt: entry.publishedAt,

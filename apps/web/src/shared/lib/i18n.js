@@ -4,9 +4,9 @@ export const supportedLocales = ["ko", "en"];
 const translations = {
   language: ["언어", "Language"],
   languageName: ["한국어", "English"],
-  brand: ["스토리 아카이브", "Story Archive"],
+  brand: ["애니베일", "Eniveil"],
   brandSubtitle: ["INTERACTIVE STORY PLATFORM", "INTERACTIVE STORY PLATFORM"],
-  homeTitle: ["스토리 아카이브 · 인터랙티브 작품", "Story Archive · Interactive Stories"],
+  homeTitle: ["애니베일 · 인터랙티브 작품", "Eniveil · Interactive Stories"],
   entryInvitation: ["이야기가 당신을 기다립니다", "A story awaits you"],
   googleLogin: ["구글로 로그인", "Sign in with Google"],
   emailLogin: ["이메일 OTP로 로그인", "Sign in with email OTP"],

@@ -9,3 +9,8 @@ apps/web/.astro/
 __pycache__/
 
 .codex-results/
+
+# Encoded by the managed WebP image integration from assets/images.
+apps/web/public/favicon.webp
+apps/web/public/images/*.webp
+apps/web/public/og/*.webp

@@ -1,0 +1,66 @@
+[
+  {
+    "en": false,
+    "width": 320,
+    "js": false,
+    "heading": 1,
+    "summary": 1,
+    "errors": 0
+  },
+  {
+    "en": false,
+    "width": 320,
+    "js": true,
+    "heading": 1,
+    "summary": 1,
+    "errors": 0
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "js": false,
+    "heading": 1,
+    "summary": 1,
+    "errors": 0
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "js": true,
+    "heading": 1,
+    "summary": 1,
+    "errors": 0
+  },
+  {
+    "en": true,
+    "width": 320,
+    "js": false,
+    "heading": 1,
+    "summary": 1,
+    "errors": 0
+  },
+  {
+    "en": true,
+    "width": 320,
+    "js": true,
+    "heading": 1,
+    "summary": 1,
+    "errors": 0
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "js": false,
+    "heading": 1,
+    "summary": 1,
+    "errors": 0
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "js": true,
+    "heading": 1,
+    "summary": 1,
+    "errors": 0
+  }
+]

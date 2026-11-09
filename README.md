@@ -1,4 +1,4 @@
-# 이상한 축제
+# 애니베일
 
 Astro 정적 사이트 + Svelte 5 인터랙티브 화면 + Hono + Bun 기반 머더 미스터리 모노레포. 배포 시 Bun 서버 하나가 정적 화면, HTTP API, WebSocket을 제공합니다.
 

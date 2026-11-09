@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EntryIntro from "./EntryIntro.svelte";
   import { GuestLoginForm } from "../../../features/guest-login";
   import { Button } from "../../../shared/ui";
 
@@ -19,11 +20,7 @@
 
 <main id="main-content" tabindex="-1" class="main flex items-center justify-center">
   <section class="w-full max-w-sm py-8" aria-labelledby="entry-title">
-    <div class="mb-10 text-center">
-      <span class="emblem" aria-hidden="true">S</span>
-      <p class="eyebrow mt-4">{t("brand")}</p>
-      <h1 id="entry-title" class="heading-two text-festival-gold">{t("entryInvitation")}</h1>
-    </div>
+    <EntryIntro {locale} />
     <div class="border-t border-festival-line pt-2">
       <GuestLoginForm bind:nickname {busy} {t} {locale} onSubmit={onLogin} />
     </div>

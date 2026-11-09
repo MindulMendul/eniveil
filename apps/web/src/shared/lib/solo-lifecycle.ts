@@ -1,4 +1,4 @@
-import { soloRoomExitSchema, type RoomView } from "@festival/shared";
+import type { RoomView } from "@festival/shared";
 
 export type SoloExit = { roomId: string; soloPlayId: string | null };
 const exitKey = "festival_solo_exit";
@@ -20,8 +20,10 @@ export function matchesSoloExit(exit: SoloExit, room: RoomView | null) {
 
 export function pendingSoloExit(storage: Storage, room: RoomView | null): SoloExit | null {
   try {
-    const parsed = soloRoomExitSchema.safeParse(JSON.parse(storage.getItem(exitKey) ?? "null"));
-    if (parsed.success && matchesSoloExit(parsed.data, room)) return parsed.data;
+    const saved = JSON.parse(storage.getItem(exitKey) ?? "null");
+    // Only restore the exact server-provided room and attempt; never trust stored IDs.
+    if (room?.soloStarted && saved?.roomId === room.id && saved?.soloPlayId === room.soloPlayId)
+      return { roomId: room.id, soloPlayId: room.soloPlayId };
     storage.removeItem(exitKey);
   } catch { /* A new page never infers an exit from the room's active flag. */ }
   return null;

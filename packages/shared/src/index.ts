@@ -103,3 +103,5 @@ export {
   rumVitalSchema,
 } from "./story";
 export type { SoloStoryView, StoryCue, StoryPackage, StoryCatalogItem, StoryCatalogResponse } from "./story";
+export { MANAGED_IMAGES, managedImagePath, IMAGE_MAX_BYTES, IMAGE_MAX_OUTPUT_BYTES, IMAGE_MAX_DIMENSION, IMAGE_MAX_PIXELS, WEBP_QUALITY, checkImageBytes, checkImageDimensions } from './images';
+export { WORKSHOP_AUTHORING_ENABLED } from './features';

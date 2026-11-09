@@ -26,6 +26,17 @@ class ComposeDeploymentTests(unittest.TestCase):
         self.assertNotEqual(prod['volumes'],qa['volumes'])
         self.assertNotEqual(prod['services']['festival']['image'],qa['services']['festival-qa']['image'])
 
+    def test_production_domain_is_used_for_runtime_and_web_build(self):
+        target = deployment.TARGETS['production']
+        config = deployment.definition(Path('/source'), target, 'a'*40)
+        web = config['services']['festival']
+        self.assertEqual(web['environment']['APP_ORIGIN'], 'https://eniveil.com')
+        self.assertEqual(web['build']['args']['PUBLIC_SITE_URL'], 'https://eniveil.com')
+        self.assertEqual(deployment.TARGETS['qa']['origin'], 'https://qa-mindul-murder-mystery.duckdns.org')
+        self.assertEqual(web['build']['args']['PUBLIC_INDEXABLE'], 'true')
+        qa = deployment.definition(Path('/source'), deployment.TARGETS['qa'], 'b'*40)
+        self.assertEqual(qa['services']['festival-qa']['build']['args']['PUBLIC_INDEXABLE'], 'false')
+
     def test_invalid_commit_is_rejected_before_touching_server(self):
         with self.assertRaises(ValueError):
             deployment.deploy('production','main; bad')

@@ -16,7 +16,7 @@ REPOSITORY = 'https://github.com/MindulMendul/murder-parker.git'
 TARGETS = {
     'production': {'branch': 'main', 'project': 'deploy', 'service': 'festival',
                    'container': 'deploy-festival-1', 'volume': 'deploy_festival-data',
-                   'origin': 'https://mindul-murder-mystery.duckdns.org',
+                   'origin': 'https://eniveil.com',
                    'alias': 'mindul-murder-mystery', 'port': 3000},
     'qa': {'branch': 'qa', 'project': 'murder-parker-qa', 'service': 'festival-qa',
            'container': 'murder-parker-qa-festival-qa-1', 'volume': 'murder-parker-qa_festival-qa-data',
@@ -36,7 +36,7 @@ def definition(source, target, sha):
     return {'services': {service: {
         'image': 'mindul-murder-'+target['branch']+':'+sha,
         'build': {'context': str(source), 'dockerfile': 'deploy/Dockerfile',
-                  'args': {'APP_RELEASE': sha, 'PUBLIC_SITE_URL': target['origin'], 'PUBLIC_GA_MEASUREMENT_ID': os.getenv('PUBLIC_GA_MEASUREMENT_ID', '')}},
+                  'args': {'APP_RELEASE': sha, 'PUBLIC_SITE_URL': target['origin'], 'PUBLIC_INDEXABLE': 'true' if target['branch'] == 'main' else 'false', 'PUBLIC_GTM_CONTAINER_ID': os.getenv('PUBLIC_GTM_CONTAINER_ID', '')}},
         'restart': 'unless-stopped', 'mem_limit': '768m', 'cpus': 2,
         'ports': [f"127.0.0.1:{target['port']}:3000"],
         'env_file': [str(Path.home()/'murder-parker/deploy/.env')],
@@ -54,7 +54,7 @@ def wait_https(origin):
     last = None
     for _ in range(12):
         try:
-            with urllib.request.urlopen(origin+'/api/health', timeout=10) as response:
+            with urllib.request.urlopen(urllib.request.Request(origin+'/api/health', headers={'User-Agent':'mindul-deployment-health/1.0'}), timeout=10) as response:
                 if response.status == 200:
                     return
         except Exception as error:
