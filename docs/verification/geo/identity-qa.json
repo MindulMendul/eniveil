@@ -1,0 +1,66 @@
+[
+  {
+    "en": false,
+    "width": 320,
+    "js": false,
+    "canonical": "https://qa-mindul-murder-mystery.duckdns.org/about/",
+    "indexable": false,
+    "axe": null
+  },
+  {
+    "en": false,
+    "width": 320,
+    "js": true,
+    "canonical": "https://qa-mindul-murder-mystery.duckdns.org/about/",
+    "indexable": false,
+    "axe": 0
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "js": false,
+    "canonical": "https://qa-mindul-murder-mystery.duckdns.org/about/",
+    "indexable": false,
+    "axe": null
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "js": true,
+    "canonical": "https://qa-mindul-murder-mystery.duckdns.org/about/",
+    "indexable": false,
+    "axe": 0
+  },
+  {
+    "en": true,
+    "width": 320,
+    "js": false,
+    "canonical": "https://qa-mindul-murder-mystery.duckdns.org/en/about/",
+    "indexable": false,
+    "axe": null
+  },
+  {
+    "en": true,
+    "width": 320,
+    "js": true,
+    "canonical": "https://qa-mindul-murder-mystery.duckdns.org/en/about/",
+    "indexable": false,
+    "axe": 0
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "js": false,
+    "canonical": "https://qa-mindul-murder-mystery.duckdns.org/en/about/",
+    "indexable": false,
+    "axe": null
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "js": true,
+    "canonical": "https://qa-mindul-murder-mystery.duckdns.org/en/about/",
+    "indexable": false,
+    "axe": 0
+  }
+]

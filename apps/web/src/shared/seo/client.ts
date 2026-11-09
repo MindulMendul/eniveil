@@ -1,4 +1,4 @@
-import { pageMetadata, pageSchema, serializeSchema, shareImage, siteOrigin } from './metadata';
+import { indexingAllowed, pageMetadata, pageSchema, serializeSchema, shareImage, siteOrigin } from './metadata';
 export function syncMetadata(pathname: string) {
   window.dispatchEvent(new Event('site:navigation'));
   const m = pageMetadata(pathname), origin = siteOrigin(import.meta.env.PUBLIC_SITE_URL);
@@ -12,7 +12,7 @@ export function syncMetadata(pathname: string) {
     document.head.append(node);
   }
   const meta = (name:string,content:string,property=false) => add('meta',{[property?'property':'name']:name,content});
-  meta('description',m.description); meta('robots',m.indexable?'index,follow':'noindex,nofollow');
+  meta('description',m.description); meta('robots',m.indexable && indexingAllowed(import.meta.env.PUBLIC_INDEXABLE)?'index,follow':'noindex,nofollow');
   if (!m.indexable) return;
   add('link',{rel:'canonical',href:url});
   for (const lang of ['ko','en','x-default']) add('link',{rel:'alternate',hreflang:lang,href:new URL(m.localized(lang==='en'?'en':'ko'),origin).href});

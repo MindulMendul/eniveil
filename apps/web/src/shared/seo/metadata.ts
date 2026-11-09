@@ -1,3 +1,4 @@
+import { legalContact, siteOperator } from '../lib/site-identity';
 import { MANAGED_IMAGES } from '@festival/shared/images';
 export const publicPaths = ['/', '/workshop/', '/terms/', '/privacy/', '/about/'];
 export function shareImage(en: boolean, origin: string) {
@@ -8,9 +9,12 @@ export function shareImage(en: boolean, origin: string) {
   };
 }
 export function siteOrigin(value?: string) {
-  const url = new URL(value || 'https://mindul-murder-mystery.duckdns.org');
+  const url = new URL(value || 'https://eniveil.com');
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw Error('PUBLIC_SITE_URL must be an HTTP(S) origin.');
   return url.origin;
+}
+export function indexingAllowed(value?: string) {
+  return value !== 'false';
 }
 export function pageMetadata(pathname: string) {
   const en = /^\/en(?:\/|$)/.test(pathname);
@@ -50,6 +54,11 @@ export function pageSchema(pathname: string, origin: string) {
     '@id': meta.path === '/' ? website : url + '#webpage',
     name: meta.title, description: meta.description, url,
     inLanguage: meta.en ? 'en' : 'ko',
+    publisher: {
+      '@type': 'Person', '@id': new URL('/#operator', origin).href,
+      name: siteOperator, url: new URL('/', origin).href,
+      contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', url: legalContact },
+    },
     ...(meta.path === '/' ? {} : { isPartOf: { '@id': website } }),
   };
 }
