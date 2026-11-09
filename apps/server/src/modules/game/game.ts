@@ -10,11 +10,13 @@ import { supportedSoloStory } from "@festival/shared";
 import type { Room, Session, State } from "./model";
 import type { GameStateStore } from "./ports/state-store";
 import type { StoryCatalog } from "./story-catalog";
+import type { PlayAnalytics } from "./play-analytics";
 export class Game {
   online = new Map<string, number>();
   constructor(
     public store: GameStateStore,
     private readonly storyCatalog: StoryCatalog,
+    readonly analytics?: PlayAnalytics,
   ) {}
   get state(): State {
     return this.store.state;
@@ -104,6 +106,7 @@ export class Game {
     const friendIds = this.store.friendIds ? new Set(this.store.friendIds(me.id)) : null;
     return {
       me,
+      endingSessionId: this.analytics?.pending(me.id) ?? null,
       scenarios: this.storyCatalog.list(),
       rooms: Object.values(this.state.rooms)
         .filter((room) => this.joinError(room) === null && (room.access !== "friends" || (friendIds ? friendIds.has(room.hostId) : !!this.store.areFriends?.(room.hostId, me.id))))
@@ -247,7 +250,7 @@ export class Game {
     const session = room.sessionId ? this.state.sessions[room.sessionId] : undefined;
     const previousPhase = session?.phase, previouslyEnded = !!session?.endedAt;
     if (!room.memberIds.length) {
-      if (session && !session.endedAt) session.endedAt = new Date().toISOString();
+      if (session && !session.endedAt) { session.endedAt = new Date().toISOString(); this.analytics?.finish(session.id,"abandoned",null); }
       delete this.state.rooms[room.id];
     } else {
       if (room.hostId === guestId) room.hostId = room.memberIds[0];
@@ -261,9 +264,26 @@ export class Game {
   private revealWhenAllActiveVoted(room: Room, session: Session) {
     if (session.phase === "voting" && room.memberIds.every((id) => !!session.votes[id])) {
       session.phase = "reveal";
+      if (this.analytics) {
+        session.endedAt = new Date().toISOString();
+        const story=this.storyCatalog.get(session.scenarioId,session.scenarioVersion);
+        this.analytics.finish(session.id,"completed",{answer:story?.content.answer??"",votes:session.participants.map(p=>({voter:p.nickname,target:session.participants.find(t=>t.id===session.votes[p.id])?.nickname??"미투표"}))});
+      }
     }
   }
   command(me: Guest, command: Command) {
+    if(!this.analytics)return this.applyCommand(me,command);
+    const room=this.needRoom(me.id),beforeRoom=structuredClone(room);
+    const beforeSession=room.sessionId?structuredClone(this.state.sessions[room.sessionId]):null;
+    try {this.analytics.atomic(()=>this.applyCommand(me,command));}
+    catch(error){
+      if(room.sessionId&&room.sessionId!==beforeRoom.sessionId)delete this.state.sessions[room.sessionId];
+      this.state.rooms[beforeRoom.id]=beforeRoom;
+      if(beforeSession)this.state.sessions[beforeSession.id]=beforeSession;
+      throw error;
+    }
+  }
+  private applyCommand(me: Guest, command: Command) {
     const r = this.needRoom(me.id);
     const s = r.sessionId ? this.state.sessions[r.sessionId] : null;
     const host = () => {
@@ -280,6 +300,7 @@ export class Game {
       case "solo-return":
         host();
         if (r.mode !== "solo" || !r.soloStarted) throw Error("진행 중인 1인 게임이 없어.");
+        if (this.analytics) { delete this.state.rooms[r.id]; break; }
         r.soloStarted = false;
         r.soloPlayId = null;
         break;
@@ -316,6 +337,7 @@ export class Game {
           votes: {},
           endedAt: null,
         };
+        this.analytics?.start(session.id,session.scenarioId,session.scenarioVersion,'multiplayer',r.id,session.participants.map(p=>({id:p.id,role:String(p.roleIndex)})),{title:scenario.title,participants:session.participants.map(p=>({id:p.id,nickname:p.nickname}))});
         this.state.sessions[session.id] = session;
         r.sessionId = session.id;
         break;
@@ -326,6 +348,7 @@ export class Game {
         if (s.phase === "briefing") s.phase = "discussion";
         else if (s.phase === "discussion") s.phase = "voting";
         else throw Error("참가자들의 투표를 기다려 줘.");
+        if(s && this.analytics) for (const p of s.participants) this.analytics.stage(s.id,p.id,s.phase);
         break;
       case "vote":
         if (!s || s.phase !== "voting") throw Error("투표 단계가 아니야.");
@@ -333,9 +356,11 @@ export class Game {
         if (!s.participants.some((p) => p.id === command.targetId))
           throw Error("투표 대상을 확인해 줘.");
         s.votes[me.id] = command.targetId;
+        this.analytics?.record(s.id,me.id,"vote","voting",command.targetId);
         this.revealWhenAllActiveVoted(r, s);
         break;
       case "return":
+        if (this.analytics) throw Error("평가 후 로비로 돌아가 줘.");
         host();
         if (!s || s.phase !== "reveal")
           throw Error("결말 공개 후 돌아갈 수 있어.");
@@ -351,8 +376,37 @@ export class Game {
     }
     this.store.save();
   }
+  completeRating(userId:string,sessionId:string,rating:number|null) {
+    if(!this.analytics)throw Error('플레이 기록을 사용할 수 없어.');
+    const room=this.roomFor(userId),original=room?structuredClone(room):null;
+    try {this.analytics.atomic(()=>{this.analytics!.rate(sessionId,userId,rating);this.finishParticipant(userId,sessionId);});}
+    catch(error){if(original)this.state.rooms[original.id]=original;throw error;}
+  }
+  finishParticipant(userId:string,sessionId:string) {
+    const room=this.roomFor(userId),play=this.analytics?.play(sessionId);
+    if(!room || !play || play.room_id!==room.id || (room.sessionId && room.sessionId!==sessionId)) return;
+    room.memberIds=room.memberIds.filter(id=>id!==userId);
+    if(!room.memberIds.length) delete this.state.rooms[room.id];
+    else if(room.hostId===userId) room.hostId=room.memberIds[0];
+    this.store.save();
+  }
+  abandonPlay(id:string) {
+    const play=this.analytics?.play(id);if(!play?.room_id)return;
+    const room=this.state.rooms[play.room_id];
+    if(room&&(room.sessionId===id||!room.sessionId&&room.mode==='solo')){delete this.state.rooms[room.id];this.store.save();}
+  }
+  cleanupFinishedRooms() {
+    if(!this.analytics) return;
+    let changed=false;
+    for(const room of Object.values(this.state.rooms)) {
+      const play=room.sessionId?this.analytics.play(room.sessionId):this.analytics.endedForRoom(room.id);
+      if(play?.ended && Date.now()-play.ended>600000) {delete this.state.rooms[room.id];changed=true;}
+    }
+    if(changed)this.store.save();
+  }
   endSolo(me: Guest, roomId: string, soloPlayId: string | null) {
-    const room = this.needRoom(me.id);
+    const room = this.roomFor(me.id);
+    if(!room) return;
     if (room.hostId !== me.id) throw Error("방장만 진행할 수 있어.");
     if (room.id !== roomId) throw Error("현재 방을 확인해 줘.");
     // Page exits can arrive after a return or a new start. Only end their own attempt.

@@ -5,7 +5,8 @@
   import { translate } from '../../shared/lib/i18n.js';
   import { trackEvent } from '../../analytics.js';
   import StoryCuePlayer from './StoryCuePlayer.svelte';
-  import StoryRating from './StoryRating.svelte';
+  import PlayEnding from './PlayEnding.svelte';
+  import { playTracker } from '../../shared/lib/play-tracker';
 
   /** @type {{ locale?: 'ko' | 'en', storyId?: string, onExit?: () => void, exitLabel?: string, exitDisabled?: boolean, exitMessage?: string }} */
   let { locale = 'ko', storyId = supportedSoloStory.id, onExit = () => {}, exitLabel, exitDisabled = false, exitMessage = '' } = $props();
@@ -35,7 +36,21 @@
   let resolutionCues = $state([]);
   let hints = $derived(mechanics?.hints ?? {});
 
+  /** @type {ReturnType<typeof playTracker> | undefined} */
+  let tracker;
+  /** @param {string} type @param {Record<string, any>} data */
+  function record(type,data) {
+    trackEvent(type,data);
+    /** @type {Record<string, import('@festival/shared').PlayEvent['type']>} */
+    const types={case_location_open:'location',case_clue_open:'inspect',case_question:'question',case_evidence_present:'evidence_present',case_accusation_evidence_select:'evidence_select',case_hint_view:'hint'};
+    if(types[type]) tracker?.record(types[type],String(data.suspect_id&&data.clue_id?`${data.suspect_id}:${data.clue_id}`:data.question_type?`${data.suspect_id}:${data.question_type}`:data.location_id??data.clue_id??data.suspect_id??data.hint_number??''));
+  }
+  async function finishAndExit() {
+    sessionStorage.removeItem(`active-play:${storyId}`);
+    onExit();
+  }
   let phase = $state('title');
+  $effect(()=>{if(runId && phase!=='title')tracker?.stage(/** @type {import('@festival/shared').PlayEvent['stage']} */(phase));});
   let roomId = $state('');
   /** @type {string[]} */
   let found = $state([]);
@@ -78,6 +93,12 @@
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? '스토리를 불러오지 못했어.');
         storyPackage = data;
+        const saved=sessionStorage.getItem(`active-play:${storyId}`);
+        if(saved) {
+          const response=await fetch(`/api/game/sessions/${saved}`);const current=await response.json();
+          if(response.ok){runId=saved;tracker=playTracker(saved);if(current.ended){tracker?.stop();tracker=undefined;phase='win';}else{storyPackage=current.package;found=current.progress.foundEvidenceIds;openingCues=current.scene.cues;startedAt=Date.parse(current.progress.startedAt);phase=current.scene.id==='investigation'?'explore':'intro';}}
+          else sessionStorage.removeItem(`active-play:${storyId}`);
+        }
       })
       .catch((error) => {
         storyLoadError = error instanceof Error ? error.message : '스토리를 불러오지 못했어.';
@@ -87,7 +108,7 @@
       if (exited) return;
       exited = true;
       if (!startedAt || phase === 'win' || phase === 'fail') return;
-      if (runId) navigator.sendBeacon(`/api/game/sessions/${runId}/abandon`, new Blob([], { type: 'application/json' }));
+      tracker?.record("exit",undefined,false);
       trackEvent('story_abandon', {
         story_id: storyPackage?.story.id ?? 'deokil-trading-murder',
         play_duration_seconds: Math.round((Date.now() - startedAt) / 1000),
@@ -99,10 +120,11 @@
     return () => {
       window.removeEventListener('pagehide', recordAbandonment);
       recordAbandonment();
+      tracker?.stop();
     };
   });
 
-  async function startOver() {
+  async function startGame() {
     if (!storyPackage) return;
     storyLoadError = '';
     try {
@@ -115,6 +137,8 @@
       if (!response.ok) throw new Error(data.error ?? '플레이를 시작하지 못했어.');
       storyPackage = data.package;
       runId = data.runId;
+      sessionStorage.setItem(`active-play:${storyId}`,runId);
+      tracker=playTracker(runId);
       resolutionCues = [];
       openingCues = data.scene.cues;
       startedAt = Date.parse(data.progress.startedAt);
@@ -149,7 +173,7 @@
 
   /** @param {string} id */
   function enterRoom(id) {
-    trackEvent('case_location_open', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', location_id: id, language: locale });
+    record('case_location_open', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', location_id: id, language: locale });
     roomId = id;
     currentEvidence = '';
   }
@@ -171,27 +195,28 @@
         return;
       }
     }
-    trackEvent('case_clue_open', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', clue_id: id, language: locale });
+    record('case_clue_open', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', clue_id: id, language: locale });
     if (!found.includes(id)) found = [...found, id];
     currentEvidence = id;
   }
 
   /** @param {string} id */
   function chooseSuspect(id) {
+    tracker?.record("suspect",id);
     selectedSuspect = id;
     responses = [];
   }
 
   /** @param {number} index */
   function askAlibi(index) {
-    trackEvent('case_question', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', suspect_id: selectedSuspect, question_type: index === 0 ? 'alibi' : 'relationship', language: locale });
+    record('case_question', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', suspect_id: selectedSuspect, question_type: index === 0 ? 'alibi' : 'relationship', language: locale });
     const text = alibis[selectedSuspect][index];
     responses = [...responses, { text, source: index === 0 ? '알리바이' : '피해자와의 관계' }];
   }
 
   /** @param {string} id */
   function presentEvidence(id) {
-    trackEvent('case_evidence_present', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', suspect_id: selectedSuspect, clue_id: id, language: locale });
+    record('case_evidence_present', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', suspect_id: selectedSuspect, clue_id: id, language: locale });
     const response = reactions[selectedSuspect]?.[id];
     const text = response?.[0] ?? '…그 증거가 저와 무슨 상관이죠?';
     responses = [...responses, { text, source: evidence[id].name }];
@@ -199,7 +224,7 @@
 
   /** @param {string} id */
   function toggleAccusation(id) {
-    trackEvent('case_accusation_evidence_select', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', clue_id: id, selected: !accusation.includes(id), language: locale });
+    record('case_accusation_evidence_select', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', clue_id: id, selected: !accusation.includes(id), language: locale });
     if (accusation.includes(id)) accusation = accusation.filter((item) => item !== id);
     else if (accusation.length < 3) accusation = [...accusation, id];
   }
@@ -218,6 +243,7 @@
     }
     const outcome = result.outcome === 'success' ? 'success' : 'failure';
     trackEvent('story_attempt_end', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', outcome, clue_count: found.length, play_duration_seconds: Math.round((Date.now() - startedAt) / 1000), language: locale });
+    tracker?.stop();tracker=undefined;
     if (result.outcome === 'success') {
       resolutionCues = result.cues;
       phase = 'win';
@@ -232,7 +258,7 @@
     const index = Math.min(hintIndex[phase] ?? 0, list.length - 1);
     hintIndex = { ...hintIndex, [phase]: index + 1 };
     hintMessage = list[index];
-    trackEvent('case_hint_view', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', stage: phase, hint_number: index + 1, language: locale });
+    record('case_hint_view', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', stage: phase, hint_number: index + 1, language: locale });
   }
 </script>
 
@@ -258,12 +284,12 @@
         <div class="border border-festival-line px-4 py-3"><span class="text-[10px] tracking-[1px] text-festival-gold">{step.number}</span><p class="mb-0 mt-2 text-sm">{step.label}</p></div>
       {/each}
     </div>
-    <Button class="primary mx-auto max-w-[540px]" disabled={!storyPackage} onclick={startOver} variant="primary">{t('caseStart')} <span>→</span></Button>
+    <Button class="primary mx-auto max-w-[540px]" disabled={!storyPackage} onclick={startGame} variant="primary">{t('caseStart')} <span>→</span></Button>
     <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={exitDisabled} onclick={onExit}>{exitLabel ?? t('backToPlatform')}</button>
   </section>
 {:else if phase === 'intro'}
   {#if openingCues.length}
-    <StoryCuePlayer cues={openingCues} onComplete={finishOpening} />
+    <StoryCuePlayer cues={openingCues} onAction={(type,index)=>tracker?.record(type==='next'?'cue_next':'cue_skip',String(index))} onComplete={finishOpening} />
   {:else}
     <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center">
       <p class="muted">{t('openingHasNoNarration')}</p>
@@ -323,8 +349,6 @@
     <div class="lobby-grid"><section class="panel"><h2 class="heading-two">{t('culpritQuestion')}</h2><div class="grid grid-cols-2 gap-3 max-[520px]:grid-cols-1">{#each suspects as suspect}<button class="cursor-pointer border p-4 text-left focus-visible:outline-2 focus-visible:outline-festival-gold {selectedSuspect === suspect.id ? 'border-festival-gold bg-festival-panel-hover' : 'border-festival-line bg-transparent hover:border-festival-gold-border'}" onclick={() => chooseSuspect(suspect.id)}><span class="text-xs text-festival-muted">{selectedSuspect === suspect.id ? `● ${t('selectedLabel')}` : `○ ${t('selectLabel')}`}</span><h3 class="heading-three mb-0 mt-2">{suspect.name}</h3></button>{/each}</div></section><aside class="panel"><div class="section-heading"><h2 class="heading-two mb-0">{t('decisiveEvidence')}</h2><span class="tag gold">{accusation.length} / 3</span></div><p class="muted my-4">{t('chooseThreeEvidence')}</p><div class="grid max-h-[390px] gap-2 overflow-auto">{#each found as id}<Button class="secondary mt-0" onclick={() => toggleAccusation(id)} variant="secondary"><span>{accusation.includes(id) ? '☑' : '☐'} {evidence[id].icon} {evidence[id].name}</span><span>{accusation.includes(id) ? t('selectedLabel') : ''}</span></Button>{/each}</div></aside></div>
     <div class="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-festival-line pt-5"><Button class="text-button" onclick={showHint} variant="text">{t('hint')}</Button><div class="flex gap-3"><Button class="secondary mt-0 w-auto" onclick={() => { phase = 'cross'; selectedSuspect = ''; }} variant="secondary">{t('reviewEvidence')}</Button><Button class="primary mt-0 w-auto min-w-[190px]" disabled={!selectedSuspect || accusation.length !== 3} onclick={arrest} variant="primary">{t('arrest')} <span>→</span></Button></div></div>
   </section>
-{:else if phase === 'win'}
-  <section class="mx-auto max-w-[760px] border border-festival-gold-border bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('allCaught')}</p><h1 class="heading-one page-title">{t('success')}</h1><p class="muted">{locale === 'en' ? 'You identified the culprit and the key evidence.' : '범인과 핵심 증거를 정확히 짚어냈어.'}</p>{#if resolutionCues.length}<div class="mt-8"><StoryCuePlayer cues={resolutionCues} onComplete={() => {}} /></div>{/if}<StoryRating {runId} /><Button class="primary mt-7" onclick={startOver} variant="primary">{t('replay')} <span>↻</span></Button><button class="mt-4 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={exitDisabled} onclick={onExit}>{exitLabel ?? t('backToPlatform')}</button></section>
-{:else}
-  <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center max-[520px]:p-5"><p class="eyebrow">{t('caseUnresolved')}</p><span class="text-5xl text-festival-gold" aria-hidden="true">…</span><h1 class="heading-one page-title mt-5">{t('unresolved')}</h1><p class="narrative">{resultMessage}</p><StoryRating {runId} /><div class="mt-7 grid gap-3 sm:grid-cols-2"><Button class="primary mt-0" onclick={startOver} variant="primary">{t('restart')} <span>↻</span></Button><Button class="secondary mt-0" disabled={exitDisabled} onclick={onExit} variant="secondary">{exitLabel ?? t('backToPlatform')} <span>↗</span></Button></div></section>
+{:else if phase === 'win' || phase === 'fail'}
+  <PlayEnding id={runId} {locale} onExit={finishAndExit} />
 {/if}
