@@ -48,7 +48,7 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER || 'ubuntu' }}
           SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
           DEPLOY_SHA: ${{ github.sha }}
-          PUBLIC_GTM_CONTAINER_ID: ${{ vars.GTM_CONTAINER_ID || 'GTM-56Q5K95G' }}
+          PUBLIC_GTM_CONTAINER_ID: ${{ github.ref_name == 'main' && (vars.GTM_CONTAINER_ID || 'GTM-56Q5K95G') || vars.QA_GTM_CONTAINER_ID }}
         run: |
           set -euo pipefail
           test -n "$SSH_PRIVATE_KEY" || { echo 'SSH_PRIVATE_KEY secret is required (OpenSSH key or base64 encoded key)'; exit 1; }
