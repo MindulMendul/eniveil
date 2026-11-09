@@ -18,7 +18,8 @@ Optional secrets: `SSH_HOST` (default `129.154.220.233`), `SSH_USER` (default
 `ubuntu`), `SSH_PORT` (default `22`). `deploy/ssh_known_hosts` pins the server's
 Ed25519 public host key; update it explicitly if the server key rotates.
 
-For manual deployment, set `PUBLIC_GTM_CONTAINER_ID=GTM-56Q5K95G` in the environment that runs `deploy/deploy-compose.py`; an empty value disables the consent controls and GTM. The GitHub workflow uses `GTM_CONTAINER_ID` and defaults to this container. See `docs/gtm-analytics.md`.
+For GitHub deployment, production uses `GTM_CONTAINER_ID` and defaults to `GTM-56Q5K95G`. QA uses only the optional `QA_GTM_CONTAINER_ID`; when unset, QA consent controls and tags are disabled. QA never falls back to the production variable or container.
+For manual deployment, set `PUBLIC_GTM_CONTAINER_ID` in the environment running `deploy/deploy-compose.py`: use the production ID for production, a separate QA container for QA, or an empty value to disable analytics. Both environments load tags only after user consent. See `docs/gtm-analytics.md`.
 `APP_ORIGIN` is fixed to the URLs above. Environment files remain on the server:
 `~/murder-parker/deploy/.env` for production and
 `~/murder-parker-qa/deploy/.env` for QA, when present.
