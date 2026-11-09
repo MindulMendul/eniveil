@@ -1,11 +1,12 @@
 <script lang="ts" generics="Module">
   import type { Snippet } from 'svelte';
   import Button from './Button.svelte';
-  let { load, children, locale, embedded = false }: {
+  let { load, children, locale, embedded = false, fallback }: {
     load: () => Promise<Module>;
     children: Snippet<[Module]>;
     locale: 'ko' | 'en';
     embedded?: boolean;
+    fallback?: Snippet<[boolean]>;
   } = $props();
   const screen = $derived(load());
 </script>
@@ -20,9 +21,9 @@
 {/snippet}
 
 {#await screen}
-  {#if embedded}{@render status(false)}{:else}<main id="main-content" tabindex="-1" class="main center">{@render status(false)}</main>{/if}
+  {#if fallback}{@render fallback(false)}{:else if embedded}{@render status(false)}{:else}<main id="main-content" tabindex="-1" class="main center">{@render status(false)}</main>{/if}
 {:then module}
   {@render children(module)}
 {:catch}
-  {#if embedded}{@render status(true)}{:else}<main id="main-content" tabindex="-1" class="main center">{@render status(true)}</main>{/if}
+  {#if fallback}{@render fallback(true)}{:else if embedded}{@render status(true)}{:else}<main id="main-content" tabindex="-1" class="main center">{@render status(true)}</main>{/if}
 {/await}

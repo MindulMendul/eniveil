@@ -13,7 +13,8 @@
     "start:temporal-worker": "node --env-file=.env temporal-worker/src/index.js",
     "check": "bun run --cwd apps/web check && bunx tsc -p apps/server/tsconfig.json --noEmit",
     "test": "bun test apps/server apps/web/tests",
-    "verify": "bun run check && bun run build && bun run test"
+    "verify": "bun run check && bun run build && bun run test && bun test apps/web/integration",
+    "test:html": "bun run build && bun test apps/web/integration"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
