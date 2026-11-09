@@ -23,6 +23,12 @@ const en = Astro.url.pathname.startsWith('/en');
     const message = document.querySelector<HTMLElement>('[data-analytics-message]')!;
     const error = document.querySelector<HTMLElement>('[data-analytics-error]')!;
     const privacy = document.querySelector<HTMLAnchorElement>('[data-analytics-privacy]')!;
+    let failedChoice: 'granted' | 'denied' | null = null;
+    const updateError = (en: boolean) => {
+      error.textContent = failedChoice === 'granted'
+        ? (en ? 'Your choice could not be saved. Enable browser storage or try again.' : '선택을 저장할 수 없습니다. 브라우저 저장소를 허용하거나 다시 시도해 주세요.')
+        : (en ? 'Your choice could not be saved. Close all site tabs, then clear the saved consent in browser site data before returning.' : '선택을 저장할 수 없습니다. 사이트의 모든 탭을 닫고 다시 방문하기 전에 브라우저 사이트 데이터에서 저장된 동의를 삭제해 주세요.');
+    };
     const sync = () => {
       const en = location.pathname === '/en' || location.pathname.startsWith('/en/');
       settings.textContent = en ? 'Analytics and advertising settings' : '분석 및 광고 설정';
@@ -31,15 +37,15 @@ const en = Astro.url.pathname.startsWith('/en');
       message.textContent = en ? 'Allow analytics and advertising tags?' : '분석 및 광고 태그 사용에 동의하시나요?';
       privacy.textContent = en ? 'Privacy policy' : '개인정보 처리방침';
       privacy.href = en ? '/en/privacy/' : '/privacy/';
-      error.textContent = en ? 'Your choice could not be saved. Close all site tabs, then clear the saved consent in browser site data before returning.' : '선택을 저장할 수 없습니다. 사이트의 모든 탭을 닫고 다시 방문하기 전에 브라우저 사이트 데이터에서 저장된 동의를 삭제해 주세요.';
+      updateError(en);
       trackPageView(en ? 'en' : 'ko');
     };
     choice.hidden = analyticsConsent() !== null;
     settings.setAttribute('aria-expanded', String(!choice.hidden));
     settings.onclick = () => { choice.hidden = false; settings.setAttribute('aria-expanded', 'true'); deny.focus(); };
     const choose = (value: 'granted' | 'denied') => {
-      if (!setAnalyticsConsent(value)) { error.hidden = false; return; }
-      error.hidden = true; choice.hidden = true; settings.setAttribute('aria-expanded', 'false'); settings.focus();
+      if (!setAnalyticsConsent(value)) { failedChoice = value; updateError(location.pathname === '/en' || location.pathname.startsWith('/en/')); error.hidden = false; return; }
+      failedChoice = null; error.hidden = true; choice.hidden = true; settings.setAttribute('aria-expanded', 'false'); settings.focus();
     };
     allow.onclick = () => choose('granted'); deny.onclick = () => choose('denied');
     window.addEventListener('site:navigation', sync);
@@ -47,8 +53,8 @@ const en = Astro.url.pathname.startsWith('/en');
   }
 </script>
 <style>
-  .analytics-choice{padding:1rem;position:relative;z-index:1;border-top:1px solid currentColor;font:inherit}
-  button{font:inherit;min-height:44px;padding:.5rem .75rem;cursor:pointer;margin:.25rem}
-  p{margin:.5rem 0;line-height:1.6}
+  .analytics-choice{padding:var(--spacing-4);position:relative;z-index:1;border-top:1px solid currentColor;font:inherit}
+  button{font:inherit;min-height:44px;padding:var(--spacing-2) var(--spacing-3);cursor:pointer;margin:var(--spacing-1)}
+  p{margin:var(--spacing-2) 0;line-height:1.6}
   [hidden]{display:none}
 </style>
