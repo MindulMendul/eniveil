@@ -4,6 +4,7 @@ export type StoryContent = {
   roles: { name: string; secret: string }[];
   clues: string[];
   answer: string;
+  answerRoleIndex?: number;
 };
 
 export type StoryVersion = {

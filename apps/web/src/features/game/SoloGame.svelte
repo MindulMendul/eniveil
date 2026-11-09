@@ -6,6 +6,7 @@
   import { trackEvent } from '../../analytics.js';
   import StoryCuePlayer from './StoryCuePlayer.svelte';
   import PlayEnding from './PlayEnding.svelte';
+  import { restoreSoloUi,soloUiKey } from '../../shared/lib/solo-progress';
   import { playTracker } from '../../shared/lib/play-tracker';
 
   /** @type {{ locale?: 'ko' | 'en', storyId?: string, onExit?: () => void, exitLabel?: string, exitDisabled?: boolean, exitMessage?: string }} */
@@ -45,6 +46,22 @@
     const types={case_location_open:'location',case_clue_open:'inspect',case_question:'question',case_evidence_present:'evidence_present',case_accusation_evidence_select:'evidence_select',case_hint_view:'hint'};
     if(types[type]) tracker?.record(types[type],String(data.suspect_id&&data.clue_id?`${data.suspect_id}:${data.clue_id}`:data.question_type?`${data.suspect_id}:${data.question_type}`:data.location_id??data.clue_id??data.suspect_id??data.hint_number??''));
   }
+  let disposed=false;
+  let leaving=$state(false);
+  async function leavePlay() {
+    if(leaving)return;leaving=true;storyLoadError='';
+    try {
+      if(runId&&!['win','fail'].includes(phase)) {
+        tracker?.record('exit','explicit');
+        if(tracker&&!await tracker.flush())throw new Error('플레이 기록을 저장하지 못했어. 다시 시도해 줘.');
+        const response=await fetch(`/api/game/sessions/${runId}/abandon`,{method:'POST'});
+        if(!response.ok)throw new Error('플레이를 종료하지 못했어. 다시 시도해 줘.');
+      }
+      sessionStorage.removeItem(`active-play:${storyId}`);if(runId)sessionStorage.removeItem(soloUiKey(runId));
+      await onExit();
+    }catch(error){storyLoadError=error instanceof Error?error.message:'연결을 확인해 줘.';}
+    finally{leaving=false;}
+  }
   async function finishAndExit() {
     sessionStorage.removeItem(`active-play:${storyId}`);
     onExit();
@@ -64,6 +81,12 @@
   let hintMessage = $state('');
   let startedAt = $state(0);
   let runId = $state('');
+  let openingIndex = $state(0);
+  $effect(()=>{
+    if(runId&&['intro','cast','explore','alibi','cross','accuse'].includes(phase)){
+      try{sessionStorage.setItem(soloUiKey(runId),JSON.stringify({phase,roomId,currentEvidence,selectedSuspect,accusation,responses,openingIndex,hintIndex}));}catch{/* Browser storage can be disabled. */}
+    }
+  });
   /** @type {Record<string, number>} */
   let hintIndex = $state({});
 
@@ -88,27 +111,29 @@
         route: '/solo',
       }),
     }).catch(() => {});
-    void fetch(`/api/game/stories/${encodeURIComponent(storyId)}`)
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? '스토리를 불러오지 못했어.');
-        storyPackage = data;
-        const saved=sessionStorage.getItem(`active-play:${storyId}`);
-        if(saved) {
-          const response=await fetch(`/api/game/sessions/${saved}`);const current=await response.json();
-          if(response.ok){runId=saved;tracker=playTracker(saved);if(current.ended){tracker?.stop();tracker=undefined;phase='win';}else{storyPackage=current.package;found=current.progress.foundEvidenceIds;openingCues=current.scene.cues;startedAt=Date.parse(current.progress.startedAt);phase=current.scene.id==='investigation'?'explore':'intro';}}
-          else sessionStorage.removeItem(`active-play:${storyId}`);
+    const loader=new AbortController();
+    void (async()=>{
+      const saved=sessionStorage.getItem(`active-play:${storyId}`);
+      if(saved) {
+        const response=await fetch(`/api/game/sessions/${encodeURIComponent(saved)}`,{signal:loader.signal});
+        const current=await response.json();if(loader.signal.aborted)return;
+        if(response.ok&&!current.finished&&current.outcome!=='abandoned') {
+          runId=saved;
+          if(current.ended){phase='win';return;}
+          hydrateRun(current);return;
         }
-      })
-      .catch((error) => {
-        storyLoadError = error instanceof Error ? error.message : '스토리를 불러오지 못했어.';
-      });
+        sessionStorage.removeItem(`active-play:${storyId}`);
+      }
+      const response=await fetch(`/api/game/stories/${encodeURIComponent(storyId)}`,{signal:loader.signal});
+      const data=await response.json();if(loader.signal.aborted)return;if(!response.ok)throw Error(data.error??'스토리를 불러오지 못했어.');
+      storyPackage=data;
+    })().catch(error=>{if(!loader.signal.aborted)storyLoadError=error instanceof Error?error.message:'스토리를 불러오지 못했어.';});
     let exited = false;
     const recordAbandonment = () => {
       if (exited) return;
       exited = true;
       if (!startedAt || phase === 'win' || phase === 'fail') return;
-      tracker?.record("exit",undefined,false);
+
       trackEvent('story_abandon', {
         story_id: storyPackage?.story.id ?? 'deokil-trading-murder',
         play_duration_seconds: Math.round((Date.now() - startedAt) / 1000),
@@ -118,6 +143,7 @@
     };
     window.addEventListener('pagehide', recordAbandonment);
     return () => {
+      disposed=true;loader.abort();
       window.removeEventListener('pagehide', recordAbandonment);
       recordAbandonment();
       tracker?.stop();
@@ -134,29 +160,25 @@
         body: JSON.stringify({ storyId: storyPackage.story.id }),
       });
       const data = await response.json();
+      if(disposed)return;
       if (!response.ok) throw new Error(data.error ?? '플레이를 시작하지 못했어.');
-      storyPackage = data.package;
-      runId = data.runId;
-      sessionStorage.setItem(`active-play:${storyId}`,runId);
-      tracker=playTracker(runId);
-      resolutionCues = [];
-      openingCues = data.scene.cues;
-      startedAt = Date.parse(data.progress.startedAt);
+      sessionStorage.setItem(`active-play:${storyId}`,data.runId);
+      hydrateRun(data);
     } catch (error) {
       storyLoadError = error instanceof Error ? error.message : '플레이를 시작하지 못했어.';
       return;
     }
     trackEvent('story_start', { story_id: storyPackage?.story.id ?? storyId, language: locale });
-    phase = 'intro';
-    roomId = '';
-    found = [];
-    currentEvidence = '';
-    selectedSuspect = '';
-    responses = [];
-    accusation = [];
-    resultMessage = '';
-    hintMessage = '';
-    hintIndex = {};
+  }
+
+  /** @param {any} data */
+  function hydrateRun(data) {
+    storyPackage=data.package;runId=data.runId;found=data.progress.foundEvidenceIds;
+    openingCues=data.scene.cues;startedAt=Date.parse(data.progress.startedAt);
+    const content=data.package.content.mechanics;
+    const ui=restoreSoloUi(sessionStorage,runId,data.scene.id==='investigation',found,content.locations?.map(/** @param {any} item */item=>item.id)??[],content.suspects?.map(/** @param {any} item */item=>item.id)??[]);
+    roomId=ui.roomId;currentEvidence=ui.currentEvidence;selectedSuspect=ui.selectedSuspect;accusation=ui.accusation;responses=ui.responses;openingIndex=ui.openingIndex;hintIndex=ui.hintIndex;
+    tracker?.stop();tracker=playTracker(runId);phase=ui.phase;
   }
 
   async function finishOpening() {
@@ -237,6 +259,7 @@
       body: JSON.stringify({ suspectId: selectedSuspect, evidenceIds: accusation }),
     });
     const result = await response.json();
+    if(disposed)return;
     if (!response.ok) {
       storyLoadError = result.error ?? '고발 결과를 확인하지 못했어.';
       return;
@@ -264,6 +287,7 @@
 
 <svelte:head><title>{storyPackage?.story.title ?? '덕일상사 살인사건'} · 애니베일</title></svelte:head>
 
+{#if !['title','win','fail'].includes(phase)}<Button variant="text" disabled={exitDisabled||leaving} onclick={leavePlay}>{locale==='en'?'Leave':'나가기'}</Button>{/if}
 {#if storyLoadError}<p class="mx-auto mb-4 max-w-[960px] border border-red-700/50 bg-festival-panel px-5 py-3 text-sm text-red-300" role="alert">{storyLoadError}</p>{/if}
 {#if exitMessage}<p class="mx-auto mb-4 max-w-[960px] text-sm text-festival-muted" role="status">{exitMessage}</p>{/if}
 {#if hintMessage}
@@ -285,11 +309,11 @@
       {/each}
     </div>
     <Button class="primary mx-auto max-w-[540px]" disabled={!storyPackage} onclick={startGame} variant="primary">{t('caseStart')} <span>→</span></Button>
-    <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={exitDisabled} onclick={onExit}>{exitLabel ?? t('backToPlatform')}</button>
+    <button class="mt-5 cursor-pointer border-0 bg-transparent px-3 py-2 text-xs text-festival-muted hover:text-festival-gold disabled:cursor-not-allowed disabled:opacity-50" disabled={exitDisabled||leaving} onclick={leavePlay}>{exitLabel ?? t('backToPlatform')}</button>
   </section>
 {:else if phase === 'intro'}
   {#if openingCues.length}
-    <StoryCuePlayer cues={openingCues} onAction={(type,index)=>tracker?.record(type==='next'?'cue_next':'cue_skip',String(index))} onComplete={finishOpening} />
+    <StoryCuePlayer cues={openingCues} initialIndex={openingIndex} onAction={(type,index)=>{openingIndex=type==='next'?index+1:openingCues.length;tracker?.record(type==='next'?'cue_next':'cue_skip',String(index));}} onComplete={finishOpening} />
   {:else}
     <section class="mx-auto max-w-[680px] border border-festival-line bg-festival-panel p-8 text-center">
       <p class="muted">{t('openingHasNoNarration')}</p>

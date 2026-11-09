@@ -6,7 +6,7 @@
   import { Button } from '../../shared/ui';
   import { playTracker } from '../../shared/lib/play-tracker';
   let { id,onExit,locale='ko' }: {id:string;onExit:()=>void;locale?:'ko'|'en'}=$props();
-  let view=$state<{outcome:string;mode:string;endingComplete:boolean;finished:boolean;cueIndex:number;result:{cues?:StoryCue[];message?:string;answer?:string;votes?:{voter:string;target:string}[]}}|null>(null);
+  let view=$state<{storyId:string;outcome:string;mode:string;endingComplete:boolean;finished:boolean;cueIndex:number;result:{cues?:StoryCue[];message?:string;answer?:string;votes?:{voter:string;target:string}[]}}|null>(null);
   let error=$state(''),busy=$state(false);
   let tracker:ReturnType<typeof playTracker>|undefined;
   async function ending() {
@@ -16,7 +16,7 @@
   }
   onMount(()=>{
     let disposed=false;
-    void fetch(`/api/play/sessions/${id}`).then(async response=>{const data=await response.json();if(!response.ok)throw Error(data.error);if(disposed)return;view=data;if(data.finished||data.outcome==='abandoned'){onExit();return;}tracker=playTracker(id);tracker.stage(data.endingComplete?'rating':data.mode==='solo'?(data.outcome==='failed'?'fail':'win'):'reveal');}).catch(cause=>{if(!disposed)error=cause.message;});
+    void fetch(`/api/play/sessions/${id}`).then(async response=>{const data=await response.json();if(!response.ok)throw Error(data.error);if(disposed)return;if(data.finished||data.outcome==='abandoned'){sessionStorage.removeItem(`active-play:${data.storyId}`);sessionStorage.removeItem(`solo-ui:${id}`);onExit();return;}if(!data.ended)throw Error('아직 끝나지 않은 플레이야.');view=data;tracker=playTracker(id);tracker.stage(data.endingComplete?'rating':data.mode==='solo'?(data.outcome==='failed'?'fail':'win'):'reveal');}).catch(cause=>{if(!disposed)error=cause.message;});
     return()=>{disposed=true;tracker?.stop();};
   });
 </script>
@@ -25,7 +25,7 @@
   {#if !view}<p role="status">{locale==='en'?'Loading…':'불러오는 중…'}</p>
   {:else if view.endingComplete}
     <h1 class="heading-one">{locale==='en'?'Rate this story':'스토리 평가'}</h1>
-    <StoryRating runId={id} {locale} beforeSubmit={async()=>{if(tracker&&!await tracker.flush())throw Error(locale==='en'?'Could not save play records. Please retry.':'플레이 기록을 저장하지 못했어. 다시 시도해 줘.');}} onDone={onExit} />
+    <StoryRating runId={id} {locale} beforeSubmit={async()=>{if(tracker&&!await tracker.flush())throw Error(locale==='en'?'Could not save play records. Please retry.':'플레이 기록을 저장하지 못했어. 다시 시도해 줘.');}} onDone={()=>{if(view)sessionStorage.removeItem(`active-play:${view.storyId}`);sessionStorage.removeItem(`solo-ui:${id}`);onExit();}} />
   {:else if view.result.cues?.length}
     <StoryCuePlayer cues={view.result.cues} initialIndex={view.cueIndex} onAction={(type,index)=>tracker?.record(type==='next'?'cue_next':'cue_skip',String(index))} onComplete={ending} />
     {#if error}<Button disabled={busy} onclick={ending}>{locale==='en'?'Continue':'계속'}</Button>{/if}

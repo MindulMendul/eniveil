@@ -28,11 +28,12 @@ const evt=(sequence:number,stage:PlayEvent['stage']='explore',type:PlayEvent['ty
 test('duplicate and late events preserve visits, separate active/unknown time and keep internal MMR private',()=>{
  const{analytics,users,setTime}=setup();const user=users[0].id;
  analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{title:'Story'});
- const first=evt(0);setTime(101000);analytics.events('p',user,[first]);
+ const first=evt(0);setTime(101000);analytics.events('p',user,[first]);analytics.stage('p',user,'explore');
  setTime(106000);analytics.events('p',user,[evt(1,'explore','heartbeat')]);
  analytics.events('p',user,[first]);analytics.events('p',user,[evt(0,'alibi')]);
  expect(analytics.member('p',user).stage).toBe('explore');
  setTime(160000);analytics.events('p',user,[evt(2,'cross')]);
+ expect(analytics.member('p',user).stage).toBe('explore');analytics.stage('p',user,'cross');
  const visits=analytics.db.query('SELECT * FROM play_visits WHERE session_id=? ORDER BY id').all('p') as {stage:string;active_ms:number;unmeasured_ms:number}[];
  expect(visits.map(v=>v.stage)).toEqual(['intro','explore','cross']);
  expect(visits[1]!.active_ms).toBe(5000);expect(visits[1]!.unmeasured_ms).toBe(54000);
@@ -76,7 +77,7 @@ test('multiplayer chat and independent endings retain records after the room is 
  expect((await request(`/api/play/sessions/${id}/chat`,undefined,2)).status).toBe(400);
  game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});
  game.command(a!,{type:'vote',requestId:'3',targetId:b!.id});game.command(b!,{type:'vote',requestId:'4',targetId:a!.id});
- expect(game.state.sessions[id]!.endedAt).not.toBeNull();expect(analytics.pending(b!.id)).toBe(id);
+ expect(game.state.sessions[id]!.endedAt).not.toBeNull();expect(analytics.play(id)?.correct).toBeNull();expect(analytics.pending(b!.id)).toBe(id);
  expect(()=>game.command(a!,{type:'return',requestId:'5'})).toThrow();
  await request(`/api/play/sessions/${id}/ending`,{});await request(`/api/play/sessions/${id}/rating`,{rating:5});
  expect(game.roomFor(a!.id)).toBeUndefined();expect(game.roomFor(b!.id)?.id).toBe(room.id);
@@ -109,7 +110,8 @@ test('independent client sequences do not discard a second tab and server skill 
  for(let i=0;i<3;i++){const id=`p${i}`;analytics.start(id,'story',1,'solo',null,[{id:user,role:'detective'}],{});analytics.finish(id,i===2?'failed':'completed',{});}
  analytics.start('next','story',2,'solo',null,[{id:user,role:'detective'}],{});
  const ids=[crypto.randomUUID(),crypto.randomUUID()];analytics.events('next',user,[{...evt(0,'explore'),clientId:ids[0]},{...evt(0,'cross'),clientId:ids[1]}]);
- expect(analytics.member('next',user).stage).toBe('cross');
+ expect(analytics.member('next',user).stage).toBe('intro');
+ expect((analytics.db.query('SELECT count(*) AS n FROM play_ui_visits WHERE session_id=?').get('next') as {n:number}).n).toBe(2);
  const raw=analytics.db.query('SELECT mmr,prior_plays,mmr_version FROM play_members WHERE session_id=?').get('next') as {mmr:number;prior_plays:number;mmr_version:string};
  expect(raw.prior_plays).toBe(3);expect(raw.mmr).toBeCloseTo(800+400*2/3);expect(raw.mmr_version).toBe('performance-v1');
  expect(JSON.stringify(analytics.view('next',user))).not.toContain('mmr');
@@ -133,4 +135,41 @@ test('an unrated ended solo room expires while its owner can still recover the e
  analytics.start('solo','deokil-trading-murder',1,'solo',room.id,[{id:user!.id,role:'detective'}],{});
  setTime(Date.now()-600001);analytics.finish('solo','completed',{cues:[]});game.cleanupFinishedRooms();
  expect(game.state.rooms[room.id]).toBeUndefined();expect(analytics.pending(user!.id)).toBe('solo');expect(analytics.view('solo',user!.id).endingComplete).toBe(false);
+});
+
+test('late opening and stale device claims cannot skip the ending or rewrite authoritative rating visits',()=>{
+ const{analytics,users,setTime}=setup();const user=users[0].id;
+ analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{});setTime(101000);analytics.finish('p','completed',{cues:[]});
+ setTime(102000);analytics.events('p',user,[{...evt(0,'intro','cue_next'),target:'99',sceneId:'opening'}]);
+ expect(analytics.view('p',user).cueIndex).toBe(0);expect(analytics.member('p',user).stage).toBe('win');
+ analytics.events('p',user,[{...evt(1,'win','cue_next'),target:'1',sceneId:'resolution'}]);expect(analytics.view('p',user).cueIndex).toBe(2);
+ analytics.ending('p',user);analytics.events('p',user,[{...evt(0,'intro'),clientId:crypto.randomUUID()}]);
+ expect(analytics.member('p',user).stage).toBe('rating');
+ expect((analytics.db.query('SELECT stage FROM play_visits WHERE session_id=? AND exited IS NULL').get('p') as {stage:string}).stage).toBe('rating');
+});
+
+test('raw legacy events expire at 90 days while long-lived action totals stay intact',()=>{
+ const{analytics,store,users,setTime}=setup();const user=users[0].id;
+ analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{});analytics.record('p',user,'hint','explore');analytics.finish('p','completed',{});
+ const old=new Date(100000).toISOString();
+ for(const runId of [null,'p'])store.db.query("INSERT INTO story_run_events VALUES(?,?,?,'hint',?,NULL,'{}')").run(crypto.randomUUID(),runId,'story',old);
+ setTime(100*86400000+100000);analytics.pruneRetention();
+ expect((store.db.query('SELECT count(*) AS n FROM story_run_events').get() as {n:number}).n).toBe(0);
+ expect((analytics.db.query('SELECT count(*) AS n FROM play_events').get() as {n:number}).n).toBe(0);
+ const report=analytics.report('story');expect(report.actions.some(row=>(row as {type:string;count:number}).type==='hint'&&(row as {count:number}).count===1)).toBe(true);
+ expect(analytics.play('p')).not.toBeNull();
+});
+
+test('wrong or tied multiplayer votes separate completion from assessed correctness',()=>{
+ const{analytics,game,users}=setup();const[a,b]=users;const room=game.create(a!,'rehearsal');game.join(b!,room.code);game.command(a!,{type:'start',requestId:'s'});
+ const id=room.sessionId!,session=game.state.sessions[id]!;const wrong=session.participants.find(p=>p.roleIndex===0)!.id;
+ game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});game.command(a!,{type:'vote',requestId:'3',targetId:wrong});game.command(b!,{type:'vote',requestId:'4',targetId:wrong});
+ expect(analytics.play(id)?.outcome).toBe('completed');expect(analytics.play(id)?.correct).toBe(0);
+ const row=analytics.report('rehearsal').skills[0] as {completionRate:number;successRate:number};expect(row.completionRate).toBe(1);expect(row.successRate).toBe(0);
+});
+
+test('abandoned timing ends at the last activity rather than cleanup detection',()=>{
+ const{analytics,users,setTime}=setup();const user=users[0].id;analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{});
+ setTime(105000);analytics.events('p',user,[evt(0,'intro','heartbeat')]);setTime(2000000);analytics.finish('p','abandoned',null);
+ expect(analytics.play('p')?.ended).toBe(105000);expect((analytics.db.query('SELECT exited FROM play_visits WHERE session_id=? ORDER BY id LIMIT 1').get('p') as {exited:number}).exited).toBe(105000);
 });
