@@ -26,6 +26,20 @@ export class Store {
       : { guests: {}, rooms: {}, sessions: {} };
     for (const guest of Object.values(this.state.guests)) this.reserveNickname(guest.nickname, guest.id);
   }
+  private friendsTableReady = false;
+  private hasFriendsTable() {
+    if (!this.friendsTableReady) this.friendsTableReady = !!this.db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='friend_connections'").get();
+    return this.friendsTableReady;
+  }
+  friendIds(id: string): string[] {
+    if (!this.hasFriendsTable()) return [];
+    const rows = this.db.query("SELECT sender_id,recipient_id FROM friend_connections WHERE status='accepted' AND (sender_id=? OR recipient_id=?)").all(id,id) as {sender_id:string;recipient_id:string}[];
+    return rows.map(row => row.sender_id === id ? row.recipient_id : row.sender_id);
+  }
+  areFriends(a: string, b: string) {
+    if (!this.hasFriendsTable()) return false;
+    return !!this.db.query("SELECT 1 FROM friend_connections WHERE status='accepted' AND ((sender_id=? AND recipient_id=?) OR (sender_id=? AND recipient_id=?))").get(a,b,b,a);
+  }
   save() {
     this.db
       .query(

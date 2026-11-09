@@ -8,10 +8,15 @@ export const nicknameSchema = z.string().trim().normalize("NFKC").refine(
 export const guestSchema = z.object({ nickname: nicknameSchema });
 export const friendAccountIdSchema = z.uuid();
 export const friendRequestSchema = z.object({ accountId: friendAccountIdSchema });
+export const roomAccessSchema = z.enum(["public", "friends", "secret"]);
+export type RoomAccess = z.infer<typeof roomAccessSchema>;
 export const createRoomSchema = z.object({
+  access: roomAccessSchema.default("public"),
+  pin: z.string().regex(/^\d{4}$/).optional(),
   scenarioId: z.string().min(1).max(80),
 });
 export const joinRoomSchema = z.object({
+  pin: z.string().regex(/^\d{4}$/).optional(),
   code: z
     .string()
     .trim()
@@ -27,6 +32,7 @@ export const supportedSoloStory = {
   title: "덕일상사 살인사건",
 } as const;
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("presence"), lobby: z.boolean(), requestId: z.string().max(80) }),
   z.object({ type: z.literal("mode"), mode: z.enum(["solo", "multiplayer"]), requestId: z.string().max(80) }),
   z.object({ type: z.literal("solo-return"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("start"), requestId: z.string().max(80) }),
@@ -53,6 +59,7 @@ export type Scenario = {
   difficulty?: "easy" | "normal" | "hard" | null;
 };
 export type RoomSummary = {
+  access: RoomAccess;
   id: string;
   code: string;
   title: string;
@@ -88,6 +95,7 @@ export type Snapshot = {
   room: RoomView | null;
 };
 export type ServerEvent =
+  | { type: "social-changed" }
   | { type: "snapshot"; data: Snapshot }
   | { type: "ack"; requestId: string }
   | { type: "error"; requestId?: string; message: string };
@@ -105,3 +113,6 @@ export {
 export type { SoloStoryView, StoryCue, StoryPackage, StoryCatalogItem, StoryCatalogResponse } from "./story";
 export { MANAGED_IMAGES, managedImagePath, IMAGE_MAX_BYTES, IMAGE_MAX_OUTPUT_BYTES, IMAGE_MAX_DIMENSION, IMAGE_MAX_PIXELS, WEBP_QUALITY, checkImageBytes, checkImageDimensions } from './images';
 export { WORKSHOP_AUTHORING_ENABLED } from './features';
+
+export const inviteFriendSchema = z.object({ targetId: z.uuid() });
+export const invitationResponseSchema = z.object({ accept: z.boolean(), pin: z.string().regex(/^\d{4}$/).optional() });
