@@ -8,4 +8,4 @@
 
 QA/운영에는 이 검증 시점에 배포하지 않았다. 배포 후 검증은 승격 PR과 이슈에 별도로 기록한다.
 
-리뷰 보완: 인증 API와 entry 청크 응답을 각각 보류한 실제 브라우저에서도 한/영 소개와 단일 main/h1을 유지했다. LazyContent의 pending/error 슬롯과 최초 로딩에서 같은 소개를 사용한다. HTML 검증은 apps/web/integration으로 분리했다. `bun run test`는 dist를 제거한 상태에서107 tests/5,326 assertions를 통과하고, `bun run test:html`은 빌드 후 HTML 통합 테스트를 실행한다. 기본 verify는 빌드→단위 테스트→HTML 통합 테스트(1 test/15 assertions) 순서로 총108 tests/5,341 assertions를 검증한다.
+리뷰 보완: 인증 API와 entry 청크 응답을 각각 보류한 실제 브라우저에서도 한/영 소개와 단일 main/h1을 유지했다. LazyContent의 pending/error 슬롯과 최초 로딩에서 같은 소개를 사용한다. HTML 검증은 apps/web/integration으로 분리했다. 기존 HTTP 테스트도 실제 404 산출물을 필요로 하므로 `bun run test` 자체가 먼저 앱을 빌드한다. dist 없는 시작 상태에서도107 tests/5,326 assertions를 검증하며, `bun run test:html`은 빌드 후 HTML 통합 테스트를 실행한다. 기본 verify는 빌드→단위 테스트→HTML 통합 테스트(1 test/15 assertions) 순서로 총108 tests/5,341 assertions를 검증한다.
