@@ -1,5 +1,6 @@
 <script lang="ts">
   import { WORKSHOP_AUTHORING_ENABLED } from "@festival/shared/features";
+  import EntryIntro from "../pages/entry/ui/EntryIntro.svelte";
   import SoloRoomLifecycle from "../features/game/SoloRoomLifecycle.svelte";
   import LazyContent from "../shared/ui/LazyContent.svelte";
   import { shouldRecoverFocus } from "../shared/lib/focus-policy";
@@ -512,6 +513,16 @@
   });
 </script>
 
+{#snippet publicEntryLoading(failed: boolean)}
+  <main id="main-content" tabindex="-1" class="main flex items-center justify-center">
+    <section class="w-full max-w-sm py-8" aria-labelledby="entry-title">
+      <EntryIntro {locale} />
+      <p role={failed ? 'alert' : 'status'}>{failed ? (locale === 'en' ? 'Could not load this page. Please refresh.' : '화면을 불러오지 못했어요. 새로고침해 주세요.') : t('workshopLoading')}</p>
+      {#if failed}<Button variant="secondary" onclick={() => window.location.reload()}>{locale === 'en' ? 'Refresh' : '새로고침'}</Button>{/if}
+    </section>
+  </main>
+{/snippet}
+
 <svelte:head>
   <title>{pageMetadata(localePath(locale, currentPath)).title}</title>
 </svelte:head>
@@ -529,7 +540,7 @@
   {/if}
 
   {#if loading}
-    <PageState kind="loading" message={t("workshopLoading")} />
+    {#if entryHome}{@render publicEntryLoading(false)}{:else}<PageState kind="loading" message={t("workshopLoading")} />{/if}
   {:else if soloRecovery && snapshot}
     <main id="main-content" tabindex="-1" class="main"><Panel><p role="status">{locale === "en" ? "The previous solo investigation has ended. Reconnect to return to your room." : "이전 1인 수사가 종료됐어. 연결을 확인한 뒤 같은 방으로 돌아가 줘."}</p><Button disabled={busy} onclick={() => void action(async () => { await reconcileSolo(); if (!socket || socket.readyState > 1) connect(); })}>{locale === "en" ? "Retry returning to room" : "방 복귀 다시 시도"}</Button></Panel></main>
   {:else if account.needsNickname}
@@ -565,7 +576,7 @@
       {/snippet}
     </LazyContent>{/key}
   {:else if !snapshot}
-    <LazyContent load={loadEntryPage} {locale}>{#snippet children({ EntryPage })}<EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />{/snippet}</LazyContent>
+    <LazyContent load={loadEntryPage} {locale} fallback={entryHome ? publicEntryLoading : undefined}>{#snippet children({ EntryPage })}<EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />{/snippet}</LazyContent>
   {:else if room?.soloStarted && ownedSoloPlayId !== room.soloPlayId}
     <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Investigation in progress" : "수사 진행 중"}</h1><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
   {:else if room?.soloStarted}

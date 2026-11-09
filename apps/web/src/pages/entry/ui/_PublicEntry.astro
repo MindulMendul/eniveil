@@ -1,0 +1,18 @@
+---
+import EntryIntro from './EntryIntro.svelte';
+const { locale } = Astro.props as { locale: 'ko' | 'en' };
+const en = locale === 'en';
+const prefix = en ? '/en' : '';
+---
+<main id="main-content" tabindex="-1" class="main flex items-center justify-center">
+  <section class="w-full max-w-sm py-8" aria-labelledby="entry-title">
+    <EntryIntro {locale} />
+    <nav class="flex flex-wrap justify-center gap-4" aria-label={en ? 'Public pages' : '공개 페이지'}>
+      <a href={`${prefix}/about/`}>{en ? 'About' : '서비스 소개'}</a>
+      <a href={`${prefix}/terms/`}>{en ? 'Terms of service' : '이용약관'}</a>
+      <a href={`${prefix}/privacy/`}>{en ? 'Privacy policy' : '개인정보 처리방침'}</a>
+      <a href={en ? '/' : '/en/'} lang={en ? 'ko' : 'en'}>{en ? '한국어' : 'English'}</a>
+    </nav>
+    <noscript><p class="mt-4">{en ? 'Enable JavaScript to sign in and play.' : '로그인과 플레이에는 JavaScript가 필요합니다.'}</p></noscript>
+  </section>
+</main>
