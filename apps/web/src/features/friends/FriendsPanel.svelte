@@ -110,10 +110,10 @@
 </div>
 
 <style>
-  .friend-search, li { display:flex; align-items:center; flex-wrap:wrap; gap:.75rem; }
-  .friend-search { margin-top:.5rem; }
+  .friend-search, li { display:flex; align-items:center; flex-wrap:wrap; gap:var(--spacing-3); }
+  .friend-search { margin-top:var(--spacing-2); }
   .friend-search :global(input) { flex:1; min-width:0; }
-  li { justify-content:space-between; padding-block:.5rem; overflow-wrap:anywhere; }
+  li { justify-content:space-between; padding-block:var(--spacing-2); overflow-wrap:anywhere; }
   ul { list-style:none; padding:0; }
-  h3 { margin-top:1.5rem; }
+  h3 { margin-top:var(--spacing-6); }
 </style>
