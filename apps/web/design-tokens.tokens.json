@@ -1226,6 +1226,30 @@
         "value": 1.2,
         "unit": "rem"
       }
+    },
+    "1-25": {
+      "$value": {
+        "value": 0.3125,
+        "unit": "rem"
+      }
+    },
+    "7-5": {
+      "$value": {
+        "value": 1.875,
+        "unit": "rem"
+      }
+    },
+    "11-25": {
+      "$value": {
+        "value": 2.8125,
+        "unit": "rem"
+      }
+    },
+    "13-5": {
+      "$value": {
+        "value": 3.375,
+        "unit": "rem"
+      }
     }
   },
   "border": {

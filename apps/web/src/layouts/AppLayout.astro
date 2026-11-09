@@ -1,9 +1,12 @@
 ---
+import AnalyticsConsent from "../shared/analytics/AnalyticsConsent.astro";
 import "../shared/styles/base.css";
 import Metadata from "../shared/seo/Metadata.astro";
+import PublicEntry from "../pages/entry/ui/_PublicEntry.astro";
 import App from "../app/App.svelte";
 
 const { locale = "ko" } = Astro.props;
+const publicHome = ["/", "/en", "/en/"].includes(Astro.url.pathname);
 
 ---
 <!doctype html>
@@ -23,6 +26,9 @@ const { locale = "ko" } = Astro.props;
       import { initRUM } from '../rum';
       initRUM();
     </script>
-    <App client:only="svelte" />
+    <App client:only="svelte">
+      {publicHome && <PublicEntry slot="fallback" {locale} />}
+    </App>
+    <AnalyticsConsent />
   </body>
 </html>

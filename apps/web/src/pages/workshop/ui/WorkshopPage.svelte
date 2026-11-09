@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ManagedImage from "../../../shared/ui/ManagedImage.svelte";
+  import { WORKSHOP_AUTHORING_ENABLED } from "@festival/shared/features";
   import { Modal, Button, Select, TextInput, FilterBar, StateMessage } from "../../../shared/ui";
   import { onDestroy, tick, untrack } from 'svelte';
   import { workshopRequest, type WorkshopStory } from '../model/_story';
@@ -57,7 +59,7 @@
     if ((next.key === 'favorites' || next.key === 'mine') && !loggedIn) { onLogin(() => chooseTab(next)); return; }
     tab = next.key; view = next.key === 'favorites' || next.key === 'mine' ? next.key : 'all'; sort = next.sort; refresh();
   }
-  function edit(id?: string) { onEdit(id); }
+  function edit(id?: string) { if (WORKSHOP_AUTHORING_ENABLED) onEdit(id); }
   async function favorite(story: WorkshopStory) {
     if (disposed) return;
     if (!loggedIn) { onLogin(() => void favorite(story)); return; }
@@ -92,7 +94,7 @@
 <main id="main-content" tabindex="-1" class="main workshop">
   <div class="page-heading">
     <div><p class="eyebrow">COMMUNITY STORIES</p><h1 class="heading-one">{label('창작마당', 'Workshop')}</h1></div>
-    <Button class="primary" onclick={() => edit()} variant="primary">＋ {label('새 머미 만들기', 'Create a story')}</Button>
+    {#if WORKSHOP_AUTHORING_ENABLED}<Button class="primary" onclick={() => edit()} variant="primary">＋ {label('새 머미 만들기', 'Create a story')}</Button>{/if}
   </div>
   <a class="text-button" href={locale === 'en' ? '/en/' : '/'}>← {label('플랫폼으로 돌아가기', 'Back to platform')}</a>
   <nav class="tabs" aria-label={label('창작 머미 목록', 'Story collections')}>
@@ -119,15 +121,15 @@
   <div class="results"><span class="muted" aria-live="polite">{label('작품', 'Stories')} {total}</span>{#if !loggedIn}<span class="muted">{label('로그인하면 창작과 즐겨찾기를 이용할 수 있어요.', 'Sign in to create stories and save favorites.')}</span>{/if}</div>
   {#if error}<div class="panel notice" role="alert"><p>{error}</p><Button class="secondary" onclick={() => void load(pendingOffset)} variant="secondary">{label('다시 시도', 'Retry')}</Button></div>{/if}
   {#if loading}<StateMessage kind="loading" message={label('이야기를 불러오는 중…', 'Loading stories…')} />
-  {:else if !stories.length}<div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{label('아직 일치하는 이야기가 없어요.', 'No stories match yet.')}</h2><p class="muted">{label('필터를 바꾸거나 새로운 이야기를 만들어 보세요.', 'Try different filters or create a story.')}</p></div>
+  {:else if !stories.length}<div class="empty"><span class="empty-symbol">✧</span><h2 class="heading-three">{label('아직 일치하는 이야기가 없어요.', 'No stories match yet.')}</h2><p class="muted">{label('다른 검색 조건을 선택해 보세요.', 'Try different filters.')}</p></div>
   {:else}
     <ul class="story-grid m-0 list-none p-0" role="list">{#each stories as story (story.id)}<li class="grid min-w-0">
       <article class="panel story-card">
-        <div class="thumbnail">{#if story.thumbnailUrl}<img src={story.thumbnailUrl} alt={story.title} loading="lazy" referrerpolicy="no-referrer" />{:else}<span aria-hidden="true">✧</span><span class="thumbnail-caption">STORY ARCHIVE</span>{/if}<span class="mode-tag">{story.mode === 'solo' ? label('혼자 플레이', 'Solo') : label('함께 플레이', 'Multiplayer')}</span></div>
+        <div class="thumbnail"><ManagedImage src={story.thumbnailUrl} alt={story.title} loading="lazy" /><span class="mode-tag">{story.mode === 'solo' ? label('혼자 플레이', 'Solo') : label('함께 플레이', 'Multiplayer')}</span></div>
         <div class="card-content"><div class="card-heading"><span class="tag">{difficultyLabel(story.difficulty)}</span>{#if !story.published}<span class="tag">{label('비공개 초안', 'Private draft')}</span>{/if}</div>
         <h2 class="heading-two">{story.title}</h2><p class="muted description">{story.subtitle}</p><p class="creator">{label('만든 이', 'By')} · {story.author.name}</p>
         <div class="statistics"><span>★ {story.averageRating === null ? label('평가 전', 'Unrated') : story.averageRating.toFixed(1)} <small>({story.ratingCount})</small></span><span>▷ {story.playCount} {label('플레이', 'plays')}</span><span>♡ {story.favoriteCount}</span></div>
-        <div class="card-actions"><Button class="secondary" onclick={() => details(story)} variant="secondary">{label('자세히 보기', 'Details')}</Button>{#if story.published}<button class="favorite" class:saved={story.isFavorite} aria-pressed={story.isFavorite} aria-label={`${story.title} ${label('즐겨찾기', 'favorite')}`} disabled={favoriteBusy.includes(story.id)} onclick={() => void favorite(story)}>{story.isFavorite ? '♥' : '♡'}</button>{/if}{#if story.canEdit}<Button class="text-button" onclick={() => edit(story.id)} variant="text">{label('수정하기', 'Edit')} ↗</Button>{/if}</div>
+        <div class="card-actions"><Button class="secondary" onclick={() => details(story)} variant="secondary">{label('자세히 보기', 'Details')}</Button>{#if story.published}<button class="favorite" class:saved={story.isFavorite} aria-pressed={story.isFavorite} aria-label={`${story.title} ${label('즐겨찾기', 'favorite')}`} disabled={favoriteBusy.includes(story.id)} onclick={() => void favorite(story)}>{story.isFavorite ? '♥' : '♡'}</button>{/if}{#if WORKSHOP_AUTHORING_ENABLED && story.canEdit}<Button class="text-button" onclick={() => edit(story.id)} variant="text">{label('수정하기', 'Edit')} ↗</Button>{/if}</div>
         </div>
       </article></li>
     {/each}</ul>
@@ -135,7 +137,7 @@
   {/if}
 </main>
 <Modal bind:element={dialog} class="story-dialog" labelledby="story-dialog-title" onClose={() => selected = null}>
-  {#if selected}<div class="dialog-content"><p class="eyebrow">STORY DETAILS</p><h2 tabindex="-1" id="story-dialog-title" class="heading-two">{selected.title}</h2><p class="muted">{selected.subtitle}</p><p>{label('만든 이', 'Creator')}: {selected.author.name}</p><p>{label('난이도', 'Difficulty')}: {difficultyLabel(selected.difficulty)}</p><p>★ {selected.averageRating?.toFixed(1) ?? label('평가 전', 'Unrated')} · {selected.playCount} {label('플레이', 'plays')} · ♡ {selected.favoriteCount}</p><p class="muted">{selected.playerCount.min}–{selected.playerCount.max} {label('명', 'players')} · {selected.estimatedMinutes} {label('분', 'min')}</p>{#if !selected.published}<p class="muted">{label('비공개 초안 · 플레이하려면 공개 필요', 'Private draft · Publish to play')}</p>{:else if selected.mode !== 'solo'}<p class="muted">{label('지원하지 않는 플레이 방식', 'Unsupported play format')}</p>{/if}<div class="card-actions">{#if selected.published && selected.mode === 'solo'}<Button variant="primary" class="primary" onclick={() => { const id = selected!.id; dialog.close(); onPlay(id); }}>{label('플레이하기', 'Play story')} →</Button>{/if}<Button class="secondary" onclick={() => dialog.close()} variant="secondary">{label('닫기', 'Close')}</Button>{#if selected.canEdit}<Button class="secondary" onclick={() => { const id = selected!.id; dialog.close(); edit(id); }} variant="secondary">{label('수정하기', 'Edit')}</Button>{/if}</div></div>{/if}
+  {#if selected}<div class="dialog-content"><p class="eyebrow">STORY DETAILS</p><h2 tabindex="-1" id="story-dialog-title" class="heading-two">{selected.title}</h2><p class="muted">{selected.subtitle}</p><p>{label('만든 이', 'Creator')}: {selected.author.name}</p><p>{label('난이도', 'Difficulty')}: {difficultyLabel(selected.difficulty)}</p><p>★ {selected.averageRating?.toFixed(1) ?? label('평가 전', 'Unrated')} · {selected.playCount} {label('플레이', 'plays')} · ♡ {selected.favoriteCount}</p><p class="muted">{selected.playerCount.min}–{selected.playerCount.max} {label('명', 'players')} · {selected.estimatedMinutes} {label('분', 'min')}</p>{#if !selected.published}<p class="muted">{label('비공개 초안 · 플레이하려면 공개 필요', 'Private draft · Publish to play')}</p>{:else if selected.mode !== 'solo'}<p class="muted">{label('지원하지 않는 플레이 방식', 'Unsupported play format')}</p>{/if}<div class="card-actions">{#if selected.published && selected.mode === 'solo'}<Button variant="primary" class="primary" onclick={() => { const id = selected!.id; dialog.close(); onPlay(id); }}>{label('플레이하기', 'Play story')} →</Button>{/if}<Button class="secondary" onclick={() => dialog.close()} variant="secondary">{label('닫기', 'Close')}</Button>{#if WORKSHOP_AUTHORING_ENABLED && selected.canEdit}<Button class="secondary" onclick={() => { const id = selected!.id; dialog.close(); edit(id); }} variant="secondary">{label('수정하기', 'Edit')}</Button>{/if}</div></div>{/if}
 </Modal>
 <style>
 .workshop {
@@ -224,13 +226,10 @@
   color:var(--color-workshop-accent);
   font-size:var(--typography-size-control-12);
   border-bottom:var(--border-thin) solid var(--color-workshop-line)}
-.thumbnail img {
+.thumbnail :global(img) {
   width:100%;
   height:100%;
   object-fit:cover}
-.thumbnail-caption {
-  font-size:var(--typography-size-control-2-4);
-  letter-spacing:.25em}
 .mode-tag {
   position:absolute;
   bottom:var(--spacing-3);

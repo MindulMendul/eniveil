@@ -1,6 +1,19 @@
 import { expect, spyOn, test } from 'bun:test';
-import { checkDimensions, imageDimensions, jpegDimensions, webpFilename } from '../src/features/image-converter/headers';
-import { convertToWebp, MAX_IMAGE_BYTES } from '../src/features/image-converter/convert';
+import { checkDimensions, imageDimensions, jpegDimensions, webpFilename } from '../src/shared/images/headers';
+import { convertToWebp, MAX_IMAGE_BYTES } from '../src/shared/images/convert';
+import { IMAGE_MAX_DIMENSION, IMAGE_MAX_OUTPUT_BYTES, checkImageBytes } from '@festival/shared/images';
+
+test('image limits include each dimension, total pixels and exact byte boundaries', () => {
+  checkDimensions(IMAGE_MAX_DIMENSION, 1);
+  checkDimensions(4000, 4000);
+  for (const [w,h] of [[4097,1],[1,4097],[4096,4096],[0,1],[-1,1],[1.5,1],[NaN,1],[Infinity,1]]) {
+    expect(() => checkDimensions(w!,h!)).toThrow('dimensions');
+  }
+  checkImageBytes(MAX_IMAGE_BYTES);
+  checkImageBytes(IMAGE_MAX_OUTPUT_BYTES, true);
+  for (const size of [0,-1,NaN,Infinity,1.5,MAX_IMAGE_BYTES + 1]) expect(() => checkImageBytes(size)).toThrow('size');
+  expect(() => checkImageBytes(IMAGE_MAX_OUTPUT_BYTES + 1, true)).toThrow('output-size');
+});
 
 test('oversized metadata rejects before decoding; wrong headers reject safely', async () => {
   const bytes = new Uint8Array(24);

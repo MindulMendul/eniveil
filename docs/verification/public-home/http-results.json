@@ -1,0 +1,12 @@
+[
+  {
+    "path": "/",
+    "agents": 3,
+    "samePublicHtml": true
+  },
+  {
+    "path": "/en/",
+    "agents": 3,
+    "samePublicHtml": true
+  }
+]

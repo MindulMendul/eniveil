@@ -41,3 +41,20 @@ test('structured data safely round-trips closing script tags and special charact
   expect(serialized).not.toContain('<');
   expect(JSON.parse(serialized)).toEqual(data);
 });
+
+test('production defaults, verified operator identity and QA indexing policy agree', async () => {
+  const { indexingAllowed } = await import('../src/shared/seo/metadata');
+  expect(siteOrigin()).toBe('https://eniveil.com');
+  expect(indexingAllowed('false')).toBe(false);
+  expect(indexingAllowed('true')).toBe(true);
+  for (const origin of ['https://eniveil.com', 'https://qa-mindul-murder-mystery.duckdns.org']) {
+    const ko = pageSchema('/', origin)!;
+    const en = pageSchema('/en/about/', origin)!;
+    expect(ko.publisher).toEqual(en.publisher);
+    expect(ko.publisher['@id']).toBe(origin + '/#operator');
+    expect(ko.publisher.name).toBe('MindulMendul');
+    expect(ko.publisher.url).toBe(origin + '/');
+    expect(ko.publisher.contactPoint.url).toBe('https://github.com/MindulMendul/eniveil/issues/new');
+    expect(ko.publisher).not.toHaveProperty('sameAs');
+  }
+});

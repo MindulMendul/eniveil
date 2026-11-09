@@ -1,0 +1,26 @@
+[
+  {
+    "path": "apps/web/assets/images/story-archive-ko.png",
+    "before": "51bf13836c2e77e8b712bc7afad02fc2024782ad701f83fc6e05ff58eeafc9f4",
+    "after": "ae85363444e4f0f60bb726fe9b07a533fa17978de7e3805eee5d5b1f11051f4f",
+    "changed": true
+  },
+  {
+    "path": "apps/web/assets/images/story-archive-en.png",
+    "before": "b89bceb79e5b5ebabd36644651c560e7ceb262fb70e8551732e710e7c71cbe0b",
+    "after": "69261a05ba8740fa70cb976a9a7f34afb1ca3eda33c557c9513b88bc076cd988",
+    "changed": true
+  },
+  {
+    "path": "apps/web/dist/og/story-archive-ko-v2.webp",
+    "before": "5e2c04d53b0fb2224351d9f7d284bb4c7d7efd397c6d7fd586c0d6d466c59117",
+    "after": "03ed869cc15d7b4085940c9e15dd5eecd3c1cb2cfe0ea277536cbbfb21827abb",
+    "changed": true
+  },
+  {
+    "path": "apps/web/dist/og/story-archive-en-v2.webp",
+    "before": "a9f28803438f86f98ee8f2bb2df6401d5a250dd1f828693db2e9be24e3cd6348",
+    "after": "3de2abde2ea0b74171b25f9bb2f2cb574154c156707eaec7a638034d37c27ce5",
+    "changed": true
+  }
+]

@@ -1,0 +1,34 @@
+[
+  {
+    "lang": "ko",
+    "width": 320,
+    "preConsentBlocked": true,
+    "containerOnce": true,
+    "withdrawalBlocked": true,
+    "axe": 0
+  },
+  {
+    "lang": "ko",
+    "width": 1440,
+    "preConsentBlocked": true,
+    "containerOnce": true,
+    "withdrawalBlocked": true,
+    "axe": 0
+  },
+  {
+    "lang": "en",
+    "width": 320,
+    "preConsentBlocked": true,
+    "containerOnce": true,
+    "withdrawalBlocked": true,
+    "axe": 0
+  },
+  {
+    "lang": "en",
+    "width": 1440,
+    "preConsentBlocked": true,
+    "containerOnce": true,
+    "withdrawalBlocked": true,
+    "axe": 0
+  }
+]
