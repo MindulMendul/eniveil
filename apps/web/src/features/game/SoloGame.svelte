@@ -40,6 +40,7 @@
   /** @type {string[]} */
   let found = $state([]);
   let currentEvidence = $state('');
+  let discoveryMessage = $state('');
   let selectedSuspect = $state('');
   /** @type {{ text: string, source: string }[]} */
   let responses = $state([]);
@@ -152,10 +153,16 @@
     trackEvent('case_location_open', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', location_id: id, language: locale });
     roomId = id;
     currentEvidence = '';
+    discoveryMessage = '';
   }
 
   /** @param {string} id */
   async function inspect(id) {
+    // Re-checking a clue only shows its note; the discovery feedback is not repeated.
+    if (found.includes(id)) {
+      currentEvidence = id;
+      return;
+    }
     if (runId) {
       try {
         const response = await fetch(`/api/game/sessions/${runId}/evidence`, {
@@ -172,7 +179,8 @@
       }
     }
     trackEvent('case_clue_open', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', clue_id: id, language: locale });
-    if (!found.includes(id)) found = [...found, id];
+    found = [...found, id];
+    discoveryMessage = `${evidence[id].name} 발견`;
     currentEvidence = id;
   }
 
@@ -295,7 +303,18 @@
     </section><aside class="panel min-h-[210px]">
       {#if selectedRoom}
         <p class="eyebrow">SEARCH THE ROOM</p><h2 class="heading-two">{selectedRoom.name}</h2><p class="muted">{selectedRoom.mood}</p>
-        <div class="grid gap-2">{#each selectedRoom.evidence as id}<Button class="secondary mt-0" onclick={() => inspect(id)} variant="secondary"><span>{found.includes(id) ? '✓ ' : ''}{evidence[id].name}</span><span>↗</span></Button>{/each}</div>
+        <div class="relative mt-4 aspect-[4/3] w-full border border-festival-line bg-festival-panel-input" role="group" aria-label="{selectedRoom.name} 조사 지점">
+          <span class="absolute left-3 top-2 text-[10px] tracking-[1.5px] text-festival-muted">{selectedRoom.name}</span>
+          {#each selectedRoom.evidence as id, index}
+            {#if evidence[id].spot}
+              <button type="button" class="absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border bg-festival-panel text-base focus-visible:outline-2 focus-visible:outline-festival-gold {found.includes(id) ? 'border-festival-gold text-festival-gold' : 'border-dashed border-festival-muted text-festival-muted hover:border-festival-gold-border'}" style="left: {evidence[id].spot.x}%; top: {evidence[id].spot.y}%" aria-label={found.includes(id) ? `${evidence[id].name} (조사 완료)` : `조사 지점 ${index + 1}`} onclick={() => inspect(id)}>
+                <span aria-hidden="true">{found.includes(id) ? evidence[id].icon : '?'}</span>
+              </button>
+            {/if}
+          {/each}
+        </div>
+        <p class="mb-0 mt-2 text-xs text-festival-muted">{t('collectedEvidence')} {selectedRoom.evidence.filter((id) => found.includes(id)).length} / {selectedRoom.evidence.length}</p>
+        {#if discoveryMessage}<p class="mb-0 mt-3 text-sm text-festival-gold" role="status">{discoveryMessage}</p>{/if}
         {#if currentEvidence}<div class="mt-5 border-t border-festival-line pt-4"><p class="mb-2 text-xs text-festival-gold">{evidence[currentEvidence].icon} {evidence[currentEvidence].name}</p><p class="m-0 text-sm leading-[1.9] text-festival-copy-soft">{evidence[currentEvidence].detail}</p></div>{/if}
       {:else}<p class="eyebrow">CRIME SCENE</p><h2 class="heading-two">{t('whereStart')}</h2><p class="muted">{t('searchRoom')}</p>{/if}
     </aside></div>

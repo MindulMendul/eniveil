@@ -111,6 +111,9 @@ const storyContentSchema = z.strictObject({
           name: text,
           place: text,
           detail: text,
+          spot: z
+            .strictObject({ x: z.number().min(0).max(100), y: z.number().min(0).max(100) })
+            .optional(),
         }),
       ),
       locations: z.array(
