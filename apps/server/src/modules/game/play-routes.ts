@@ -3,6 +3,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { createHash, timingSafeEqual } from "node:crypto";
 import {
   playEventBatchSchema,
+  playEndingSchema,
   playRatingSchema,
   playChatSchema,
 } from "@festival/shared";
@@ -65,8 +66,9 @@ export function createPlayRoutes(deps: {
     deps.analytics.events(c.req.param("id"), c.get("owner"), events);
     return c.json({ saved: true });
   });
-  app.post("/sessions/:id/ending", (c) => {
-    deps.analytics.ending(c.req.param("id"), c.get("owner"));
+  app.post("/sessions/:id/ending", async (c) => {
+    const { action } = playEndingSchema.parse(await c.req.json());
+    deps.analytics.ending(c.req.param("id"), c.get("owner"), action);
     return c.json({ saved: true });
   });
   app.post("/sessions/:id/rating", async (c) => {

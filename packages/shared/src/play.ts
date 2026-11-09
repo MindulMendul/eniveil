@@ -16,6 +16,7 @@ export const playEventSchema = z.object({
     "hint",
     "cue_next",
     "cue_skip",
+    "cue_complete",
     "visibility",
     "heartbeat",
     "exit",
@@ -50,3 +51,6 @@ export const playChatSchema = z.object({
   text: z.string().trim().min(1).max(1000),
 });
 export type PlayEvent = z.infer<typeof playEventSchema>;
+export const playEndingSchema = z.object({
+  action: z.enum(["completed", "skipped"]),
+});

@@ -35,7 +35,9 @@ const workshopStore = new SQLiteWorkshopStore(store.db);
 const playCatalog = new PlayStoryCatalog(fileStoryCatalog, workshopStore);
 const storySessions = new StorySessionService(playCatalog, storyRunStore);
 analytics.pruneRetention();
-setInterval(()=>{for(const id of analytics.stale()){analytics.finish(id,'abandoned',null);storySessions.abandon(id);game.abandonPlay(id);}analytics.pruneRetention();},60000).unref();
+analytics.cleanupLegacy();
+game.recoverLegacySessions();
+setInterval(()=>{for(const id of analytics.stale()){analytics.finish(id,'abandoned',null);storySessions.abandon(id);game.abandonPlay(id);}analytics.cleanupLegacy();analytics.pruneRetention();},60000).unref();
 
 const notifyTemporal = (action: "start" | "event" | "end", payload: object) => {
   const baseUrl = process.env.TEMPORAL_GATEWAY_URL;

@@ -330,7 +330,7 @@
       const next = await api("/lobby/state");
       if (!currentAuth(generation)) return;
       snapshot = next;
-      if(snapshot?.room?.soloStarted&&sessionStorage.getItem(`owned-solo:${snapshot.room.id}`)===snapshot.room.soloPlayId)ownedSoloPlayId=snapshot.room.soloPlayId;
+      if(snapshot?.room?.soloStarted&&snapshot.room.hostId===snapshot.me.id)ownedSoloPlayId=snapshot.room.soloPlayId;
       if (!accountLoaded) {
         soloRecovery = pendingSoloExit(sessionStorage, snapshot?.room ?? null);
         if (soloRecovery) await reconcileSolo();

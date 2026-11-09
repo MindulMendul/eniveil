@@ -11,6 +11,7 @@ type Play = {
   ended: number | null;
   outcome: string | null;
   correct: number | null;
+  timing_status: "complete" | "partial";
   public_json: string;
   result_json: string | null;
 };
@@ -26,11 +27,13 @@ type Member = {
   sequence: number;
 };
 export class PlayAnalytics {
+  private readonly legacyEpoch: number;
   constructor(
     readonly db: Database,
     private readonly now = () => Date.now(),
   ) {
-    db.exec(`CREATE TABLE IF NOT EXISTS play_sessions(id TEXT PRIMARY KEY,story_id TEXT NOT NULL,version INTEGER NOT NULL,mode TEXT NOT NULL,room_id TEXT,started INTEGER NOT NULL,ended INTEGER,outcome TEXT,public_json TEXT NOT NULL,result_json TEXT);
+    db.exec(`CREATE TABLE IF NOT EXISTS play_migration(id INTEGER PRIMARY KEY CHECK(id=1),epoch INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS play_sessions(id TEXT PRIMARY KEY,story_id TEXT NOT NULL,version INTEGER NOT NULL,mode TEXT NOT NULL,room_id TEXT,started INTEGER NOT NULL,ended INTEGER,outcome TEXT,public_json TEXT NOT NULL,result_json TEXT);
       CREATE INDEX IF NOT EXISTS play_story_version ON play_sessions(story_id,version,started);
       CREATE INDEX IF NOT EXISTS play_room_end ON play_sessions(room_id,ended);
       CREATE TABLE IF NOT EXISTS play_members(session_id TEXT NOT NULL,user_id TEXT NOT NULL,role TEXT NOT NULL,prior_plays INTEGER NOT NULL,mmr REAL,mmr_version TEXT NOT NULL,ending_at INTEGER,finished_at INTEGER,rating INTEGER,stage TEXT NOT NULL,last_seen INTEGER NOT NULL,visible INTEGER NOT NULL DEFAULT 1,sequence INTEGER NOT NULL DEFAULT -1,PRIMARY KEY(session_id,user_id));
@@ -56,6 +59,14 @@ export class PlayAnalytics {
       db.exec(
         "ALTER TABLE play_skill ADD COLUMN updated INTEGER NOT NULL DEFAULT 0",
       );
+    db.query("INSERT OR IGNORE INTO play_migration VALUES(1,?)").run(
+      this.now(),
+    );
+    this.legacyEpoch = (
+      db.query("SELECT epoch FROM play_migration WHERE id=1").get() as {
+        epoch: number;
+      }
+    ).epoch;
     const devices = db.query("PRAGMA table_info(play_devices)").all() as {
       name: string;
     }[];
@@ -80,6 +91,14 @@ export class PlayAnalytics {
     )
       db.exec(
         "ALTER TABLE play_members ADD COLUMN prior_plays_scope TEXT NOT NULL DEFAULT 'retained_365_days'",
+      );
+    if (
+      !(
+        db.query("PRAGMA table_info(play_sessions)").all() as { name: string }[]
+      ).some((column) => column.name === "timing_status")
+    )
+      db.exec(
+        "ALTER TABLE play_sessions ADD COLUMN timing_status TEXT NOT NULL DEFAULT 'complete'",
       );
     db.exec(
       "INSERT OR IGNORE INTO play_action_totals SELECT session_id,user_id,stage,type,count(*) FROM play_events GROUP BY session_id,user_id,stage,type",
@@ -139,6 +158,58 @@ export class PlayAnalytics {
         });
       }
     });
+  }
+  canClaimLegacy(startedAt: number, lastActiveAt: number) {
+    return (
+      Number.isFinite(startedAt) &&
+      Number.isFinite(lastActiveAt) &&
+      lastActiveAt >= this.now() - 365 * 86400000 &&
+      startedAt <= this.legacyEpoch &&
+      this.now() <= this.legacyEpoch + 86400000
+    );
+  }
+  markLegacy(id: string, startedAt: number, endedAt: number | null) {
+    const wasPartial = this.play(id)?.timing_status === "partial";
+    this.db
+      .query(
+        "UPDATE play_sessions SET timing_status='partial',started=?,ended=COALESCE(?,ended) WHERE id=?",
+      )
+      .run(startedAt, endedAt, id);
+    if (!wasPartial)
+      this.record(
+        id,
+        this.members(id)[0].user_id,
+        "legacy_recovered",
+        "migration",
+        null,
+        { historicalStageTiming: "unknown" },
+      );
+  }
+  cleanupLegacy() {
+    if (
+      !this.db
+        .query(
+          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='story_runs'",
+        )
+        .get()
+    )
+      return;
+    if (this.now() <= this.legacyEpoch + 86400000) return;
+    this.db
+      .query(
+        "UPDATE story_runs SET ended_at=last_active_at,outcome='abandoned',package_json=NULL WHERE ended_at IS NULL AND NOT EXISTS(SELECT 1 FROM play_sessions WHERE play_sessions.id=story_runs.id) AND (last_active_at<? OR started_at<=?)",
+      )
+      .run(
+        new Date(this.now() - 1800000).toISOString(),
+        new Date(this.legacyEpoch).toISOString(),
+      );
+  }
+  resume(user: string, story: string, roomId: string | null) {
+    return this.db
+      .query(
+        "SELECT s.id FROM play_sessions s JOIN play_members m ON m.session_id=s.id WHERE m.user_id=? AND s.story_id=? AND m.finished_at IS NULL AND (s.outcome IS NULL OR s.outcome<>'abandoned') AND (? IS NULL OR s.room_id=?) ORDER BY s.started DESC LIMIT 1",
+      )
+      .get(user, story, roomId, roomId) as { id: string } | null;
   }
   activeForRoom(roomId: string) {
     return this.db
@@ -466,7 +537,12 @@ export class PlayAnalytics {
       outcome,
       effectiveEndedAt: now,
     });
-    if (play.mode !== "solo" || outcome === "abandoned") return;
+    if (
+      play.mode !== "solo" ||
+      outcome === "abandoned" ||
+      play.timing_status === "partial"
+    )
+      return;
     this.db
       .query(
         "INSERT INTO play_skill(user_id,completed,wins,mmr,updated) VALUES(?,1,?,NULL,?) ON CONFLICT(user_id) DO UPDATE SET completed=completed+1,wins=wins+excluded.wins,updated=excluded.updated",
@@ -483,13 +559,29 @@ export class PlayAnalytics {
       .query("SELECT * FROM play_members WHERE session_id=?")
       .all(id) as Member[];
   }
-  ending(id: string, user: string) {
+  ending(id: string, user: string, action: "completed" | "skipped") {
     this.atomic(() => {
       const play = this.play(id),
         member = this.member(id, user);
       if (!play?.ended || play.outcome === "abandoned")
         throw new Error("결말을 확인할 수 없는 플레이야.");
       if (!member.ending_at) {
+        const result = JSON.parse(play.result_json ?? "null");
+        const required = Array.isArray(result?.cues) ? result.cues.length : 0;
+        if (
+          action === "completed" &&
+          required > 0 &&
+          this.view(id, user).cueIndex < required
+        )
+          throw new Error("결말을 끝까지 보거나 명시적으로 건너뛰어 줘.");
+        this.record(
+          id,
+          user,
+          action === "skipped" ? "ending_skipped" : "ending_acknowledged",
+          member.stage,
+          null,
+          { action },
+        );
         this.db
           .query(
             "UPDATE play_members SET ending_at=? WHERE session_id=? AND user_id=?",
@@ -564,7 +656,7 @@ export class PlayAnalytics {
     if (!play) throw new Error("플레이를 찾을 수 없어.");
     const cue = this.db
       .query(
-        "SELECT max(CAST(target AS INTEGER)) AS target FROM play_events WHERE session_id=? AND user_id=? AND type IN ('cue_next','cue_skip') AND json_extract(payload,'$.sceneId')='resolution' AND stage IN ('win','fail','reveal') AND target<>'' AND target NOT GLOB '*[^0-9]*' AND at>=?",
+        "SELECT max(CAST(target AS INTEGER)) AS target FROM play_events WHERE session_id=? AND user_id=? AND type IN ('cue_next','cue_skip','cue_complete') AND json_extract(payload,'$.sceneId')='resolution' AND stage IN ('win','fail','reveal') AND target<>'' AND target NOT GLOB '*[^0-9]*' AND at>=?",
       )
       .get(id, user, play.ended ?? this.now()) as {
       target: number | null;
@@ -691,17 +783,17 @@ export class PlayAnalytics {
   report(storyId: string, version?: number) {
     const sessions = this.db
       .query(
-        "SELECT id,version,mode,started,ended,outcome,correct FROM play_sessions WHERE story_id=? AND (? IS NULL OR version=?) ORDER BY started DESC LIMIT 500",
+        "SELECT id,version,mode,started,ended,outcome,correct,timing_status FROM play_sessions WHERE story_id=? AND (? IS NULL OR version=?) ORDER BY started DESC LIMIT 500",
       )
       .all(storyId, version ?? null, version ?? null);
     const stages = this.db
       .query(
-        `SELECT s.version,v.stage,count(*) visits,avg(v.exited-v.entered) averageMs,min(v.exited-v.entered) minMs,max(v.exited-v.entered) maxMs,avg(v.active_ms) averageActiveMs,sum(v.unmeasured_ms) unmeasuredMs FROM play_visits v JOIN play_sessions s ON s.id=v.session_id WHERE s.story_id=? AND (? IS NULL OR s.version=?) GROUP BY s.version,v.stage`,
+        `SELECT s.version,v.stage,count(*) visits,avg(v.exited-v.entered) averageMs,min(v.exited-v.entered) minMs,max(v.exited-v.entered) maxMs,avg(v.active_ms) averageActiveMs,sum(v.unmeasured_ms) unmeasuredMs FROM play_visits v JOIN play_sessions s ON s.id=v.session_id WHERE s.story_id=? AND s.timing_status='complete' AND (? IS NULL OR s.version=?) GROUP BY s.version,v.stage`,
       )
       .all(storyId, version ?? null, version ?? null);
     const skills = this.db
       .query(
-        `SELECT s.version,CASE WHEN m.mmr IS NULL THEN 'unrated' ELSE CAST(round(m.mmr/100)*100 AS TEXT) END skillBand,count(*) plays,avg(CASE WHEN s.ended IS NULL THEN NULL WHEN s.outcome='abandoned' THEN 0.0 ELSE 1.0 END) completionRate,avg(s.correct) successRate,count(s.correct) assessedPlays,avg(s.ended-s.started) averageMs,avg(m.rating) averageRating FROM play_members m JOIN play_sessions s ON s.id=m.session_id WHERE s.story_id=? AND (? IS NULL OR s.version=?) GROUP BY s.version,skillBand`,
+        `SELECT s.version,CASE WHEN m.mmr IS NULL THEN 'unrated' ELSE CAST(round(m.mmr/100)*100 AS TEXT) END skillBand,count(*) plays,avg(CASE WHEN s.ended IS NULL THEN NULL WHEN s.outcome='abandoned' THEN 0.0 ELSE 1.0 END) completionRate,avg(s.correct) successRate,count(s.correct) assessedPlays,avg(CASE WHEN s.timing_status='complete' THEN s.ended-s.started END) averageMs,avg(m.rating) averageRating FROM play_members m JOIN play_sessions s ON s.id=m.session_id WHERE s.story_id=? AND (? IS NULL OR s.version=?) GROUP BY s.version,skillBand`,
       )
       .all(storyId, version ?? null, version ?? null);
     const actions = this.db
@@ -711,7 +803,7 @@ export class PlayAnalytics {
       .all(storyId, version ?? null, version ?? null);
     const timings = this.db
       .query(
-        "SELECT v.stage,s.version,v.exited-v.entered duration FROM play_visits v JOIN play_sessions s ON s.id=v.session_id WHERE s.story_id=? AND (? IS NULL OR s.version=?) AND v.exited IS NOT NULL ORDER BY v.id DESC LIMIT 10000",
+        "SELECT v.stage,s.version,v.exited-v.entered duration FROM play_visits v JOIN play_sessions s ON s.id=v.session_id WHERE s.story_id=? AND s.timing_status='complete' AND (? IS NULL OR s.version=?) AND v.exited IS NOT NULL ORDER BY v.id DESC LIMIT 10000",
       )
       .all(storyId, version ?? null, version ?? null) as {
       stage: string;
@@ -736,7 +828,7 @@ export class PlayAnalytics {
     });
     const observedStages = this.db
       .query(
-        "SELECT s.version,v.stage,count(*) visits,avg(v.exited-v.entered) averageMs FROM play_ui_visits v JOIN play_sessions s ON s.id=v.session_id WHERE s.story_id=? AND (? IS NULL OR s.version=?) GROUP BY s.version,v.stage",
+        "SELECT s.version,v.stage,count(*) visits,avg(v.exited-v.entered) averageMs FROM play_ui_visits v JOIN play_sessions s ON s.id=v.session_id WHERE s.story_id=? AND s.timing_status='complete' AND (? IS NULL OR s.version=?) GROUP BY s.version,v.stage",
       )
       .all(storyId, version ?? null, version ?? null);
     return {

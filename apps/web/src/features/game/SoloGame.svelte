@@ -113,10 +113,20 @@
     }).catch(() => {});
     const loader=new AbortController();
     void (async()=>{
-      const saved=sessionStorage.getItem(`active-play:${storyId}`);
+      let saved=sessionStorage.getItem(`active-play:${storyId}`);
+      if(!saved){
+        const response=await fetch(`/api/game/resume?storyId=${encodeURIComponent(storyId)}`,{signal:loader.signal});const data=await response.json();
+        if(loader.signal.aborted)return;
+        if(response.ok&&typeof data.runId==='string'){const resumed=String(data.runId);saved=resumed;sessionStorage.setItem(`active-play:${storyId}`,resumed);}
+      }
       if(saved) {
-        const response=await fetch(`/api/game/sessions/${encodeURIComponent(saved)}`,{signal:loader.signal});
-        const current=await response.json();if(loader.signal.aborted)return;
+        let response=await fetch(`/api/game/sessions/${encodeURIComponent(saved)}`,{signal:loader.signal});
+        let current=await response.json();if(loader.signal.aborted)return;
+        if(response.status===409&&current.code==='legacy_claim_required') {
+          const claim=await fetch(`/api/game/sessions/${encodeURIComponent(saved)}/claim`,{method:'POST',signal:loader.signal});
+          if(claim.ok){response=await fetch(`/api/game/sessions/${encodeURIComponent(saved)}`,{signal:loader.signal});current=await response.json();}
+          if(loader.signal.aborted)return;
+        }
         if(response.ok&&!current.finished&&current.outcome!=='abandoned') {
           runId=saved;
           if(current.ended){phase='win';return;}

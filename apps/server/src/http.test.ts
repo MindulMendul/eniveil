@@ -154,11 +154,11 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, independ
     const blockedReturn=crypto.randomUUID();aa.ws.send(JSON.stringify({type:'return',requestId:blockedReturn}));
     await wait(()=>aa.events.some(e=>e.type==='error'&&e.requestId===blockedReturn));
     expect((await req(`/api/play/sessions/${id}/rating`,a.cookie,{rating:5})).status).toBe(400);
-    expect((await req(`/api/play/sessions/${id}/ending`,a.cookie,{})).status).toBe(200);
+    expect((await req(`/api/play/sessions/${id}/ending`,a.cookie,{action:'completed'})).status).toBe(200);
     expect((await req(`/api/play/sessions/${id}/rating`,a.cookie,{rating:5})).status).toBe(200);
     await wait(()=>!aa.latest.room);
     expect(reconnected.latest.room!.session!.phase).toBe('reveal');
-    expect((await req(`/api/play/sessions/${id}/ending`,b.cookie,{})).status).toBe(200);
+    expect((await req(`/api/play/sessions/${id}/ending`,b.cookie,{action:'completed'})).status).toBe(200);
     expect((await req(`/api/play/sessions/${id}/rating`,b.cookie,{rating:null})).status).toBe(200);
     await wait(()=>!reconnected.latest.room);
     expect((await req(`/api/play/sessions/${id}`,a.cookie)).status).toBe(200);

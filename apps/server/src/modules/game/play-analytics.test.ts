@@ -39,7 +39,7 @@ test('duplicate and late events preserve visits, separate active/unknown time an
  expect(visits[1]!.active_ms).toBe(5000);expect(visits[1]!.unmeasured_ms).toBe(54000);
  expect((analytics.db.query('SELECT count(*) AS n FROM play_events WHERE id=?').get(first.id) as {n:number}).n).toBe(1);
  analytics.finish('p','completed',{message:'Ending'});
- expect(()=>analytics.rate('p',user,5)).toThrow('결말');analytics.ending('p',user);analytics.rate('p',user,5);
+ expect(()=>analytics.rate('p',user,5)).toThrow('결말');analytics.ending('p',user,'completed');analytics.rate('p',user,5);
  expect(analytics.view('p',user).rating).toBe(5);
  expect(JSON.stringify(analytics.view('p',user))).not.toContain('mmr');
  expect(()=>analytics.view('p',users[1].id)).toThrow('본인');
@@ -54,7 +54,7 @@ test('solo HTTP session ownership, ending gate, rating and recovery survive the 
  const end=await request(`/api/game/sessions/${start.runId}/accuse`,{suspectId:'dae',evidenceIds:[]});expect(end.status).toBe(200);
  expect((await request(`/api/play/sessions/${start.runId}/rating`,{rating:5})).status).toBe(400);
  const restored=await(await request(`/api/game/sessions/${start.runId}`)).json() as {outcome:string};expect(restored.outcome).toBe('failed');
- await request(`/api/play/sessions/${start.runId}/ending`,{});
+ await request(`/api/play/sessions/${start.runId}/ending`,{action:'completed'});
  expect((await request(`/api/play/sessions/${start.runId}/rating`,{rating:4})).status).toBe(200);
  const row=analytics.db.query('SELECT rating FROM story_ratings WHERE run_id=?').get(start.runId) as {rating:number};expect(row.rating).toBe(4);
  expect(analytics.pending(users[0].id)).toBeNull();
@@ -79,10 +79,10 @@ test('multiplayer chat and independent endings retain records after the room is 
  game.command(a!,{type:'vote',requestId:'3',targetId:b!.id});game.command(b!,{type:'vote',requestId:'4',targetId:a!.id});
  expect(game.state.sessions[id]!.endedAt).not.toBeNull();expect(analytics.play(id)?.correct).toBeNull();expect(analytics.pending(b!.id)).toBe(id);
  expect(()=>game.command(a!,{type:'return',requestId:'5'})).toThrow();
- await request(`/api/play/sessions/${id}/ending`,{});await request(`/api/play/sessions/${id}/rating`,{rating:5});
+ await request(`/api/play/sessions/${id}/ending`,{action:'completed'});await request(`/api/play/sessions/${id}/rating`,{rating:5});
  expect(game.roomFor(a!.id)).toBeUndefined();expect(game.roomFor(b!.id)?.id).toBe(room.id);
  expect(analytics.view(id,b!.id).endingComplete).toBe(false);
- await request(`/api/play/sessions/${id}/ending`,{},1);await request(`/api/play/sessions/${id}/rating`,{rating:null},1);
+ await request(`/api/play/sessions/${id}/ending`,{action:'completed'},1);await request(`/api/play/sessions/${id}/rating`,{rating:null},1);
  expect(game.state.rooms[room.id]).toBeUndefined();expect(analytics.chats(id,a!.id)[0]!.text).toBe('단서를 같이 보자');
  expect(analytics.member(id,a!.id).rating).toBe(5);expect(analytics.member(id,b!.id).finished_at).not.toBeNull();
  expect(JSON.stringify(game.snapshot(c!))).not.toContain('mmr');
@@ -91,7 +91,7 @@ test('multiplayer chat and independent endings retain records after the room is 
 test('abandonment excludes ratings and stale/retention queries distinguish missing activity',()=>{
  const{analytics,users,setTime}=setup();analytics.start('p','story',1,'solo',null,[{id:users[0].id,role:'detective'}],{});
  setTime(2000000);expect(analytics.stale()).toEqual(['p']);analytics.finish('p','abandoned',null);
- expect(()=>analytics.ending('p',users[0].id)).toThrow();expect(analytics.pending(users[0].id)).toBeNull();
+ expect(()=>analytics.ending('p',users[0].id,'completed')).toThrow();expect(analytics.pending(users[0].id)).toBeNull();
  setTime(400*86400000);analytics.pruneRetention();expect(analytics.play('p')).toBeNull();
 });
 
@@ -99,7 +99,7 @@ test('failed room persistence rolls back both the rating and room membership',()
  const{analytics,game,store,users}=setup();const[a,b]=users;
  const room=game.create(a!,'rehearsal');game.join(b!,room.code);game.command(a!,{type:'start',requestId:'s'});const id=room.sessionId!;
  game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});game.command(a!,{type:'vote',requestId:'3',targetId:b!.id});game.command(b!,{type:'vote',requestId:'4',targetId:a!.id});
- analytics.ending(id,a!.id);const save=store.save;store.save=()=>{throw Error('disk full');};
+ analytics.ending(id,a!.id,'completed');const save=store.save;store.save=()=>{throw Error('disk full');};
  expect(()=>game.completeRating(a!.id,id,5)).toThrow('disk full');
  expect(game.roomFor(a!.id)?.memberIds).toHaveLength(2);expect(analytics.member(id,a!.id).finished_at).toBeNull();
  store.save=save;game.completeRating(a!.id,id,5);expect(game.roomFor(a!.id)).toBeUndefined();
@@ -143,7 +143,7 @@ test('late opening and stale device claims cannot skip the ending or rewrite aut
  setTime(102000);analytics.events('p',user,[{...evt(0,'intro','cue_next'),target:'99',sceneId:'opening'}]);
  expect(analytics.view('p',user).cueIndex).toBe(0);expect(analytics.member('p',user).stage).toBe('win');
  analytics.events('p',user,[{...evt(1,'win','cue_next'),target:'1',sceneId:'resolution'}]);expect(analytics.view('p',user).cueIndex).toBe(2);
- analytics.ending('p',user);analytics.events('p',user,[{...evt(0,'intro'),clientId:crypto.randomUUID()}]);
+ analytics.ending('p',user,'completed');analytics.events('p',user,[{...evt(0,'intro'),clientId:crypto.randomUUID()}]);
  expect(analytics.member('p',user).stage).toBe('rating');
  expect((analytics.db.query('SELECT stage FROM play_visits WHERE session_id=? AND exited IS NULL').get('p') as {stage:string}).stage).toBe('rating');
 });
@@ -172,4 +172,52 @@ test('abandoned timing ends at the last activity rather than cleanup detection',
  const{analytics,users,setTime}=setup();const user=users[0].id;analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{});
  setTime(105000);analytics.events('p',user,[evt(0,'intro','heartbeat')]);setTime(2000000);analytics.finish('p','abandoned',null);
  expect(analytics.play('p')?.ended).toBe(105000);expect((analytics.db.query('SELECT exited FROM play_visits WHERE session_id=? ORDER BY id LIMIT 1').get('p') as {exited:number}).exited).toBe(105000);
+});
+
+test('scripted ending completion requires the final resolution cursor or an explicit skip',async()=>{
+ const{analytics,users,request}=setup();const user=users[0].id;
+ analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{});analytics.finish('p','completed',{cues:[{},{}]});
+ expect((await request('/api/play/sessions/p/ending',{})).status).toBe(400);
+ expect((await request('/api/play/sessions/p/ending',{action:'completed'})).status).toBe(400);
+ analytics.events('p',user,[{...evt(0,'intro','cue_next'),sceneId:'opening',target:'99'}]);
+ expect(()=>analytics.ending('p',user,'completed')).toThrow('끝까지');
+ analytics.events('p',user,[{...evt(1,'win','cue_next'),sceneId:'resolution',target:'0'}]);
+ expect(()=>analytics.ending('p',user,'completed')).toThrow('끝까지');
+ analytics.events('p',user,[{...evt(2,'win','cue_next'),sceneId:'resolution',target:'1'}]);analytics.ending('p',user,'completed');expect(analytics.view('p',user).endingComplete).toBe(true);
+ analytics.start('skip','story',1,'solo',null,[{id:user,role:'detective'}],{});analytics.finish('skip','completed',{cues:[{},{}]});analytics.ending('skip',user,'skipped');expect(analytics.view('skip',user).endingComplete).toBe(true);
+ expect((analytics.db.query("SELECT count(*) AS n FROM play_events WHERE session_id='skip' AND type='ending_skipped'").get() as {n:number}).n).toBe(1);
+});
+
+test('a pre-deployment bearer capability can be claimed once by an old action and then enforces ownership',async()=>{
+ const{store,analytics,request}=setup();const runs=new SQLiteStoryRunStore(store.db),oldService=new StorySessionService(fileStoryCatalog,runs);
+ const started=oldService.start('deokil-trading-murder');const old=new Date(90000).toISOString();store.db.query('UPDATE story_runs SET started_at=?,last_active_at=? WHERE id=?').run(old,old,started.runId);
+ expect((await request(`/api/game/sessions/${started.runId}`)).status).toBe(409);
+ expect(analytics.play(started.runId)).toBeNull();
+ expect((await request(`/api/game/sessions/${started.runId}/advance`,{})).status).toBe(200);
+ expect(analytics.play(started.runId)?.timing_status).toBe('partial');
+ expect((await request(`/api/game/sessions/${started.runId}/claim`,{},1)).status).toBe(400);
+ expect((await request(`/api/game/sessions/${started.runId}`,undefined,1)).status).toBe(400);
+ const resumed=await(await request('/api/game/resume?storyId=deokil-trading-murder')).json() as {runId:string};expect(resumed.runId).toBe(started.runId);
+});
+
+test('unclaimable old runs time out without assigning a guessed owner and release pinned source',()=>{
+ const{store,analytics,setTime}=setup();const runs=new SQLiteStoryRunStore(store.db),oldService=new StorySessionService(fileStoryCatalog,runs);const run=oldService.start('deokil-trading-murder');
+ const old=new Date(90000).toISOString();store.db.query('UPDATE story_runs SET started_at=?,last_active_at=? WHERE id=?').run(old,old,run.runId);
+ setTime(2000000);analytics.cleanupLegacy();expect(runs.get(run.runId)?.outcome).toBeNull();setTime(100000+86400001);analytics.cleanupLegacy();expect(runs.get(run.runId)?.outcome).toBe('abandoned');expect(runs.get(run.runId)?.storyPackage).toBeUndefined();expect(analytics.play(run.runId)).toBeNull();
+});
+
+test('ongoing legacy multiplayer sessions retain known participants and their roles after recovery',()=>{
+ const{store,analytics,game,users}=setup();const previous=new Game(store,storyCatalog);for(const user of users)previous.online.set(user.id,1);
+ const[a,b]=users;const room=previous.create(a!,'rehearsal');previous.join(b!,room.code);previous.command(a!,{type:'start',requestId:'old'});previous.command(a!,{type:'advance',requestId:'old-advance'});const id=room.sessionId!,role=previous.snapshot(a!).room!.session!.role;
+ game.recoverLegacySessions();expect(analytics.play(id)?.timing_status).toBe('partial');expect(game.snapshot(a!).room!.session!.role).toEqual(role);
+ game.command(a!,{type:'advance',requestId:'new-advance'});expect(game.state.sessions[id]!.phase).toBe('voting');expect(analytics.members(id)).toHaveLength(2);
+});
+
+test('completed legacy recovery uses only the recorded outcome when its immutable ending source is gone',async()=>{
+ const{store,analytics,request,users}=setup();const runs=new SQLiteStoryRunStore(store.db),oldService=new StorySessionService(fileStoryCatalog,runs);
+ const old=oldService.start('deokil-trading-murder');oldService.advance(old.runId);for(const id of ['e1','e2','e3'])oldService.inspectEvidence(old.runId,id);oldService.accuse(old.runId,'sa',['e1','e2','e3']);
+ store.db.query('UPDATE story_runs SET started_at=?,last_active_at=?,ended_at=? WHERE id=?').run(new Date(90000).toISOString(),new Date(99000).toISOString(),new Date(99000).toISOString(),old.runId);
+ expect((await request(`/api/game/sessions/${old.runId}/claim`,{})).status).toBe(200);
+ const restored=await(await request(`/api/play/sessions/${old.runId}`)).json() as {result:{cues:unknown[]};outcome:string};expect(restored.result.cues).toEqual([]);expect(restored.outcome).toBe('completed');
+ expect((analytics.db.query('SELECT count(*) AS n FROM play_skill WHERE user_id=?').get(users[0].id) as {n:number}).n).toBe(0);
 });

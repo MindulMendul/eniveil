@@ -12,6 +12,7 @@ import type { StoryCatalog } from "../platform/stories/ports/story-catalog";
 import { supportsSoloStory } from "./solo-story";
 import type { StorySessionService } from "./story-session-service";
 
+import { claimLegacyPlay } from "./legacy-play";
 import type { PlayAnalytics } from "./play-analytics";
 
 export function createGameRoutes(deps: {
@@ -30,13 +31,44 @@ export function createGameRoutes(deps: {
     await next();
   });
 
+  const ensureOwner = (c: Context, id: string) => {
+    if (!deps.analytics || !deps.owner) return;
+    const owner = deps.owner(c);
+    if (!deps.analytics.play(id))
+      claimLegacyPlay(
+        { analytics: deps.analytics, runs: deps.runs, stories: deps.stories },
+        id,
+        owner,
+        deps.roomId?.(owner, deps.runs.get(id)?.storyId ?? "") ?? null,
+      );
+    deps.analytics.member(id, owner);
+  };
   app.use("/sessions/:id/*", async (c, next) => {
-    if (deps.analytics && deps.owner)
-      deps.analytics.member(c.req.param("id")!, deps.owner(c));
+    if (c.req.method !== "GET") ensureOwner(c, c.req.param("id")!);
     await next();
   });
+  app.get("/resume", (c) => {
+    const { storyId } = startStorySessionSchema.parse({
+      storyId: c.req.query("storyId"),
+    });
+    if (!deps.analytics || !deps.owner) return c.json({ runId: null });
+    const owner = deps.owner(c),
+      run = deps.analytics.resume(
+        owner,
+        storyId,
+        deps.roomId?.(owner, storyId) ?? null,
+      );
+    return c.json({ runId: run?.id ?? null });
+  });
+  app.post("/sessions/:id/claim", (c) => c.json({ runId: c.req.param("id") }));
   app.get("/sessions/:id", (c) => {
     const id = c.req.param("id");
+    if (deps.analytics && !deps.analytics.play(id))
+      return c.json(
+        { error: "이전 플레이 복구가 필요해.", code: "legacy_claim_required" },
+        409,
+      );
+    ensureOwner(c, id);
     if (deps.analytics && deps.owner) {
       const view = deps.analytics.view(id, deps.owner(c));
       if (view.ended) return c.json(view);
@@ -194,6 +226,15 @@ export function createGameRoutes(deps: {
     if (!Number.isInteger(rating) || rating < 1 || rating > 5)
       return c.json({ error: "평점은 1점부터 5점까지 입력해 줘." }, 400);
     if (deps.analytics && deps.owner) {
+      const id = c.req.param("id"),
+        owner = deps.owner(c);
+      if (
+        deps.analytics.play(id)?.timing_status === "partial" &&
+        !deps.analytics.member(id, owner).ending_at
+      )
+        throw new Error(
+          "이전 버전 플레이는 새로고침해 결말과 평가를 이어가 줘.",
+        );
       if (deps.rate) deps.rate(deps.owner(c), c.req.param("id"), rating);
       else deps.analytics.rate(c.req.param("id"), deps.owner(c), rating);
       return c.json({ saved: true });

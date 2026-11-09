@@ -323,6 +323,84 @@ export class Game {
       };
     }
   }
+  recoverLegacySessions() {
+    if (!this.analytics) return;
+    const before = structuredClone(this.state);
+    try {
+      this.analytics.atomic(() => {
+        let changed = false;
+        for (const room of Object.values(this.state.rooms)) {
+          const session = room.sessionId
+            ? this.state.sessions[room.sessionId]
+            : null;
+          if (!session || this.analytics!.play(session.id)) continue;
+          const story = this.storyCatalog.get(
+            session.scenarioId,
+            session.scenarioVersion,
+          );
+          if (!story) continue;
+          this.analytics!.start(
+            session.id,
+            session.scenarioId,
+            session.scenarioVersion,
+            "multiplayer",
+            room.id,
+            session.participants.map((p) => ({
+              id: p.id,
+              role: String(p.roleIndex),
+            })),
+            {
+              title: story.scenario.title,
+              participants: session.participants.map((p) => ({
+                id: p.id,
+                nickname: p.nickname,
+              })),
+            },
+          );
+          this.analytics!.markLegacy(
+            session.id,
+            this.analytics!.play(session.id)!.started,
+            null,
+          );
+          for (const participant of session.participants)
+            this.analytics!.stage(session.id, participant.id, session.phase);
+          if (session.phase === "reveal")
+            this.finishRecoveredSession(
+              session,
+              story.content.answer,
+              story.content.answerRoleIndex,
+            );
+          changed = true;
+        }
+        if (changed) this.store.save();
+      });
+    } catch (error) {
+      this.store.state = before;
+      throw error;
+    }
+  }
+  private finishRecoveredSession(
+    session: Session,
+    answer: string,
+    answerRoleIndex: number | undefined,
+  ) {
+    const result = {
+      answer,
+      votes: session.participants.map((p) => ({
+        voter: p.nickname,
+        target:
+          session.participants.find((other) => other.id === session.votes[p.id])
+            ?.nickname ?? "미투표",
+      })),
+    };
+    this.analytics!.finish(
+      session.id,
+      "completed",
+      result,
+      this.groupCorrectness(session, answerRoleIndex),
+    );
+    session.endedAt ??= new Date().toISOString();
+  }
   private groupCorrectness(
     session: Session,
     answerRoleIndex: number | undefined,

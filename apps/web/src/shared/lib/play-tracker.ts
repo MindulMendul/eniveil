@@ -63,7 +63,7 @@ export function playTracker(id: string) {
       sequence: sequence++,
       type,
       stage,
-      ...(type === "cue_next" || type === "cue_skip"
+      ...(type === "cue_next" || type === "cue_skip" || type === "cue_complete"
         ? {
             sceneId:
               stage === "intro"
