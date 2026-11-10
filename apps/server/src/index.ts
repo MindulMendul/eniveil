@@ -5,6 +5,7 @@ import { bodyLimit } from "hono/body-limit";
 import { resolve } from "node:path";
 import { Store } from "./store";
 import { PlayAnalytics } from "./modules/game/play-analytics";
+import { sweepPlays } from "./modules/game/play-cleanup";
 import { createPlayRoutes, playOwner } from "./modules/game/play-routes";
 import { Game } from "./game";
 import { metrics, observeHTTP } from "./observability";
@@ -37,7 +38,7 @@ const storySessions = new StorySessionService(playCatalog, storyRunStore);
 analytics.pruneRetention();
 analytics.cleanupLegacy();
 game.recoverLegacySessions();
-setInterval(()=>{for(const id of analytics.stale()){analytics.finish(id,'abandoned',null);storySessions.abandon(id);game.abandonPlay(id);}analytics.cleanupLegacy();analytics.pruneRetention();},60000).unref();
+setInterval(() => sweepPlays({analytics,game,store,storySessions}),60000).unref();
 
 const notifyTemporal = (action: "start" | "event" | "end", payload: object) => {
   const baseUrl = process.env.TEMPORAL_GATEWAY_URL;
@@ -111,7 +112,7 @@ app.route("/api/game", createGameRoutes({
   analytics,
   owner: c => playOwner(c,store,production),
   rate: (owner,id,rating)=>game.completeRating(owner,id,rating),
-  roomId: (owner,story) => {const r=game.roomFor(owner);return r?.soloStarted?r.id:null;},
+  roomId: (owner,story) => game.soloRoomForStory(owner,story),
 }));
 app.route("/api/lobby", lobby.app);
 app.route("/api/play", createPlayRoutes({analytics,store,game,production,notify:lobby.broadcast,adminToken:process.env.STORY_ADMIN_TOKEN}));

@@ -26,6 +26,10 @@ export class Game {
       r.memberIds.includes(id),
     );
   }
+  soloRoomForStory(owner: string, story: string) {
+    const room=this.roomFor(owner);
+    return room?.soloStarted && room.mode === 'solo' && story === supportedSoloStory.id ? room.id : null;
+  }
   needRoom(id: string) {
     const r = this.roomFor(id);
     if (!r) throw new Error("참여 중인 방이 없어.");

@@ -451,6 +451,34 @@ export class PlayAnalytics {
       )
       .run(id, user, client, event.stage, now);
   }
+  private closeObservedVisits(id: string, at: number, user?: string) {
+    const visits = this.db
+      .query(
+        `SELECT v.id,v.entered,d.last_seen,d.visible FROM play_ui_visits v LEFT JOIN play_devices d ON d.session_id=v.session_id AND d.user_id=v.user_id AND d.client_id=v.client_id WHERE v.session_id=? AND v.exited IS NULL AND (? IS NULL OR v.user_id=?)`,
+      )
+      .all(id, user ?? null, user ?? null) as {
+      id: number;
+      entered: number;
+      last_seen: number | null;
+      visible: number | null;
+    }[];
+    for (const visit of visits) {
+      const elapsed = Math.max(
+        0,
+        at - Math.max(visit.entered, visit.last_seen ?? visit.entered),
+      );
+      this.db
+        .query(
+          "UPDATE play_ui_visits SET exited=?,active_ms=active_ms+?,unmeasured_ms=unmeasured_ms+? WHERE id=?",
+        )
+        .run(
+          at,
+          visit.visible && elapsed <= 30000 ? elapsed : 0,
+          elapsed > 30000 ? elapsed : 0,
+          visit.id,
+        );
+    }
+  }
   stage(id: string, user: string, stage: string, at = this.now()) {
     const member = this.member(id, user);
     if (member.stage === stage) return;
@@ -514,11 +542,7 @@ export class PlayAnalytics {
             "UPDATE story_runs SET ended_at=?,last_active_at=?,outcome='abandoned',package_json=NULL WHERE id=? AND ended_at IS NULL",
           )
           .run(new Date(now).toISOString(), new Date(now).toISOString(), id);
-      this.db
-        .query(
-          "UPDATE play_ui_visits SET exited=? WHERE session_id=? AND exited IS NULL",
-        )
-        .run(now, id);
+      this.closeObservedVisits(id, now);
       for (const { user_id } of this.members(id))
         this.finishMember(play, user_id, outcome, now);
     });
@@ -587,11 +611,7 @@ export class PlayAnalytics {
             "UPDATE play_members SET ending_at=? WHERE session_id=? AND user_id=?",
           )
           .run(this.now(), id, user);
-        this.db
-          .query(
-            "UPDATE play_ui_visits SET exited=? WHERE session_id=? AND user_id=? AND exited IS NULL",
-          )
-          .run(this.now(), id, user);
+        this.closeObservedVisits(id, this.now(), user);
         this.stage(id, user, "rating");
         this.record(id, user, "ending_completed", "rating");
       }
@@ -635,11 +655,7 @@ export class PlayAnalytics {
             "INSERT INTO story_ratings(run_id,story_id,rating,created_at) VALUES(?,?,?,?) ON CONFLICT(run_id) DO UPDATE SET rating=excluded.rating,created_at=excluded.created_at",
           )
           .run(id, play.story_id, rating, new Date(now).toISOString());
-      this.db
-        .query(
-          "UPDATE play_ui_visits SET exited=? WHERE session_id=? AND user_id=? AND exited IS NULL",
-        )
-        .run(now, id, user);
+      this.closeObservedVisits(id, now, user);
       this.record(
         id,
         user,

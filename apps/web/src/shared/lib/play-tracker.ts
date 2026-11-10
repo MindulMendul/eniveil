@@ -95,10 +95,10 @@ export function playTracker(id: string) {
     if (departed) return;
     departed = true;
     record("exit", undefined, false);
-    if (queue.length)
+    for (let offset = 0; offset < queue.length; offset += 50)
       navigator.sendBeacon(
         `/api/play/sessions/${id}/events`,
-        new Blob([JSON.stringify({ events: queue.slice(0, 50) })], {
+        new Blob([JSON.stringify({ events: queue.slice(offset, offset + 50) })], {
           type: "application/json",
         }),
       );

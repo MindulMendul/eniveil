@@ -7,7 +7,7 @@
 - `play_sessions`: 스토리/버전, 모드, 원래 방 ID, 서버 시작/종료 시각, completed/failed/abandoned 결과, 본인에게 허용된 공개 결말. 방을 지워도 남는다.
 - `play_members`: 참가자/역할, 보관 중인 최근 365일 범위의 같은 스토리 이전 플레이 횟수(0이어도 생애 첫 플레이로 단정하지 않음), 시작 시 실력 추정치와 산정 버전, 결말 완료/평가 완료 시각, 평점. 평점 NULL + 완료 시각 존재는 건너뛰기다.
 - `play_events`: 스키마 버전 1. 이벤트 UUID, 서버 전역 순서, 플레이/사용자, 유형·단계·대상 ID, 서버 수신 시각(ms), server/client 출처, 클라이언트 식별자·순서·발생 시각. 클라이언트 시각·행동은 관측값이며 정답/권한 판단에 쓰지 않는다. 동일 플레이·사용자·UUID는 한 번만 저장한다. 늦은 이벤트도 원본은 보존하지만 최신 단계·시간을 되돌리지 않는다.
-- `play_visits`: 단계별 각 방문의 진입/이탈·활동·미측정 시간. 재방문은 새 행이다. intro/cast/explore/alibi/cross/accuse/briefing/discussion/voting과 win/fail/reveal, rating을 분리한다. 이 표는 서버 전이만 반영한다. 세부 UI 단계는 play_ui_visits에서 별도로 분석한다.
+- `play_visits`: 단계별 각 방문의 진입/이탈·활동·미측정 시간. 재방문은 새 행이다. 이 표는 서버 전이만 반영한다. 1인은 intro→cast(수사 전체)→win/fail→rating, 다인은 briefing/discussion/voting→reveal→rating이다. explore/alibi/cross/accuse 등 1인 수사의 세부 단계와 재방문 시간은 서버 확정 단계가 아닌 play_ui_visits의 클라이언트 관측값으로 별도 분석한다.
 - `play_ui_visits`: 탭별 UI 관측 방문. 클라이언트 주장 단계는 이 표와 원본 이벤트에만 남고 서버 확정 단계·결말·평가 상태를 덮어쓰지 않는다. 관리 조회에서도 observedStages/observedVisits로 별도 구분한다.
 - `play_action_totals`: 원문 보관 만료와 별개로 유지하는 세션/사용자/단계/행동별 빈도. 재전송은 한 번만 합산하고 365일 보관한다.
 - `play_devices`: 탭별 마지막 처리 순서. 새로고침/여러 탭에서 순서가 충돌하지 않게 한다.

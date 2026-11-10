@@ -1,3 +1,4 @@
+import { sweepPlays } from './play-cleanup';
 import { afterEach,test,expect } from 'bun:test';
 import { Hono } from 'hono';
 import { Store } from '../../store';
@@ -220,4 +221,46 @@ test('completed legacy recovery uses only the recorded outcome when its immutabl
  expect((await request(`/api/game/sessions/${old.runId}/claim`,{})).status).toBe(200);
  const restored=await(await request(`/api/play/sessions/${old.runId}`)).json() as {result:{cues:unknown[]};outcome:string};expect(restored.result.cues).toEqual([]);expect(restored.outcome).toBe('completed');
  expect((analytics.db.query('SELECT count(*) AS n FROM play_skill WHERE user_id=?').get(users[0].id) as {n:number}).n).toBe(0);
+});
+
+
+test('closing UI visits accounts for the final visible interval and long unknown gaps',()=>{
+ const{analytics,users,setTime}=setup(),user=users[0].id;
+ analytics.start('tail','story',1,'solo',null,[{id:user,role:'detective'}],{});
+ setTime(101000);analytics.events('tail',user,[{...evt(0),clientId:'tab',visible:true}]);
+ setTime(106000);analytics.finish('tail','completed',{message:'done'});
+ let rows=analytics.db.query('SELECT * FROM play_ui_visits WHERE session_id=? ORDER BY id').all('tail') as any[];
+ expect(rows[0].active_ms).toBe(5000);expect(rows[0].exited-rows[0].entered).toBe(5000);
+ setTime(107000);analytics.events('tail',user,[{...evt(1,'win'),clientId:'tab',visible:true}]);
+ setTime(112000);analytics.ending('tail',user,'completed');
+ rows=analytics.db.query('SELECT * FROM play_ui_visits WHERE session_id=? ORDER BY id').all('tail') as any[];
+ expect(rows[1].active_ms).toBe(5000);
+ setTime(113000);analytics.events('tail',user,[{...evt(2,'rating'),clientId:'tab',visible:true}]);
+ setTime(150000);analytics.rate('tail',user,null);
+ rows=analytics.db.query('SELECT * FROM play_ui_visits WHERE session_id=? ORDER BY id').all('tail') as any[];
+ expect(rows[2].unmeasured_ms).toBe(37000);expect(rows[2].active_ms).toBe(0);
+});
+
+test('a workshop play in another tab cannot acquire or close the active solo room',()=>{
+ const{analytics,game,users}=setup(),user=users[0]!;
+ const room=game.create(user,'deokil-trading-murder');game.command(user,{type:'start',requestId:'start'});
+ expect(game.soloRoomForStory(user.id,'other-workshop-story')).toBeNull();
+ expect(game.soloRoomForStory(user.id,'deokil-trading-murder')).toBe(room.id);
+ analytics.start('other','other-workshop-story',1,'solo',game.soloRoomForStory(user.id,'other-workshop-story'),[{id:user.id,role:'detective'}],{});
+ analytics.finish('other','completed',{});analytics.ending('other',user.id,'completed');game.completeRating(user.id,'other',3);
+ expect(game.roomFor(user.id)?.id).toBe(room.id);
+});
+
+test('cleanup rolls back one failed stale play and continues other plays and future passes',()=>{
+ const{store,analytics,game,users,setTime}=setup(),user=users[0]!;
+ const runs=new SQLiteStoryRunStore(store.db),storySessions=new StorySessionService(fileStoryCatalog,runs);
+ const room=game.create(user,'deokil-trading-murder');game.command(user,{type:'start',requestId:'start'});
+ analytics.start('stale1','story',1,'solo',room.id,[{id:user.id,role:'detective'}],{});
+ analytics.start('stale2','story',1,'solo',null,[{id:user.id,role:'detective'}],{});
+ setTime(2000000);const save=store.save.bind(store);store.save=()=>{throw Error('temporary save failure');};const failures:unknown[]=[];
+ sweepPlays({analytics,game,store,storySessions},e=>failures.push(e));
+ expect(failures.length).toBe(1);expect(analytics.play('stale1')?.ended).toBeNull();expect(game.roomFor(user.id)?.id).toBe(room.id);
+ expect(analytics.play('stale2')?.outcome).toBe('abandoned');
+ store.save=save;sweepPlays({analytics,game,store,storySessions},e=>failures.push(e));
+ expect(analytics.play('stale1')?.outcome).toBe('abandoned');expect(game.roomFor(user.id)).toBeUndefined();
 });
