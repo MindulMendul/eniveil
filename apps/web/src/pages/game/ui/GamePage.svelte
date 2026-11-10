@@ -1,4 +1,7 @@
 <script lang="ts">
+  import GameChat from "../../../features/game/GameChat.svelte";
+  import { playTracker } from "../../../shared/lib/play-tracker";
+  import { onMount } from "svelte";
   import type { Command, RoomView, SessionView } from "@festival/shared";
   import { GAME_PHASE_LABELS } from "../../../entities/session";
   import { Button, Panel } from "../../../shared/ui";
@@ -18,6 +21,9 @@
     connected: boolean;
     onCommand: (type: Command["type"], targetId?: string) => void;
   } = $props();
+  let tracker:ReturnType<typeof playTracker>|undefined;
+  onMount(()=>{tracker=playTracker(session.id);tracker.stage(session.phase);return()=>tracker?.stop();});
+  $effect(()=>{tracker?.stage(session.phase);});
 </script>
 
 <main id="main-content" tabindex="-1" class="main">
@@ -50,7 +56,7 @@
             <p class="clue-text">{clue}</p>
           </div>
         {/each}
-        <p class="fine">대화는 대면 또는 디스코드를 이용해 줘.</p>
+
       {:else if session.phase === "voting"}
         <h2 class="heading-two">누가 초대장을 옮겼을까?</h2>
         <p class="muted">투표는 한 번만 가능하고, 모두 완료하면 진상이 공개돼.</p>
@@ -81,7 +87,7 @@
     <aside class="sidebar">
       <Panel>
         <p class="eyebrow">PRIVATE ROLE CARD</p>
-        <details open={session.phase === "briefing"}>
+        <details open={session.phase === "briefing"} ontoggle={event=>tracker?.record('inspect',event.currentTarget.open?'role_open':'role_close')}>
           <summary class="summary">{session.role.name} · 내 비밀 보기</summary>
           <p class="muted detail-copy">{session.role.secret}</p>
         </details>
@@ -94,10 +100,6 @@
             <Button disabled={busy || !connected} onclick={() => onCommand("advance")}>
               {session.phase === "briefing" ? "단서 공개하기" : "투표 시작하기"} →
             </Button>
-          {:else if session.phase === "reveal"}
-            <Button disabled={busy || !connected} onclick={() => onCommand("return")}>
-              대기방으로 돌아가기 →
-            </Button>
           {:else}
             <p class="muted">모두 투표하면 결말이 공개돼.</p>
           {/if}
@@ -109,4 +111,5 @@
       </Panel>
     </aside>
   </div>
+  {#if session.phase!=="reveal"}<GameChat sessionId={session.id} members={room.members}/>{/if}
 </main>

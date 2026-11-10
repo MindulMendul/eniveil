@@ -216,7 +216,7 @@ export function createLobbyRoutes(deps: {
       };
     }),
   );
-  setInterval(broadcast, 30000).unref();
+  setInterval(() => {deps.game.cleanupFinishedRooms();broadcast();}, 30000).unref();
 
   const disconnect = (guestId: string) => {
     for (const [ws, entry] of sockets) if (entry.guest.id === guestId) {
@@ -224,5 +224,5 @@ export function createLobbyRoutes(deps: {
       ws.close(1008, "Signed out");
     }
   };
-  return { app, websocket, disconnect, connectionCount: () => sockets.size };
+  return { app, websocket, broadcast, disconnect, connectionCount: () => sockets.size };
 }

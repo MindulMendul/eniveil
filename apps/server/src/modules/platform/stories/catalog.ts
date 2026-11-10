@@ -53,6 +53,7 @@ const scenarios: Scenario[] = [
 ];
 
 const rehearsalContent: StoryContent = {
+  answerRoleIndex: 1,
   roles: [
     {
       name: "축제 안내원",

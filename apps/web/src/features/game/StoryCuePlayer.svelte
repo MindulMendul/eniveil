@@ -3,7 +3,7 @@
   import { onDestroy, onMount } from "svelte";
   import type { StoryCue } from "@festival/shared";
 
-  let { cues, onComplete }: { cues: StoryCue[]; onComplete: () => void } = $props();
+  let { cues, onComplete,initialIndex=0,onAction=()=>{} }: { cues: StoryCue[]; onComplete: () => void;initialIndex?:number;onAction?:(type:"next"|"skip",index:number)=>void } = $props();
   let cue = $state<StoryCue | null>(null);
   let effect = $state<"fade" | "dissolve" | "cut" | null>(null);
   let waiting = $state(false);
@@ -45,17 +45,19 @@
   function advance() {
     if (!cue || waiting) return;
     const index = cues.indexOf(cue);
+    onAction("next",index);
     run(index + 1);
   }
 
   function skip() {
+    onAction("skip",cues.length-1);
     if (timer) clearTimeout(timer);
     effect = null;
     waiting = false;
     run(cues.length);
   }
 
-  onMount(() => run(0));
+  onMount(() => run(Math.max(0,Math.min(initialIndex,cues.length))));
   onDestroy(() => {
     if (timer) clearTimeout(timer);
   });
