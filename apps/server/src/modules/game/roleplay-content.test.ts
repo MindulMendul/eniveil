@@ -120,3 +120,36 @@ test("a newer published version is offered, while an older session can still loa
   expect(catalog.get(older.story.id, 1)?.scenario.version).toBe(1);
   expect(catalog.get(older.story.id, 2)?.scenario.title).toBe("샘플 v2");
 });
+
+test("a room keeps its creation version after a newer version is published", () => {
+  const v1 = roleplayPackage();
+  const v2 = roleplayPackage();
+  v2.story.version = 2;
+  v2.story.playerCount = { min: 3, max: 3 };
+  const id = v1.story.id;
+  const meta = (version: number) => ({ id, version, mode: "multiplayer" as const });
+  let current = withRoleplayPackages(storyCatalog, {
+    list: () => [meta(1)],
+    get: () => v1,
+  });
+  const store = new Store(":memory:");
+  stores.push(store);
+  const game = new Game(store, {
+    list: () => current.list(),
+    get: (storyId, version) => current.get(storyId, version),
+  });
+  const host: Guest = { id: "h", nickname: "방장" }, guest: Guest = { id: "g", nickname: "참가자" };
+  for (const member of [host, guest]) { store.state.guests[member.id] = member; game.online.set(member.id, 1); }
+  const room = game.create(host, id);
+  game.join(guest, room.code);
+
+  current = withRoleplayPackages(storyCatalog, {
+    list: () => [meta(1), meta(2)],
+    get: (_id, version) => (version === 2 ? v2 : v1),
+  });
+  const view = game.snapshot(host).room!;
+  expect(view.capacity).toBe(2);
+  expect(view.scenario.version).toBe(1);
+  game.command(host, { type: "start", requestId: crypto.randomUUID() });
+  expect(game.snapshot(host).room?.session).not.toBeNull();
+});
