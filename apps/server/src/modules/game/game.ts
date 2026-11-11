@@ -23,7 +23,8 @@ export class Game {
   }
   /** A room keeps the version it was created with, so later publishes cannot change its seats or content. */
   private roomStory(room: Room) {
-    return this.storyCatalog.get(room.scenarioId, room.scenarioVersion)!;
+    // A pinned version can disappear after a rollback. Fall back to the current version so one stale room cannot break every lobby view.
+    return this.storyCatalog.get(room.scenarioId, room.scenarioVersion) ?? this.storyCatalog.get(room.scenarioId)!;
   }
   roomFor(id: string) {
     return Object.values(this.state.rooms).find((r) =>

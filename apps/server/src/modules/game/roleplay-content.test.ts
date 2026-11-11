@@ -153,3 +153,32 @@ test("a room keeps its creation version after a newer version is published", () 
   game.command(host, { type: "start", requestId: crypto.randomUUID() });
   expect(game.snapshot(host).room?.session).not.toBeNull();
 });
+
+test("a room whose pinned version was removed still renders the lobby and does not break other viewers", () => {
+  const v1 = roleplayPackage();
+  const v2 = roleplayPackage();
+  v2.story.version = 2;
+  const id = v1.story.id;
+  const meta = (version: number) => ({ id, version, mode: "multiplayer" as const });
+  let current = withRoleplayPackages(storyCatalog, {
+    list: () => [meta(1)],
+    get: () => v1,
+  });
+  const store = new Store(":memory:");
+  stores.push(store);
+  const game = new Game(store, {
+    list: () => current.list(),
+    get: (storyId, version) => current.get(storyId, version),
+  });
+  const host: Guest = { id: "h", nickname: "방장" }, outsider: Guest = { id: "o", nickname: "구경꾼" };
+  for (const member of [host, outsider]) { store.state.guests[member.id] = member; game.online.set(member.id, 1); }
+  game.create(host, id);
+
+  // Rollback: version 1 is no longer published, only version 2 remains.
+  current = withRoleplayPackages(storyCatalog, {
+    list: () => [meta(2)],
+    get: () => v2,
+  });
+  expect(() => game.snapshot(outsider)).not.toThrow();
+  expect(game.snapshot(host).room?.scenario.version).toBe(2);
+});
