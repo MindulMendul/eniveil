@@ -48,6 +48,15 @@
         <h2 class="heading-two">너의 역할은 ‘{session.role.name}’</h2>
         <p class="narrative">{session.role.secret}</p>
         <p class="fine">이 정보는 너에게만 보여. 어떻게 이야기할지는 네가 결정해.</p>
+        {#if session.items.length}
+          <p class="eyebrow mt-4">ITEMS</p>
+          {#each session.items as item}
+            <div class="clue">
+              <span class="clue-label">{item.name}</span>
+              <p class="clue-text">{item.description}</p>
+            </div>
+          {/each}
+        {/if}
       {:else if session.phase === "discussion"}
         <h2 class="heading-two">증언을 맞춰 볼 시간</h2>
         {#each session.clues as clue, index (index)}

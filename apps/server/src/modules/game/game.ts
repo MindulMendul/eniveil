@@ -85,6 +85,9 @@ export class Game {
                   name: "역할 정보 없음",
                   secret: "이 작품의 역할 정보를 불러오지 못했어.",
                 },
+                items: (story?.content.items ?? [])
+                  .filter((item) => item.ownerRoleIndex === participant.roleIndex)
+                  .map(({ name, description }) => ({ name, description })),
                 clues:
                   session.phase === "briefing"
                     ? []

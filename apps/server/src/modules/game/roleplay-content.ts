@@ -32,6 +32,11 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
       clues: mechanics.clues,
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
+      items: source.content.items.map((item) => ({
+        name: item.name,
+        description: item.description ?? "",
+        ownerRoleIndex: item.initialOwnerRoleId ? roleIndex.get(item.initialOwnerRoleId) : undefined,
+      })),
     },
   };
 }

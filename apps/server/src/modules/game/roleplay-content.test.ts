@@ -28,6 +28,7 @@ function roleplayPackage(): StoryPackage {
     answer: ANSWER,
     answerRoleId: "r2",
   };
+  source.content.items = [{ id: "key", name: "무대 서랍 열쇠", description: "서랍을 여는 열쇠다.", visibleTo: { type: "all" }, transfer: { mode: "never" }, initialOwnerRoleId: "r2" }];
   return storyPackageSchema.parse(source);
 }
 
@@ -87,4 +88,16 @@ test("clues stay hidden in the briefing and the answer stays hidden until the re
   game.command(a, { type: "advance", requestId: crypto.randomUUID() });
   expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
   expect(JSON.stringify(game.snapshot(b))).not.toContain(ANSWER);
+});
+
+test("an item reaches only the role that owns it", () => {
+  const { game, a, b } = setup();
+  const viewA = game.snapshot(a).room!.session!;
+  const viewB = game.snapshot(b).room!.session!;
+  const owners = [viewA, viewB].filter((view) => view.items.some((item) => item.name === "무대 서랍 열쇠"));
+  expect(owners).toHaveLength(1);
+  const nonOwner = owners[0] === viewA ? viewB : viewA;
+  expect(nonOwner.items).toEqual([]);
+  const nonOwnerViewer = owners[0] === viewA ? b : a;
+  expect(JSON.stringify(game.snapshot(nonOwnerViewer))).not.toContain("무대 서랍 열쇠");
 });

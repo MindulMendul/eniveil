@@ -73,6 +73,8 @@ export type SessionView = {
   scenarioVersion: number;
   phase: "briefing" | "discussion" | "voting" | "reveal";
   role: { name: string; secret: string };
+  /** Items the viewer's role owns; other roles' items are never sent. */
+  items: { name: string; description: string }[];
   clues: string[];
   voteCount: number;
   hasVoted: boolean;
