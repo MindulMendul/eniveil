@@ -119,6 +119,7 @@ export class Game {
                 clues: this.visibleClues(session, story?.content),
                 availableClueCount: this.availableClues(session, story?.content).length,
                 collectedClueCount: session.collectedClueIds?.length ?? 0,
+                meetingPrompt: story?.content.meetingPrompt ?? null,
                 voteCount: r.memberIds.filter((id) => !!session.votes[id])
                   .length,
                 hasVoted: !!session.votes[me.id],

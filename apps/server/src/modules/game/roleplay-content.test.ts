@@ -34,11 +34,14 @@ function roleplayPackage(): StoryPackage {
   return storyPackageSchema.parse(source);
 }
 
-function setup(stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number }) {
+function setup(stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number }, meetingPrompt?: string) {
   const store = new Store(":memory:");
   stores.push(store);
   const pkg = roleplayPackage();
-  if (pkg.content.mechanics.type === "roleplay") pkg.content.mechanics.stageDurations = stageDurations;
+  if (pkg.content.mechanics.type === "roleplay") {
+    pkg.content.mechanics.stageDurations = stageDurations;
+    pkg.content.mechanics.meetingPrompt = meetingPrompt;
+  }
   const catalog = withRoleplayPackages(storyCatalog, {
     list: () => [{ id: pkg.story.id, version: pkg.story.version, mode: "multiplayer" }],
     get: () => pkg,
@@ -125,6 +128,13 @@ test("an expired configured investigation advances on the server", () => {
   expect(game.expireTimedStages(session.phaseEndsAt!)).toHaveLength(1);
   expect(session.phase).toBe("meeting");
   expect(session.phaseEndsAt).toBeNull();
+});
+
+test("a meeting shows only the configured prompt to participants", () => {
+  const { game, a, b } = setup(undefined, "발견한 사실만 말하고, 추측은 나중에 정리하세요.");
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.meetingPrompt).toBe("발견한 사실만 말하고, 추측은 나중에 정리하세요.");
 });
 
 test("a newer published version is offered, while an older session can still load its own version", () => {

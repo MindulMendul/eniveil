@@ -75,7 +75,7 @@
 
       {:else if session.phase === "meeting"}
         <h2 class="heading-two">각자의 추리를 나눠 볼 시간</h2>
-        <p class="muted">참가자들과 대화하며 단서를 정리해 봐.</p>
+        <p class="muted">{session.meetingPrompt ?? "참가자들과 대화하며 단서를 정리해 봐."}</p>
       {:else if session.phase === "final_choice"}
         <h2 class="heading-two">누가 초대장을 옮겼을까?</h2>
         <p class="muted">투표는 한 번만 가능하고, 모두 완료하면 진상이 공개돼.</p>

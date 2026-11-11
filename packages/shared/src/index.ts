@@ -80,6 +80,7 @@ export type SessionView = {
   clues: string[];
   availableClueCount: number;
   collectedClueCount: number;
+  meetingPrompt: string | null;
   voteCount: number;
   hasVoted: boolean;
   result: null | { answer: string; votes: { voter: string; target: string }[] };

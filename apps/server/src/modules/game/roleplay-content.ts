@@ -46,6 +46,7 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
       ),
       secondClues: normalizeClues(mechanics.secondClues, "second"),
       stageDurations: mechanics.stageDurations,
+      meetingPrompt: mechanics.meetingPrompt,
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
       items: source.content.items.map((item) => ({

@@ -161,6 +161,7 @@ const storyContentSchema = z.strictObject({
           secondInvestigationSeconds: z.number().int().min(30).max(3600).optional(),
         })
         .optional(),
+      meetingPrompt: text.optional(),
       answer: text,
       answerRoleId: storyId,
     }),
