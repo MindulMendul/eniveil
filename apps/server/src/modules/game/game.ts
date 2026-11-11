@@ -30,6 +30,17 @@ export class Game {
       r.memberIds.includes(id),
     );
   }
+  /** Chat is available only while participants are collecting clues or meeting. */
+  canChat(id: string, sessionId: string) {
+    const room = this.roomFor(id);
+    if (room?.sessionId !== sessionId) return false;
+    const phase = this.state.sessions[sessionId]?.phase;
+    return (
+      phase === "first_investigation" ||
+      phase === "meeting" ||
+      phase === "second_investigation"
+    );
+  }
   soloRoomForStory(owner: string, story: string) {
     const room=this.roomFor(owner);
     return room?.soloStarted && room.mode === 'solo' && story === supportedSoloStory.id ? room.id : null;
@@ -431,7 +442,7 @@ export class Game {
   }
   private revealWhenAllActiveVoted(room: Room, session: Session) {
     if (
-      session.phase === "voting" &&
+      session.phase === "final_choice" &&
       room.memberIds.every((id) => !!session.votes[id])
     ) {
       session.phase = "reveal";
@@ -594,9 +605,11 @@ export class Game {
   private advanceRoom(me: Guest, room: Room, session: Session | null) {
     this.requireHost(me, room);
     if (!session) throw new Error("진행 중인 게임이 없어.");
-    if (session.phase === "briefing") session.phase = "discussion";
-    else if (session.phase === "discussion") session.phase = "voting";
-    else throw new Error("참가자들의 투표를 기다려 줘.");
+    if (session.phase === "briefing") session.phase = "first_investigation";
+    else if (session.phase === "first_investigation") session.phase = "meeting";
+    else if (session.phase === "meeting") session.phase = "second_investigation";
+    else if (session.phase === "second_investigation") session.phase = "final_choice";
+    else throw new Error("참가자들의 최종 선택을 기다려 줘.");
     if (this.analytics)
       for (const participant of session.participants)
         this.analytics.stage(session.id, participant.id, session.phase);
@@ -607,13 +620,13 @@ export class Game {
     session: Session | null,
     targetId: string,
   ) {
-    if (!session || session.phase !== "voting")
-      throw new Error("투표 단계가 아니야.");
+    if (!session || session.phase !== "final_choice")
+      throw new Error("최종 선택 단계가 아니야.");
     if (session.votes[me.id]) throw new Error("이미 투표했어.");
     if (!session.participants.some((p) => p.id === targetId))
       throw new Error("투표 대상을 확인해 줘.");
     session.votes[me.id] = targetId;
-    this.analytics?.record(session.id, me.id, "vote", "voting", targetId);
+    this.analytics?.record(session.id, me.id, "vote", "final_choice", targetId);
     this.revealWhenAllActiveVoted(room, session);
   }
   private returnRoom(me: Guest, room: Room, session: Session | null) {

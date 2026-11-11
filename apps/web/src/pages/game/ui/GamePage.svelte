@@ -57,8 +57,8 @@
             </div>
           {/each}
         {/if}
-      {:else if session.phase === "discussion"}
-        <h2 class="heading-two">증언을 맞춰 볼 시간</h2>
+      {:else if session.phase === "first_investigation" || session.phase === "second_investigation"}
+        <h2 class="heading-two">{session.phase === "first_investigation" ? "첫 번째 단서를 살펴볼 시간" : "두 번째 단서를 살펴볼 시간"}</h2>
         {#each session.clues as clue, index (index)}
           <div class="clue">
             <span class="clue-label">단서 {index + 1}</span>
@@ -66,7 +66,10 @@
           </div>
         {/each}
 
-      {:else if session.phase === "voting"}
+      {:else if session.phase === "meeting"}
+        <h2 class="heading-two">각자의 추리를 나눠 볼 시간</h2>
+        <p class="muted">참가자들과 대화하며 단서를 정리해 봐.</p>
+      {:else if session.phase === "final_choice"}
         <h2 class="heading-two">누가 초대장을 옮겼을까?</h2>
         <p class="muted">투표는 한 번만 가능하고, 모두 완료하면 진상이 공개돼.</p>
         <div class="votes">
@@ -104,21 +107,21 @@
       <Panel>
         <h3 class="heading-three">다음 진행</h3>
         {#if host}
-          {#if session.phase === "briefing" || session.phase === "discussion"}
+          {#if session.phase !== "final_choice" && session.phase !== "reveal"}
             <p class="muted">모두 준비됐는지 대화로 확인하고 진행해 줘.</p>
             <Button disabled={busy || !connected} onclick={() => onCommand("advance")}>
-              {session.phase === "briefing" ? "단서 공개하기" : "투표 시작하기"} →
+              {session.phase === "briefing" ? "1차 단서 수집 시작하기" : session.phase === "first_investigation" ? "회의 시작하기" : session.phase === "meeting" ? "2차 단서 수집 시작하기" : "최종 선택 시작하기"} →
             </Button>
           {:else}
             <p class="muted">모두 투표하면 결말이 공개돼.</p>
           {/if}
         {:else}
           <p class="muted">
-            {session.phase === "voting" ? "모두 투표하면 결말이 공개돼." : "방장이 다음 단계로 진행할 거야."}
+            {session.phase === "final_choice" ? "모두 선택하면 결말이 공개돼." : "방장이 다음 단계로 진행할 거야."}
           </p>
         {/if}
       </Panel>
     </aside>
   </div>
-  {#if session.phase!=="reveal"}<GameChat sessionId={session.id} members={room.members}/>{/if}
+  {#if session.phase === "first_investigation" || session.phase === "meeting" || session.phase === "second_investigation"}<GameChat sessionId={session.id} members={room.members}/>{/if}
 </main>

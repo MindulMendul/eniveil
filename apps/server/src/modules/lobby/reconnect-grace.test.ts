@@ -96,7 +96,9 @@ for (const playing of [false, true]) {
 test('voting completes when the last missing voter expires and preserves participant history', () => {
   const s = setup(true), session = s.game.state.sessions[s.room.sessionId!];
   s.game.command(s.a, { type: 'advance', requestId: 'discussion' });
-  s.game.command(s.a, { type: 'advance', requestId: 'voting' });
+  s.game.command(s.a, { type: 'advance', requestId: 'meeting' });
+  s.game.command(s.a, { type: 'advance', requestId: 'second-investigation' });
+  s.game.command(s.a, { type: 'advance', requestId: 'final-choice' });
   s.game.command(s.b, { type: 'vote', requestId: 'vote', targetId: s.a.id });
   s.presence.disconnect(s.a.id); s.tick(60_000);
   expect(session.phase).toBe('reveal');
@@ -112,7 +114,9 @@ test('a player who expired before voting does not block the remaining vote', () 
   const s = setup(true), session = s.game.state.sessions[s.room.sessionId!];
   s.presence.disconnect(s.b.id); s.tick(60_000);
   s.game.command(s.a, { type: 'advance', requestId: 'discussion' });
-  s.game.command(s.a, { type: 'advance', requestId: 'voting' });
+  s.game.command(s.a, { type: 'advance', requestId: 'meeting' });
+  s.game.command(s.a, { type: 'advance', requestId: 'second-investigation' });
+  s.game.command(s.a, { type: 'advance', requestId: 'final-choice' });
   s.game.command(s.a, { type: 'vote', requestId: 'vote', targetId: s.a.id });
   expect(session.phase).toBe('reveal');
   expect(session.participants).toHaveLength(2);

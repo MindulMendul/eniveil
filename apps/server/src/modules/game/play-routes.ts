@@ -88,15 +88,14 @@ export function createPlayRoutes(deps: {
     const { id, text } = playChatSchema.parse(await c.req.json());
     const sessionId = c.req.param("id"),
       user = c.get("owner");
-    const room = deps.game.roomFor(user);
-    if (room?.sessionId !== sessionId)
-      throw new Error("현재 방에서만 채팅할 수 있어.");
+    if (!deps.game.canChat(user, sessionId))
+      throw new Error("현재 단계에서는 채팅할 수 없어.");
     deps.analytics.chat(
       sessionId,
       user,
       id,
       text,
-      deps.game.state.sessions[sessionId]?.phase ?? "discussion",
+      deps.game.state.sessions[sessionId]?.phase ?? "meeting",
     );
     return c.json({ saved: true });
   });

@@ -71,7 +71,7 @@ export type Member = Guest & { online: boolean };
 export type SessionView = {
   id: string;
   scenarioVersion: number;
-  phase: "briefing" | "discussion" | "voting" | "reveal";
+  phase: "briefing" | "first_investigation" | "meeting" | "second_investigation" | "final_choice" | "reveal";
   role: { name: string; secret: string };
   /** Items the viewer's role owns; other roles' items are never sent. */
   items: { name: string; description: string }[];

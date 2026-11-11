@@ -23,7 +23,7 @@ export type Session = {
   scenarioId: string;
   scenarioVersion: number;
   participants: { id: string; nickname: string; roleIndex: number }[];
-  phase: "briefing" | "discussion" | "voting" | "reveal";
+  phase: "briefing" | "first_investigation" | "meeting" | "second_investigation" | "final_choice" | "reveal";
   votes: Record<string, string>;
   endedAt: string | null;
 };
