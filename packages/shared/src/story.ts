@@ -144,7 +144,15 @@ const storyContentSchema = z.strictObject({
         }),
       }),
     }),
-    z.strictObject({ type: z.literal("roleplay") }),
+    z.strictObject({
+      type: z.literal("roleplay"),
+      /** One memory per role. Shown only to the role's owner; never sent to other players. */
+      memories: z.array(z.strictObject({ roleId: storyId, text })).min(2),
+      /** Shared clues opened during the investigation stages. */
+      clues: z.array(text).min(1),
+      answer: text,
+      answerRoleId: storyId,
+    }),
   ]),
 });
 
@@ -267,6 +275,22 @@ export const storyPackageSchema = z
       }
       if (mechanics.solution.requiredEvidenceIds.some((id) => !exists(id, evidenceIds))) {
         ctx.addIssue({ code: "custom", path: ["content", "mechanics", "solution", "requiredEvidenceIds"], message: "정답 판정에 필요한 증거를 찾을 수 없어." });
+      }
+    }
+    if (story.content.mechanics.type === "roleplay") {
+      const mechanics = story.content.mechanics;
+      const memoryRoleIds = mechanics.memories.map((item) => item.roleId);
+      unique(memoryRoleIds, ["content", "mechanics", "memories"]);
+      mechanics.memories.forEach((item, index) => {
+        if (!exists(item.roleId, roleIds)) {
+          ctx.addIssue({ code: "custom", path: ["content", "mechanics", "memories", index, "roleId"], message: "기억을 연결할 역할을 찾을 수 없어." });
+        }
+      });
+      if (roleIds.some((id) => !memoryRoleIds.includes(id))) {
+        ctx.addIssue({ code: "custom", path: ["content", "mechanics", "memories"], message: "모든 역할에 기억 내용이 하나씩 필요해." });
+      }
+      if (!exists(mechanics.answerRoleId, roleIds)) {
+        ctx.addIssue({ code: "custom", path: ["content", "mechanics", "answerRoleId"], message: "정답 역할을 찾을 수 없어." });
       }
     }
   });
