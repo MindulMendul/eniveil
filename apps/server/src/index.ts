@@ -10,6 +10,7 @@ import { createPlayRoutes, playOwner } from "./modules/game/play-routes";
 import { Game } from "./game";
 import { metrics, observeHTTP } from "./observability";
 import { storyCatalog } from "./modules/platform/stories/catalog";
+import { withRoleplayPackages } from "./modules/game/roleplay-content";
 import { fileStoryCatalog } from "./modules/platform/stories/file-catalog";
 import { SQLiteStoryRunStore } from "./infrastructure/sqlite/story-run-store";
 import { SQLiteWorkshopStore } from "./infrastructure/sqlite/workshop-store";
@@ -30,7 +31,7 @@ export const store = new Store(
   process.env.DATABASE_PATH ?? "./data/festival.sqlite",
 );
 const analytics = new PlayAnalytics(store.db);
-export const game = new Game(store, storyCatalog, analytics);
+export const game = new Game(store, withRoleplayPackages(storyCatalog, fileStoryCatalog), analytics);
 const storyRunStore = new SQLiteStoryRunStore(store.db);
 const workshopStore = new SQLiteWorkshopStore(store.db);
 const playCatalog = new PlayStoryCatalog(fileStoryCatalog, workshopStore);

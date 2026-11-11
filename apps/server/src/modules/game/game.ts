@@ -21,6 +21,10 @@ export class Game {
   get state(): State {
     return this.store.state;
   }
+  /** A room keeps the version it was created with, so later publishes cannot change its seats or content. */
+  private roomStory(room: Room) {
+    return this.storyCatalog.get(room.scenarioId, room.scenarioVersion)!;
+  }
   roomFor(id: string) {
     return Object.values(this.state.rooms).find((r) =>
       r.memberIds.includes(id),
@@ -36,7 +40,7 @@ export class Game {
     return r;
   }
   summary(r: Room): RoomSummary {
-    const s = this.storyCatalog.get(r.scenarioId)!.scenario;
+    const s = this.roomStory(r).scenario;
     return {
       access: r.access ?? "public",
       id: r.id,
@@ -57,7 +61,7 @@ export class Game {
     const r = this.roomFor(me.id);
     let room: RoomView | null = null;
     if (r) {
-      const scenario = this.storyCatalog.get(r.scenarioId)!.scenario;
+      const scenario = this.roomStory(r).scenario;
       const session = r.sessionId ? this.state.sessions[r.sessionId] : null;
       const participant = session?.participants.find((p) => p.id === me.id);
       const story = session
@@ -85,6 +89,9 @@ export class Game {
                   name: "역할 정보 없음",
                   secret: "이 작품의 역할 정보를 불러오지 못했어.",
                 },
+                items: (story?.content.items ?? [])
+                  .filter((item) => item.ownerRoleIndex === participant.roleIndex)
+                  .map(({ name, description }) => ({ name, description })),
                 clues:
                   session.phase === "briefing"
                     ? []
@@ -246,6 +253,7 @@ export class Game {
       access,
       ...(access === "secret" ? { pinHash: this.hashPin(code, pin!) } : {}),
       scenarioId,
+      scenarioVersion: scenario.version,
       mode: scenarioId === supportedSoloStory.id ? "solo" : "multiplayer",
       memberIds: [me.id],
       sessionId: null,
@@ -538,7 +546,7 @@ export class Game {
       room.soloPlayId = crypto.randomUUID();
       return;
     }
-    const scenario = this.storyCatalog.get(room.scenarioId)!.scenario;
+    const scenario = this.roomStory(room).scenario;
     if (
       room.memberIds.length !== scenario.players ||
       room.memberIds.some((id) => !this.online.get(id))

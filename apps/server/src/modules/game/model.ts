@@ -8,6 +8,8 @@ export type Room = {
   code: string;
   hostId: string;
   scenarioId: string;
+  /** The story version chosen when the room was created; rooms saved before this field use the newest version. */
+  scenarioVersion?: number;
   memberIds: string[];
   sessionId: string | null;
   mode?: "solo" | "multiplayer";

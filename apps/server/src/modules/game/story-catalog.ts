@@ -5,6 +5,7 @@ export type StoryContent = {
   clues: string[];
   answer: string;
   answerRoleIndex?: number;
+  items?: { name: string; description: string; ownerRoleIndex?: number }[];
 };
 
 export type StoryVersion = {
