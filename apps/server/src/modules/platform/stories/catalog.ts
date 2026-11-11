@@ -66,8 +66,10 @@ const rehearsalContent: StoryContent = {
         "너는 오후 6시 5분에 초대장을 무대 서랍으로 옮겼다. 비를 피하게 하려던 것이지만 안내원에게 말하는 것을 잊었다.",
     },
   ],
-  clues: [
+  firstClues: [
     "매표소 출입 기록에는 오후 6시 5분, 무대 담당자의 이름이 적혀 있다.",
+  ],
+  secondClues: [
     "무대 서랍에서 노란색 봉투가 발견됐다. 봉투에는 빗물이 묻지 않았다.",
   ],
   answer:
@@ -106,7 +108,7 @@ export class InMemoryStoryCatalog implements StoryCatalog {
 }
 
 function emptyContent(): StoryContent {
-  return { roles: [], clues: [], answer: "" };
+  return { roles: [], firstClues: [], secondClues: [], answer: "" };
 }
 
 export const storyCatalog: StoryCatalog = new InMemoryStoryCatalog();

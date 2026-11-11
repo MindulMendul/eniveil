@@ -29,7 +29,10 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
         name: role.name,
         secret: memoryByRole.get(role.id) ?? "",
       })),
-      clues: mechanics.clues,
+      // `clues` keeps already published one-stage packages playable. New packages
+      // declare each investigation's clues separately.
+      firstClues: mechanics.firstClues.length ? mechanics.firstClues : (mechanics.clues ?? []),
+      secondClues: mechanics.secondClues,
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
       items: source.content.items.map((item) => ({

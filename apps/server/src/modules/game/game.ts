@@ -106,7 +106,14 @@ export class Game {
                 clues:
                   session.phase === "briefing"
                     ? []
-                    : (story?.content.clues ?? []),
+                    : session.phase === "second_investigation" ||
+                        session.phase === "final_choice" ||
+                        session.phase === "reveal"
+                      ? [
+                          ...(story?.content.firstClues ?? []),
+                          ...(story?.content.secondClues ?? []),
+                        ]
+                      : (story?.content.firstClues ?? []),
                 voteCount: r.memberIds.filter((id) => !!session.votes[id])
                   .length,
                 hasVoted: !!session.votes[me.id],

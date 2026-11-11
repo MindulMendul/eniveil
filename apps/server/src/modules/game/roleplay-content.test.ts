@@ -13,6 +13,7 @@ afterEach(() => { for (const store of stores.splice(0)) store.close(); });
 const MEMORY_A = "MEMORY-A: 너는 6시에 매표소를 떠났다.";
 const MEMORY_B = "MEMORY-B: 너는 6시 5분에 무대 서랍을 열었다.";
 const CLUE = "CLUE-1: 출입 기록에는 무대 담당자의 이름이 있다.";
+const SECOND_CLUE = "CLUE-2: 서랍 손잡이에 빗물이 남아 있다.";
 const ANSWER = "ANSWER-SECRET: 초대장을 옮긴 사람은 무대 담당자다.";
 
 function roleplayPackage(): StoryPackage {
@@ -24,7 +25,8 @@ function roleplayPackage(): StoryPackage {
   source.content.mechanics = {
     type: "roleplay",
     memories: [{ roleId: "r1", text: MEMORY_A }, { roleId: "r2", text: MEMORY_B }],
-    clues: [CLUE],
+    firstClues: [CLUE],
+    secondClues: [SECOND_CLUE],
     answer: ANSWER,
     answerRoleId: "r2",
   };
@@ -49,11 +51,12 @@ function setup() {
   return { game, a, b };
 }
 
-test("a roleplay package maps each role to its own memory, shared clues and the answer role", () => {
+test("a roleplay package maps each role to its own memory, staged clues and the answer role", () => {
   const version = roleplayStoryVersion(roleplayPackage());
   expect(version?.scenario.players).toBe(2);
   expect(version?.content.roles.map((role) => role.secret)).toEqual([MEMORY_A, MEMORY_B]);
-  expect(version?.content.clues).toEqual([CLUE]);
+  expect(version?.content.firstClues).toEqual([CLUE]);
+  expect(version?.content.secondClues).toEqual([SECOND_CLUE]);
   expect(version?.content.answerRoleIndex).toBe(1);
 });
 
@@ -80,13 +83,17 @@ test("each participant sees only their own memory during the briefing", () => {
   expect(JSON.stringify(game.snapshot(b))).not.toContain(viewA.role.secret);
 });
 
-test("clues stay hidden in the briefing and the answer stays hidden until the reveal", () => {
+test("clues unlock in their investigation stages and the answer stays hidden until the reveal", () => {
   const { game, a, b } = setup();
   expect(game.snapshot(a).room!.session!.clues).toEqual([]);
   expect(JSON.stringify(game.snapshot(a))).not.toContain(ANSWER);
   expect(JSON.stringify(game.snapshot(b))).not.toContain(ANSWER);
   game.command(a, { type: "advance", requestId: crypto.randomUUID() });
   expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE, SECOND_CLUE]);
   expect(JSON.stringify(game.snapshot(b))).not.toContain(ANSWER);
 });
 
