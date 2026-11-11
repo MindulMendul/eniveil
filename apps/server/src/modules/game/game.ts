@@ -553,6 +553,8 @@ export class Game {
       return;
     }
     const scenario = this.roomStory(room).scenario;
+    if (room.capacity !== undefined && room.capacity !== scenario.players)
+      throw new Error("이 방의 작품 버전을 더 이상 시작할 수 없어. 방을 새로 만들어 줘.");
     if (
       room.memberIds.length !== this.roomCapacity(room) ||
       room.memberIds.some((id) => !this.online.get(id))

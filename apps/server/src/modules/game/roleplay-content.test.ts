@@ -191,3 +191,17 @@ test("after a rollback, a two-seat room does not admit guests for the replacemen
   live.game.join(live.seat({ id: "g1", nickname: "참가1" }), room.code);
   expect(() => live.game.join(live.seat({ id: "g2", nickname: "참가2" }), room.code)).toThrow("가득");
 });
+
+test("after a rollback to a different seat count, the old room cannot start on the replacement", () => {
+  const v1 = roleplayPackage();
+  const v2 = roleplayPackage();
+  v2.story.version = 2;
+  v2.story.playerCount = { min: 4, max: 4 };
+  const live = liveGame(withRoleplayPackages(storyCatalog, { list: () => [meta(v1.story.id, 1)], get: () => v1 }));
+  const host = live.seat({ id: "h", nickname: "방장" }), guest = live.seat({ id: "g", nickname: "참가자" });
+  const room = live.game.create(host, v1.story.id);
+  live.game.join(guest, room.code);
+  live.publish(withRoleplayPackages(storyCatalog, { list: () => [meta(v2.story.id, 2)], get: () => v2 }));
+  expect(() => live.game.command(host, { type: "start", requestId: crypto.randomUUID() })).toThrow("시작할 수 없어");
+  expect(live.game.snapshot(host).room?.session).toBeNull();
+});
