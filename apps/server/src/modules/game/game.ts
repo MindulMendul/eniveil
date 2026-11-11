@@ -120,6 +120,8 @@ export class Game {
                 availableClueCount: this.availableClues(session, story?.content).length,
                 collectedClueCount: session.collectedClueIds?.length ?? 0,
                 meetingPrompt: story?.content.meetingPrompt ?? null,
+                finalChoices: (story?.content.finalChoices ?? []).map(({ id, label }) => ({ id, label })),
+                selectedFinalChoiceId: session.finalChoices?.[me.id] ?? null,
                 voteCount: r.memberIds.filter((id) => !!session.votes[id])
                   .length,
                 hasVoted: !!session.votes[me.id],
@@ -521,6 +523,9 @@ export class Game {
       case "collect-clue":
         this.collectClue(me, room, session);
         break;
+      case "choose-final":
+        this.chooseFinal(me, room, session, command.choiceId);
+        break;
       case "vote":
         this.vote(me, room, session, command.targetId);
         break;
@@ -595,6 +600,7 @@ export class Game {
       })),
       phase: "briefing",
       votes: {},
+      finalChoices: {},
       collectedClueIds: [],
       phaseEndsAt: null,
       endedAt: null,
@@ -660,6 +666,18 @@ export class Game {
     }
     if (changed.length) this.store.save();
     return changed;
+  }
+  private chooseFinal(me: Guest, room: Room, session: Session | null, choiceId: string) {
+    if (!session || session.phase !== "final_choice") throw new Error("최종 선택 단계가 아니야.");
+    const choices = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.finalChoices ?? [];
+    if (!choices.some((choice) => choice.id === choiceId)) throw new Error("선택지를 확인해 줘.");
+    if ((session.finalChoices ?? {})[me.id]) throw new Error("이미 선택했어.");
+    (session.finalChoices ??= {})[me.id] = choiceId;
+    if (room.memberIds.every((id) => !!session.finalChoices[id])) {
+      session.phase = "reveal";
+      session.phaseEndsAt = null;
+      session.endedAt = new Date().toISOString();
+    }
   }
   private vote(
     me: Guest,

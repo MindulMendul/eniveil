@@ -162,6 +162,7 @@ const storyContentSchema = z.strictObject({
         })
         .optional(),
       meetingPrompt: text.optional(),
+      finalChoices: z.array(z.strictObject({ id: storyId, label: text, outcome: text })).max(12).optional(),
       answer: text,
       answerRoleId: storyId,
     }),

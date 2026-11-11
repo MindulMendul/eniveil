@@ -80,6 +80,11 @@
         <h2 class="heading-two">누가 초대장을 옮겼을까?</h2>
         <p class="muted">투표는 한 번만 가능하고, 모두 완료하면 진상이 공개돼.</p>
         <div class="votes">
+          {#if session.finalChoices.length}
+            {#each session.finalChoices as choice (choice.id)}
+              <Button variant="secondary" disabled={busy || !connected || !!session.selectedFinalChoiceId} onclick={() => onCommand("choose-final", choice.id)}>{choice.label} →</Button>
+            {/each}
+          {:else}
           {#each room.members as member (member.id)}
             <Button
               variant="secondary"
@@ -89,6 +94,7 @@
               {member.nickname} 지목하기 →
             </Button>
           {/each}
+          {/if}
         </div>
         <p class="fine">
           {session.hasVoted ? "투표 완료. 다른 참가자들을 기다리고 있어." : "증언과 단서를 생각하고 한 명을 골라 줘."}

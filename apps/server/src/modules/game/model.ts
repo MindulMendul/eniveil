@@ -25,6 +25,7 @@ export type Session = {
   participants: { id: string; nickname: string; roleIndex: number }[];
   phase: "briefing" | "first_investigation" | "meeting" | "second_investigation" | "final_choice" | "reveal";
   votes: Record<string, string>;
+  finalChoices: Record<string, string>;
   collectedClueIds: string[];
   phaseEndsAt: number | null;
   endedAt: string | null;
