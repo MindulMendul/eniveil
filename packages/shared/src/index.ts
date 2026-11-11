@@ -37,6 +37,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("solo-return"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("start"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("advance"), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("collect-clue"), requestId: z.string().max(80) }),
   z.object({
     type: z.literal("vote"),
     targetId: z.string().max(80),
@@ -76,6 +77,8 @@ export type SessionView = {
   /** Items the viewer's role owns; other roles' items are never sent. */
   items: { name: string; description: string }[];
   clues: string[];
+  availableClueCount: number;
+  collectedClueCount: number;
   voteCount: number;
   hasVoted: boolean;
   result: null | { answer: string; votes: { voter: string; target: string }[] };

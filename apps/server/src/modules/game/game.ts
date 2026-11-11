@@ -9,7 +9,7 @@ import type {
 import { supportedSoloStory } from "@festival/shared";
 import type { Room, Session, State } from "./model";
 import type { GameStateStore } from "./ports/state-store";
-import type { StoryCatalog } from "./story-catalog";
+import type { StoryCatalog, StoryContent } from "./story-catalog";
 import type { PlayAnalytics } from "./play-analytics";
 export class Game {
   online = new Map<string, number>();
@@ -40,6 +40,18 @@ export class Game {
       phase === "meeting" ||
       phase === "second_investigation"
     );
+  }
+  private availableClues(session: Session, story?: StoryContent) {
+    if (!story || session.phase === "briefing") return [];
+    if (session.phase === "first_investigation" || session.phase === "meeting")
+      return story.firstClues;
+    return [...story.firstClues, ...story.secondClues];
+  }
+  private visibleClues(session: Session, story?: StoryContent) {
+    const collected = new Set(session.collectedClueIds ?? []);
+    return this.availableClues(session, story)
+      .filter((clue) => collected.has(clue.id))
+      .map((clue) => clue.text);
   }
   soloRoomForStory(owner: string, story: string) {
     const room=this.roomFor(owner);
@@ -103,17 +115,9 @@ export class Game {
                 items: (story?.content.items ?? [])
                   .filter((item) => item.ownerRoleIndex === participant.roleIndex)
                   .map(({ name, description }) => ({ name, description })),
-                clues:
-                  session.phase === "briefing"
-                    ? []
-                    : session.phase === "second_investigation" ||
-                        session.phase === "final_choice" ||
-                        session.phase === "reveal"
-                      ? [
-                          ...(story?.content.firstClues ?? []),
-                          ...(story?.content.secondClues ?? []),
-                        ]
-                      : (story?.content.firstClues ?? []),
+                clues: this.visibleClues(session, story?.content),
+                availableClueCount: this.availableClues(session, story?.content).length,
+                collectedClueCount: session.collectedClueIds?.length ?? 0,
                 voteCount: r.memberIds.filter((id) => !!session.votes[id])
                   .length,
                 hasVoted: !!session.votes[me.id],
@@ -512,6 +516,9 @@ export class Game {
       case "advance":
         this.advanceRoom(me, room, session);
         break;
+      case "collect-clue":
+        this.collectClue(me, room, session);
+        break;
       case "vote":
         this.vote(me, room, session, command.targetId);
         break;
@@ -586,6 +593,7 @@ export class Game {
       })),
       phase: "briefing",
       votes: {},
+      collectedClueIds: [],
       endedAt: null,
     };
     this.analytics?.start(
@@ -635,6 +643,17 @@ export class Game {
     session.votes[me.id] = targetId;
     this.analytics?.record(session.id, me.id, "vote", "final_choice", targetId);
     this.revealWhenAllActiveVoted(room, session);
+  }
+  private collectClue(me: Guest, room: Room, session: Session | null) {
+    if (!session || (session.phase !== "first_investigation" && session.phase !== "second_investigation"))
+      throw new Error("조사 단계에서만 단서를 확인할 수 있어.");
+    const story = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content;
+    const clue = this.availableClues(session, story).find(
+      (item) => !(session.collectedClueIds ?? []).includes(item.id),
+    );
+    if (!clue) throw new Error("이 단계에서 확인할 단서를 모두 찾았어.");
+    (session.collectedClueIds ??= []).push(clue.id);
+    this.analytics?.record(session.id, me.id, "inspect", session.phase, clue.id);
   }
   private returnRoom(me: Guest, room: Room, session: Session | null) {
     if (this.analytics) throw new Error("평가 후 로비로 돌아가 줘.");

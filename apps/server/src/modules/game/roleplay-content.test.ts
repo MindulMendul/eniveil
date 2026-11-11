@@ -55,8 +55,8 @@ test("a roleplay package maps each role to its own memory, staged clues and the 
   const version = roleplayStoryVersion(roleplayPackage());
   expect(version?.scenario.players).toBe(2);
   expect(version?.content.roles.map((role) => role.secret)).toEqual([MEMORY_A, MEMORY_B]);
-  expect(version?.content.firstClues).toEqual([CLUE]);
-  expect(version?.content.secondClues).toEqual([SECOND_CLUE]);
+  expect(version?.content.firstClues).toEqual([{ id: "first-1", text: CLUE }]);
+  expect(version?.content.secondClues).toEqual([{ id: "second-1", text: SECOND_CLUE }]);
   expect(version?.content.answerRoleIndex).toBe(1);
 });
 
@@ -89,11 +89,17 @@ test("clues unlock in their investigation stages and the answer stays hidden unt
   expect(JSON.stringify(game.snapshot(a))).not.toContain(ANSWER);
   expect(JSON.stringify(game.snapshot(b))).not.toContain(ANSWER);
   game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.clues).toEqual([]);
+  expect(() => game.command(a, { type: "collect-clue", requestId: crypto.randomUUID() })).not.toThrow();
   expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
   game.command(a, { type: "advance", requestId: crypto.randomUUID() });
   expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
   game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
+  game.command(b, { type: "collect-clue", requestId: crypto.randomUUID() });
   expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE, SECOND_CLUE]);
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(() => game.command(a, { type: "collect-clue", requestId: crypto.randomUUID() })).toThrow("조사 단계");
   expect(JSON.stringify(game.snapshot(b))).not.toContain(ANSWER);
 });
 

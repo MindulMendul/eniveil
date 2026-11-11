@@ -59,6 +59,10 @@
         {/if}
       {:else if session.phase === "first_investigation" || session.phase === "second_investigation"}
         <h2 class="heading-two">{session.phase === "first_investigation" ? "첫 번째 단서를 살펴볼 시간" : "두 번째 단서를 살펴볼 시간"}</h2>
+        <p class="muted">확인한 단서 {session.collectedClueCount}/{session.availableClueCount}</p>
+        {#if session.collectedClueCount < session.availableClueCount}
+          <Button disabled={busy || !connected} onclick={() => onCommand("collect-clue")}>단서 조사하기 →</Button>
+        {/if}
         {#each session.clues as clue, index (index)}
           <div class="clue">
             <span class="clue-label">단서 {index + 1}</span>

@@ -11,6 +11,15 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
   if (source.story.mode !== "multiplayer" || mechanics.type !== "roleplay") return null;
   const memoryByRole = new Map(mechanics.memories.map((item) => [item.roleId, item.text]));
   const roleIndex = new Map(source.content.roles.map((role, index) => [role.id, index]));
+  const normalizeClues = (
+    clues: (string | { id: string; text: string })[],
+    stage: "first" | "second",
+  ) =>
+    clues.map((clue, index) =>
+      typeof clue === "string"
+        ? { id: `${stage}-${index + 1}`, text: clue }
+        : clue,
+    );
   const scenario: Scenario = {
     id: source.story.id,
     version: source.story.version,
@@ -31,8 +40,11 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
       })),
       // `clues` keeps already published one-stage packages playable. New packages
       // declare each investigation's clues separately.
-      firstClues: mechanics.firstClues.length ? mechanics.firstClues : (mechanics.clues ?? []),
-      secondClues: mechanics.secondClues,
+      firstClues: normalizeClues(
+        mechanics.firstClues.length ? mechanics.firstClues : (mechanics.clues ?? []),
+        "first",
+      ),
+      secondClues: normalizeClues(mechanics.secondClues, "second"),
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
       items: source.content.items.map((item) => ({
