@@ -34,10 +34,11 @@ function roleplayPackage(): StoryPackage {
   return storyPackageSchema.parse(source);
 }
 
-function setup() {
+function setup(stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number }) {
   const store = new Store(":memory:");
   stores.push(store);
   const pkg = roleplayPackage();
+  if (pkg.content.mechanics.type === "roleplay") pkg.content.mechanics.stageDurations = stageDurations;
   const catalog = withRoleplayPackages(storyCatalog, {
     list: () => [{ id: pkg.story.id, version: pkg.story.version, mode: "multiplayer" }],
     get: () => pkg,
@@ -48,7 +49,7 @@ function setup() {
   const room = game.create(a, pkg.story.id);
   game.join(b, room.code);
   game.command(a, { type: "start", requestId: crypto.randomUUID() });
-  return { game, a, b };
+  return { game, a, b, pkg };
 }
 
 test("a roleplay package maps each role to its own memory, staged clues and the answer role", () => {
@@ -113,6 +114,17 @@ test("an item reaches only the role that owns it", () => {
   expect(nonOwner.items).toEqual([]);
   const nonOwnerViewer = owners[0] === viewA ? b : a;
   expect(JSON.stringify(game.snapshot(nonOwnerViewer))).not.toContain("무대 서랍 열쇠");
+});
+
+test("an expired configured investigation advances on the server", () => {
+  const { game, a } = setup({ firstInvestigationSeconds: 30 });
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  const session = game.state.sessions[game.needRoom(a.id).sessionId!]!;
+  expect(session.phaseEndsAt).not.toBeNull();
+  expect(game.expireTimedStages(session.phaseEndsAt! - 1)).toEqual([]);
+  expect(game.expireTimedStages(session.phaseEndsAt!)).toHaveLength(1);
+  expect(session.phase).toBe("meeting");
+  expect(session.phaseEndsAt).toBeNull();
 });
 
 test("a newer published version is offered, while an older session can still load its own version", () => {

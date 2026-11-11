@@ -154,6 +154,13 @@ const storyContentSchema = z.strictObject({
       secondClues: z.array(z.union([text, z.strictObject({ id: storyId, text })])).default([]),
       /** Legacy one-stage clue list. New packages use firstClues or secondClues. */
       clues: z.array(text).optional(),
+      stageDurations: z
+        .strictObject({
+          firstInvestigationSeconds: z.number().int().min(30).max(3600).optional(),
+          meetingSeconds: z.number().int().min(30).max(3600).optional(),
+          secondInvestigationSeconds: z.number().int().min(30).max(3600).optional(),
+        })
+        .optional(),
       answer: text,
       answerRoleId: storyId,
     }),

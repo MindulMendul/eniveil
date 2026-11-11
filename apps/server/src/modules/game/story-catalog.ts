@@ -4,6 +4,7 @@ export type StoryContent = {
   roles: { name: string; secret: string }[];
   firstClues: { id: string; text: string }[];
   secondClues: { id: string; text: string }[];
+  stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number };
   answer: string;
   answerRoleIndex?: number;
   items?: { name: string; description: string; ownerRoleIndex?: number }[];

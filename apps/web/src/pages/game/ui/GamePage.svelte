@@ -22,6 +22,8 @@
     onCommand: (type: Command["type"], targetId?: string) => void;
   } = $props();
   let tracker:ReturnType<typeof playTracker>|undefined;
+  let now=$state(Date.now());
+  onMount(()=>{const timer=setInterval(()=>now=Date.now(),1000);return()=>clearInterval(timer);});
   onMount(()=>{tracker=playTracker(session.id);tracker.stage(session.phase);return()=>tracker?.stop();});
   $effect(()=>{tracker?.stage(session.phase);});
 </script>
@@ -31,6 +33,7 @@
     <div>
       <p class="eyebrow">{room.title} · SESSION {session.id.slice(0, 6).toUpperCase()}</p>
       <h1 class="heading-one page-title">{GAME_PHASE_LABELS[session.phase]}</h1>
+      {#if session.phaseEndsAt}<p class="muted">남은 시간 {Math.max(0, Math.ceil((session.phaseEndsAt-now)/1000))}초</p>{/if}
     </div>
     <span class="tag">시나리오 v{session.scenarioVersion}</span>
   </div>

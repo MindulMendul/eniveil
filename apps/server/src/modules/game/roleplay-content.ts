@@ -45,6 +45,7 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
         "first",
       ),
       secondClues: normalizeClues(mechanics.secondClues, "second"),
+      stageDurations: mechanics.stageDurations,
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
       items: source.content.items.map((item) => ({

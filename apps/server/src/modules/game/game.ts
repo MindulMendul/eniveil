@@ -108,6 +108,7 @@ export class Game {
                 id: session.id,
                 scenarioVersion: session.scenarioVersion,
                 phase: session.phase,
+                phaseEndsAt: session.phaseEndsAt ?? null,
                 role: story?.content.roles[participant.roleIndex] ?? {
                   name: "역할 정보 없음",
                   secret: "이 작품의 역할 정보를 불러오지 못했어.",
@@ -594,6 +595,7 @@ export class Game {
       phase: "briefing",
       votes: {},
       collectedClueIds: [],
+      phaseEndsAt: null,
       endedAt: null,
     };
     this.analytics?.start(
@@ -620,14 +622,43 @@ export class Game {
   private advanceRoom(me: Guest, room: Room, session: Session | null) {
     this.requireHost(me, room);
     if (!session) throw new Error("진행 중인 게임이 없어.");
-    if (session.phase === "briefing") session.phase = "first_investigation";
-    else if (session.phase === "first_investigation") session.phase = "meeting";
-    else if (session.phase === "meeting") session.phase = "second_investigation";
-    else if (session.phase === "second_investigation") session.phase = "final_choice";
+    if (session.phase === "briefing") this.advancePhase(session);
+    else if (session.phase === "first_investigation") this.advancePhase(session);
+    else if (session.phase === "meeting") this.advancePhase(session);
+    else if (session.phase === "second_investigation") this.advancePhase(session);
     else throw new Error("참가자들의 최종 선택을 기다려 줘.");
     if (this.analytics)
       for (const participant of session.participants)
         this.analytics.stage(session.id, participant.id, session.phase);
+  }
+  private advancePhase(session: Session, now = Date.now()) {
+    session.phase = session.phase === "briefing" ? "first_investigation"
+      : session.phase === "first_investigation" ? "meeting"
+      : session.phase === "meeting" ? "second_investigation"
+      : "final_choice";
+    const story = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content;
+    const seconds = session.phase === "first_investigation"
+      ? story?.stageDurations?.firstInvestigationSeconds
+      : session.phase === "meeting"
+        ? story?.stageDurations?.meetingSeconds
+        : session.phase === "second_investigation"
+          ? story?.stageDurations?.secondInvestigationSeconds
+          : undefined;
+    session.phaseEndsAt = seconds ? now + seconds * 1000 : null;
+  }
+  /** Advances expired configured stages. The lobby broadcasts returned sessions. */
+  expireTimedStages(now = Date.now()) {
+    const changed: Session[] = [];
+    for (const session of Object.values(this.state.sessions)) {
+      if (!session.phaseEndsAt || session.phaseEndsAt > now) continue;
+      if (!["first_investigation", "meeting", "second_investigation"].includes(session.phase)) continue;
+      this.advancePhase(session, now);
+      for (const participant of session.participants)
+        this.analytics?.stage(session.id, participant.id, session.phase);
+      changed.push(session);
+    }
+    if (changed.length) this.store.save();
+    return changed;
   }
   private vote(
     me: Guest,
