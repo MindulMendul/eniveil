@@ -86,7 +86,7 @@ export type SessionView = {
   selectedFinalChoiceId: string | null;
   voteCount: number;
   hasVoted: boolean;
-  result: null | { answer: string; votes: { voter: string; target: string }[] };
+  result: null | { answer: string; votes: { voter: string; target: string }[]; choices: { player: string; outcome: string }[] };
 };
 export type RoomView = RoomSummary & {
   mode: "solo" | "multiplayer";

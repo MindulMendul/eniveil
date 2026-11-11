@@ -106,6 +106,9 @@
         {#each session.result?.votes ?? [] as vote, index (index)}
           <p class="vote-result">{vote.voter} <span class="vote-target">→</span> {vote.target}</p>
         {/each}
+        {#each session.result?.choices ?? [] as choice, index (index)}
+          <p class="vote-result">{choice.player} <span class="vote-target">→</span> {choice.outcome}</p>
+        {/each}
       {/if}
     </Panel>
 

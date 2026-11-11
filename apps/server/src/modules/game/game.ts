@@ -138,6 +138,10 @@ export class Game {
                               (t) => t.id === session.votes[p.id],
                             )?.nickname ?? "미투표",
                         })),
+                        choices: session.participants.flatMap((p) => {
+                          const choice = (story?.content.finalChoices ?? []).find((item) => item.id === session.finalChoices?.[p.id]);
+                          return choice ? [{ player: p.nickname, outcome: choice.outcome }] : [];
+                        }),
                       }
                     : null,
               }
@@ -677,6 +681,14 @@ export class Game {
       session.phase = "reveal";
       session.phaseEndsAt = null;
       session.endedAt = new Date().toISOString();
+      const story = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content;
+      this.analytics?.finish(session.id, "completed", {
+        answer: story?.answer ?? "",
+        choices: session.participants.map((participant) => ({
+          player: participant.nickname,
+          choiceId: session.finalChoices[participant.id],
+        })),
+      });
     }
   }
   private vote(
