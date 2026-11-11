@@ -46,23 +46,37 @@ type PackageSource = {
   get(id: string, version?: number): StoryPackage | undefined;
 };
 
-/** Adds published multiplayer roleplay packages to the built-in catalog without shadowing it. */
+/**
+ * Adds published multiplayer roleplay packages to the built-in catalog without shadowing it.
+ * Listing and unversioned lookups use each story's newest version; exact-version lookups keep
+ * every published version so sessions started on an older version can still load their content.
+ */
 export function withRoleplayPackages(base: StoryCatalog, source: PackageSource): StoryCatalog {
-  const extra: StoryVersion[] = [];
+  const versions: StoryVersion[] = [];
   for (const meta of source.list()) {
     if (meta.mode !== "multiplayer") continue;
     const pkg = source.get(meta.id, meta.version);
     const version = pkg ? roleplayStoryVersion(pkg) : null;
-    if (version && !base.get(version.scenario.id, version.scenario.version)) extra.push(version);
+    if (version && !base.get(version.scenario.id, version.scenario.version)) versions.push(version);
+  }
+  const newest = new Map<string, StoryVersion>();
+  for (const item of versions) {
+    const current = newest.get(item.scenario.id);
+    if (!current || item.scenario.version > current.scenario.version) newest.set(item.scenario.id, item);
   }
   return {
     list: () => {
       const scenarios = base.list();
       const known = new Set(scenarios.map((scenario) => scenario.id));
-      return [...scenarios, ...extra.map((item) => item.scenario).filter((scenario) => !known.has(scenario.id))];
+      return [
+        ...scenarios,
+        ...[...newest.values()].map((item) => item.scenario).filter((scenario) => !known.has(scenario.id)),
+      ];
     },
     get: (id, version) =>
       base.get(id, version) ??
-      extra.find((item) => item.scenario.id === id && (version === undefined || item.scenario.version === version)),
+      (version === undefined
+        ? newest.get(id)
+        : versions.find((item) => item.scenario.id === id && item.scenario.version === version)),
   };
 }

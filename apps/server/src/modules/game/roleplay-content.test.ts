@@ -101,3 +101,22 @@ test("an item reaches only the role that owns it", () => {
   const nonOwnerViewer = owners[0] === viewA ? b : a;
   expect(JSON.stringify(game.snapshot(nonOwnerViewer))).not.toContain("무대 서랍 열쇠");
 });
+
+test("a newer published version is offered, while an older session can still load its own version", () => {
+  const older = roleplayPackage();
+  const newer = roleplayPackage();
+  newer.story.version = 2;
+  newer.story.title = "샘플 v2";
+  const catalog = withRoleplayPackages(storyCatalog, {
+    list: () => [
+      { id: older.story.id, version: 1, mode: "multiplayer" },
+      { id: newer.story.id, version: 2, mode: "multiplayer" },
+    ],
+    get: (_id, version) => (version === 2 ? newer : older),
+  });
+  const listed = catalog.list().filter((scenario) => scenario.id === older.story.id);
+  expect(listed.map((scenario) => scenario.version)).toEqual([2]);
+  expect(catalog.get(older.story.id)?.scenario.version).toBe(2);
+  expect(catalog.get(older.story.id, 1)?.scenario.version).toBe(1);
+  expect(catalog.get(older.story.id, 2)?.scenario.title).toBe("샘플 v2");
+});

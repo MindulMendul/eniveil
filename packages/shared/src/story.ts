@@ -289,6 +289,9 @@ export const storyPackageSchema = z
       if (roleIds.some((id) => !memoryRoleIds.includes(id))) {
         ctx.addIssue({ code: "custom", path: ["content", "mechanics", "memories"], message: "모든 역할에 기억 내용이 하나씩 필요해." });
       }
+      if (roleIds.length !== story.story.playerCount.max) {
+        ctx.addIssue({ code: "custom", path: ["content", "roles"], message: "역할 수는 최대 인원과 같아야 해." });
+      }
       if (!exists(mechanics.answerRoleId, roleIds)) {
         ctx.addIssue({ code: "custom", path: ["content", "mechanics", "answerRoleId"], message: "정답 역할을 찾을 수 없어." });
       }

@@ -38,3 +38,12 @@ test("memories and the answer role must reference existing roles", () => {
   unknownAnswer.content.mechanics.answerRoleId = "ghost";
   expect(storyPackageSchema.safeParse(unknownAnswer).success).toBe(false);
 });
+
+test("the role count must equal the seat count for a roleplay package", () => {
+  const moreSeats = roleplayPackage();
+  moreSeats.story.playerCount = { min: 3, max: 3 };
+  expect(storyPackageSchema.safeParse(moreSeats).success).toBe(false);
+  const moreRoles = roleplayPackage();
+  moreRoles.story.playerCount = { min: 1, max: 1 };
+  expect(storyPackageSchema.safeParse(moreRoles).success).toBe(false);
+});
