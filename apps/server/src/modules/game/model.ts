@@ -10,6 +10,8 @@ export type Room = {
   scenarioId: string;
   /** The story version chosen when the room was created; rooms saved before this field use the newest version. */
   scenarioVersion?: number;
+  /** Seats chosen at creation. Rooms saved before this field use the pinned story's player count. */
+  capacity?: number;
   memberIds: string[];
   sessionId: string | null;
   mode?: "solo" | "multiplayer";
