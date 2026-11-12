@@ -36,7 +36,17 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mode"), mode: z.enum(["solo", "multiplayer"]), requestId: z.string().max(80) }),
   z.object({ type: z.literal("solo-return"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("start"), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("transfer-host"), targetId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("remove-member"), targetId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({ type: z.literal("advance"), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("collect-clue"), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("choose-final"), choiceId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("move-room"), roomId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("collect-item"), itemId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("transfer-item"), itemId: z.string().max(80), targetId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("reveal-item"), itemId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("combine-items"), recipeId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("use-item"), itemId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({
     type: z.literal("vote"),
     targetId: z.string().max(80),
@@ -71,12 +81,28 @@ export type Member = Guest & { online: boolean };
 export type SessionView = {
   id: string;
   scenarioVersion: number;
-  phase: "briefing" | "discussion" | "voting" | "reveal";
+  phase: "briefing" | "first_investigation" | "meeting" | "second_investigation" | "final_choice" | "reveal";
+  phaseEndsAt: number | null;
   role: { name: string; secret: string };
+  /** Items the viewer's role owns; other roles' items are never sent. */
+  items: { id: string; name: string; description: string; useLabel: string | null }[];
+  itemRecipes: { id: string; itemIds: string[]; resultItemId: string; resultName: string }[];
+  transferTargets: { id: string; nickname: string }[];
+  collectableItems: { id: string; name: string; roomId: string | null }[];
+  revealedItems: { id: string; name: string; description: string }[];
+  itemUseResults: { itemId: string; text: string }[];
   clues: string[];
+  availableClueCount: number;
+  collectedClueCount: number;
+  meetingPrompt: string | null;
+  finalChoices: { id: string; label: string }[];
+  selectedFinalChoiceId: string | null;
+  rooms: { id: string; name: string; description: string | null; available: boolean; resourceChanges: { name: string; amount: number; kind: "cost" | "reward" | "penalty" }[] }[];
+  currentRoomId: string | null;
+  resources: { id: string; name: string; value: number; scope: "personal" | "shared" }[];
   voteCount: number;
   hasVoted: boolean;
-  result: null | { answer: string; votes: { voter: string; target: string }[] };
+  result: null | { answer: string; votes: { voter: string; target: string }[]; choices: { player: string; outcome: string }[] };
 };
 export type RoomView = RoomSummary & {
   mode: "solo" | "multiplayer";
@@ -89,6 +115,7 @@ export type RoomView = RoomSummary & {
   session: SessionView | null;
 };
 export type Snapshot = {
+  endingSessionId?: string | null;
   me: Guest;
   scenarios: Scenario[];
   rooms: RoomSummary[];
@@ -116,3 +143,6 @@ export { WORKSHOP_AUTHORING_ENABLED } from './features';
 
 export const inviteFriendSchema = z.object({ targetId: z.uuid() });
 export const invitationResponseSchema = z.object({ accept: z.boolean(), pin: z.string().regex(/^\d{4}$/).optional() });
+export { playEventSchema, playEventBatchSchema, playRatingSchema, playReviewSchema, playChatSchema } from './play';
+export type { PlayEvent } from './play';
+export { playEndingSchema } from './play';

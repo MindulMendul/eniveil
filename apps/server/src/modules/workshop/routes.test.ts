@@ -359,6 +359,30 @@ test("draft source and edits belong to the server-authenticated creator", async 
   expect(JSON.stringify(await (await f.request(`/stories/${item.id}`)).json())).not.toContain('"solution"');
 });
 
+test("roleplay draft secrets stay owner-only while publication exposes metadata only", async () => {
+  const f = fixture();
+  const owner = f.guest("Author"), other = f.guest("Reader");
+  const roleplay = structuredClone(f.source);
+  roleplay.story.mode = "multiplayer";
+  roleplay.story.playerCount = { min: 2, max: 2 };
+  roleplay.content.roles = [{ id: "witness", name: "Witness" }, { id: "culprit", name: "Culprit" }];
+  roleplay.content.mechanics = {
+    type: "roleplay", memories: [{ roleId: "witness", text: "PRIVATE WITNESS MEMORY" }, { roleId: "culprit", text: "PRIVATE CULPRIT MEMORY" }],
+    firstClues: [{ id: "clock", text: "A stopped clock" }], secondClues: [], answer: "PRIVATE ANSWER", answerRoleId: "culprit",
+  };
+  const created = await f.request("/drafts", { method: "POST", cookie: owner.cookie, body: { package: roleplay } });
+  expect(created.status).toBe(201);
+  const item = (await created.json() as { item: WorkshopItem }).item;
+  expect((await f.request(`/drafts/${item.id}`, { cookie: other.cookie })).status).toBe(404);
+  const own = await f.request(`/drafts/${item.id}`, { cookie: owner.cookie });
+  expect(await own.text()).toContain("PRIVATE CULPRIT MEMORY");
+  const published = await f.request(`/drafts/${item.id}`, { method: "PUT", cookie: owner.cookie, body: { package: roleplay, published: true } });
+  expect(published.status).toBe(200);
+  const metadata = await (await f.request(`/stories/${item.id}`, { cookie: other.cookie })).text();
+  expect(metadata).not.toContain("PRIVATE");
+  expect(metadata).not.toContain('"answer"');
+});
+
 test("favorites are persistent, idempotent and selected separately for each guest", async () => {
   const f = fixture();
   const owner = f.guest("Owner");

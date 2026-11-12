@@ -23,6 +23,20 @@ const cmd = (type: "start" | "advance" | "return" | "leave") => ({
   type,
   requestId: crypto.randomUUID(),
 });
+test("only a waiting-room host can transfer ownership or remove another member", () => {
+  const { game, a, b, c } = setup();
+  const room = game.create(a, "rehearsal"); game.join(b, room.code);
+  expect(() => game.command(b, { type: "transfer-host", targetId: b.id, requestId: crypto.randomUUID() })).toThrow("방장");
+  expect(() => game.command(a, { type: "transfer-host", targetId: a.id, requestId: crypto.randomUUID() })).toThrow("참가자");
+  game.command(a, { type: "transfer-host", targetId: b.id, requestId: crypto.randomUUID() });
+  expect(room.hostId).toBe(b.id);
+  game.command(b, { type: "remove-member", targetId: a.id, requestId: crypto.randomUUID() });
+  expect(room.memberIds).toEqual([b.id]);
+  expect(() => game.command(b, { type: "remove-member", targetId: c.id, requestId: crypto.randomUUID() })).toThrow("참가자");
+  game.command(b, { type: "mode", mode: "multiplayer", requestId: crypto.randomUUID() });
+  game.join(a, room.code); game.command(b, cmd("start"));
+  expect(() => game.command(b, { type: "remove-member", targetId: a.id, requestId: crypto.randomUUID() })).toThrow("대기방");
+});
 test('story choice determines room capacity and solo execution without a mode choice', () => {
   const { game, a, b } = setup();
   const room = game.create(a, 'deokil-trading-murder');
@@ -95,6 +109,8 @@ test("personalized secrets, private ballots, complete game, return, replay", () 
   expect(av.clues).toEqual([]);
   expect(JSON.stringify(av)).not.toContain(bv.role.secret);
   expect(() => game.command(b, cmd("leave"))).toThrow();
+  game.command(a, cmd("advance"));
+  game.command(a, cmd("advance"));
   game.command(a, cmd("advance"));
   game.command(a, cmd("advance"));
   expect(() =>

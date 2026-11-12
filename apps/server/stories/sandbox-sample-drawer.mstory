@@ -1,0 +1,101 @@
+{
+  "format": "murder-parker-story",
+  "formatVersion": 1,
+  "story": {
+    "id": "sandbox-sample-drawer",
+    "version": 1,
+    "mode": "multiplayer",
+    "locale": "ko",
+    "title": "샌드박스 샘플: 무대 서랍",
+    "subtitle": "역할 숙지와 아이템 확인을 위한 2인 샘플",
+    "playerCount": {
+      "min": 2,
+      "max": 2
+    },
+    "estimatedMinutes": 10,
+    "startSceneId": "opening"
+  },
+  "content": {
+    "characters": [],
+    "assets": [],
+    "scenes": [
+      {
+        "id": "opening",
+        "cues": [
+          {
+            "type": "dialogue.show",
+            "speaker": "내레이션",
+            "text": "축제 준비가 한창인 저녁, 무대 뒤 서랍이 잠긴 채 발견됐다."
+          },
+          {
+            "type": "dialogue.show",
+            "speaker": "내레이션",
+            "text": "두 사람은 각자 맡은 일과 기억을 떠올린다. 먼저 자신의 역할과 소지품을 확인하자."
+          }
+        ],
+        "choices": []
+      }
+    ],
+    "roles": [
+      {
+        "id": "guide",
+        "name": "안내원",
+        "description": "매표소를 맡은 사람"
+      },
+      {
+        "id": "stage",
+        "name": "무대 담당자",
+        "description": "무대 소품을 맡은 사람"
+      }
+    ],
+    "information": [],
+    "items": [
+      {
+        "id": "drawer-key",
+        "name": "무대 서랍 열쇠",
+        "description": "무대 뒤 서랍을 여는 열쇠다.",
+        "initialOwnerRoleId": "stage",
+        "visibleTo": {
+          "type": "all"
+        },
+        "transfer": {
+          "mode": "never"
+        }
+      },
+      {
+        "id": "ticket-book",
+        "name": "매표소 출입 장부",
+        "description": "방문 시간이 적힌 장부다. 귀퉁이가 접혀 있다.",
+        "initialOwnerRoleId": "guide",
+        "visibleTo": {
+          "type": "all"
+        },
+        "transfer": {
+          "mode": "never"
+        }
+      }
+    ],
+    "mechanics": {
+      "type": "roleplay",
+      "memories": [
+        {
+          "roleId": "guide",
+          "text": "너는 6시에 매표소를 떠났다. 그때 무대 서랍 쪽에서 소리가 났지만 확인하지 않았다."
+        },
+        {
+          "roleId": "stage",
+          "text": "너는 6시 5분에 무대 서랍에 무언가를 넣고 열쇠로 잠갔다. 그 사실을 아무에게도 말하지 않았다."
+        }
+      ],
+      "firstClues": [
+        "출입 장부의 접힌 쪽에는 6시 5분 무대 뒤 방문 기록이 적혀 있다."
+      ],
+      "secondClues": [
+        "서랍 주변 바닥에 젖은 발자국이 남아 있다. 무대 담당자의 신발과 같은 모양이다."
+      ],
+      "meetingPrompt": "서로 발견한 단서를 공유하고, 누가 서랍을 잠갔는지 추리해 보세요.",
+      "answer": "서랍에 물건을 넣고 잠근 사람은 무대 담당자다. 안내원은 소리만 들었을 뿐이다.",
+      "answerRoleId": "stage"
+    }
+  }
+}

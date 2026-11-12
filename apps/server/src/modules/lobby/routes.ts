@@ -219,7 +219,13 @@ export function createLobbyRoutes(deps: {
       };
     }),
   );
-  setInterval(broadcast, 30000).unref();
+  setInterval(() => {deps.game.cleanupFinishedRooms();broadcast();}, 30000).unref();
+  setInterval(() => {
+    const advanced = deps.game.expireTimedStages();
+    for (const session of advanced)
+      deps.notifyTemporal("event", { sessionId: session.id, phase: session.phase });
+    if (advanced.length) broadcast();
+  }, 1000).unref();
 
   const disconnect = (guestId: string) => {
     for (const [ws, entry] of sockets) if (entry.guest.id === guestId) {
@@ -232,5 +238,5 @@ export function createLobbyRoutes(deps: {
       if (entry.grant?.key === key) { entry.expires = 0; ws.close(1008,'Consent changed'); }
     }
   };
-  return { app, websocket, disconnect, disconnectConsent, connectionCount: () => sockets.size };
+  return { app, websocket, broadcast, disconnect, disconnectConsent, connectionCount: () => sockets.size };
 }

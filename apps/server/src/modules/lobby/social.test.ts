@@ -29,11 +29,11 @@ function setup(inLobby: (id: string) => boolean = () => true) {
 test('PIN preserves leading zeroes and never leaks; friends-only checks all joins', () => {
   const {store,game,host,friend,other} = setup();
   try {
-    const secret = game.create(host,'rehearsal','secret','0001');
+    const secret = game.create(host,'rehearsal','secret','1234');
     expect(() => game.join(friend,secret.code,'1')).toThrow();
     expect(() => game.join(friend,secret.code,'0002')).toThrow();
     expect(JSON.stringify(game.snapshot(friend))).not.toContain('pinHash');
-    game.join(friend,secret.code,'0001');
+    game.join(friend,secret.code,'1234');
     expect(secret.memberIds.length).toBe(2);
     game.command(friend,{type:'leave',requestId:'leave'});
     game.command(host,{type:'leave',requestId:'leave'});
@@ -123,6 +123,8 @@ test('shared game count includes completed games once and excludes unfinished on
     expect(before.friends.find(f=>f.id===friend.id)?.gamesTogether).toBe(0);
     game.command(host,{type:'advance',requestId:'advance1'});
     game.command(host,{type:'advance',requestId:'advance2'});
+    game.command(host,{type:'advance',requestId:'advance3'});
+    game.command(host,{type:'advance',requestId:'advance4'});
     game.command(host,{type:'vote',requestId:'vote1',targetId:friend.id});
     game.command(friend,{type:'vote',requestId:'vote2',targetId:host.id});
     game.command(host,{type:'return',requestId:'return'});
@@ -133,18 +135,19 @@ test('shared game count includes completed games once and excludes unfinished on
   } finally { store.close(); }
 });
 
-test('secret room locks after ten failed guesses across different accounts and unlocks after cooldown', () => {
+test('secret room PIN throttling is per guest, so an attack cannot lock out a correct entrant', () => {
   const {store,game,host,friend} = setup();
   try {
     const room = game.create(host,'rehearsal','secret','0001');
-    for (let i=0;i<10;i++) {
-      const attacker = store.createGuest(`Guess${i}`);
-      expect(() => game.join(attacker,room.code,'9999')).toThrow('PIN을 확인');
-    }
-    expect(room.pinFailures?.count).toBe(10);
-    expect(() => game.join(friend,room.code,'0001')).toThrow('잠겼어');
-    room.pinFailures!.until = Date.now() - 1;
+    const attacker = store.createGuest('Attacker');
+    for (let i=0;i<10;i++) expect(() => game.join(attacker,room.code,'9999')).toThrow('PIN을 확인');
+    expect(room.pinFailures?.[attacker.id]?.count).toBe(10);
+    expect(() => game.join(attacker,room.code,'9999')).toThrow('잠겼어');
     game.join(friend,room.code,'0001');
+    expect(room.memberIds).toHaveLength(2);
+    // A correct PIN is always accepted; a previous typo must not block entry.
+    game.command(friend,{type:'leave',requestId:'leave'});
+    game.join(attacker,room.code,'0001');
     expect(room.memberIds).toHaveLength(2);
   } finally { store.close(); }
 });

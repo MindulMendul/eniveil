@@ -1,6 +1,7 @@
 <script lang="ts">
   import { allowsService } from "../shared/analytics/consent";
   import { WORKSHOP_AUTHORING_ENABLED } from "@festival/shared/features";
+  import PlayEnding from "../features/game/PlayEnding.svelte";
   import RoomSocial from "../features/friends/RoomSocial.svelte";
   import EntryIntro from "../pages/entry/ui/EntryIntro.svelte";
   import SoloRoomLifecycle from "../features/game/SoloRoomLifecycle.svelte";
@@ -191,7 +192,10 @@
           }
         } else {
           if (soloStartRequest && soloStartRequest.requestId === event.requestId) {
-            if (event.type === "ack" && snapshot?.room?.id === soloStartRequest.roomId && snapshot.room.soloStarted) ownedSoloPlayId = snapshot.room.soloPlayId;
+            if (event.type === "ack" && snapshot?.room?.id === soloStartRequest.roomId && snapshot.room.soloStarted) {
+              ownedSoloPlayId = snapshot.room.soloPlayId;
+              if(ownedSoloPlayId)sessionStorage.setItem(`owned-solo:${snapshot.room.id}`,ownedSoloPlayId);
+            }
             soloStartRequest = null;
           }
           if (event.requestId) {
@@ -271,7 +275,8 @@
         error = "응답이 지연됐어. 현재 상태를 확인하고 다시 시도해 줘.";
       }, 8000),
     );
-    socket.send(JSON.stringify({ type, requestId, ...(targetId ? { targetId } : {}), ...(mode ? { mode } : {}) }));
+    const transfer = type === "transfer-item" && targetId ? targetId.split("|", 2) : null;
+    socket.send(JSON.stringify({ type, requestId, ...(targetId ? (type === "choose-final" ? { choiceId: targetId } : type === "move-room" ? { roomId: targetId } : type === "collect-item" || type === "reveal-item" || type === "use-item" ? { itemId: targetId } : type === "combine-items" ? { recipeId: targetId } : type === "transfer-item" && transfer ? { itemId: transfer[0], targetId: transfer[1] } : { targetId }) : {}), ...(mode ? { mode } : {}) }));
   }
 
   function changeLocale(next: "ko" | "en") {
@@ -334,6 +339,7 @@
       const next = await api("/lobby/state");
       if (!currentAuth(generation)) return;
       snapshot = next;
+      if(snapshot?.room?.soloStarted&&snapshot.room.hostId===snapshot.me.id)ownedSoloPlayId=snapshot.room.soloPlayId;
       if (!accountLoaded) {
         soloRecovery = pendingSoloExit(sessionStorage, snapshot?.room ?? null);
         if (soloRecovery) await reconcileSolo();
@@ -474,6 +480,15 @@
     });
   }
 
+  async function refreshLobby() {
+    snapshot=await api('/lobby/state');
+    ownedSoloPlayId=null;
+    currentPath='/';history.pushState({},'',localePath(locale));
+  }
+  async function exitSoloRoom() {
+    if(room?.soloStarted) await api('/lobby/rooms/solo-exit',{roomId:room.id,soloPlayId:room.soloPlayId});
+    await refreshLobby();
+  }
   async function copyInviteLink() {
     try {
       await navigator.clipboard.writeText(`${location.origin}/?room=${room?.code}`);
@@ -614,12 +629,14 @@
     </LazyContent>{/key}
   {:else if !snapshot}
     <LazyContent load={loadEntryPage} {locale} fallback={entryHome ? publicEntryLoading : undefined}>{#snippet children({ EntryPage })}<EntryPage bind:nickname {busy} {t} {locale} demo={authConfig.demo} onGoogle={googleLogin} onLogin={login} />{/snippet}</LazyContent>
+  {:else if snapshot?.endingSessionId}
+    <main id="main-content" tabindex="-1" class="main">{#key snapshot.endingSessionId}<PlayEnding id={snapshot.endingSessionId} {locale} onExit={() => void refreshLobby()} />{/key}</main>
   {:else if room?.soloStarted && ownedSoloPlayId !== room.soloPlayId}
     <main id="main-content" tabindex="-1" class="main"><Panel><h1 class="heading-one">{locale === "en" ? "Investigation in progress" : "수사 진행 중"}</h1><p role="status">{locale === "en" ? "A solo investigation is open in another page. Return to that page to continue. Ending it here also closes that investigation." : "다른 페이지에서 1인 수사가 열려 있어. 수사를 이어가려면 해당 페이지로 돌아가 줘. 여기서 종료하면 그 수사도 끝나."}</p><Button disabled={busy || !connected} onclick={() => command("solo-return")}>{locale === "en" ? "End investigation and return to room" : "수사 종료하고 방으로 돌아가기"}</Button></Panel></main>
   {:else if room?.soloStarted}
-    {#key room.soloPlayId}<SoloRoomLifecycle exit={{ roomId: room.id, soloPlayId: room.soloPlayId }} onExit={soloPageExited}><main id="main-content" tabindex="-1" class="main"><LazyContent load={loadSoloGame} {locale} embedded>
+    {#key room.soloPlayId}<SoloRoomLifecycle exit={{ roomId: room.id, soloPlayId: room.soloPlayId }} ><main id="main-content" tabindex="-1" class="main"><LazyContent load={loadSoloGame} {locale} embedded>
       {#snippet children({ SoloGame })}
-        <SoloGame {locale} storyId={room.soloStory.id} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Return to room" : "방으로 돌아가기"} onExit={() => command("solo-return")} />
+        <SoloGame {locale} storyId={room.soloStory.id} exitDisabled={!connected || busy} exitMessage={!connected ? (locale === "en" ? "Reconnecting. Return to the room when the connection is restored." : "재연결 중이야. 연결이 복구되면 방으로 돌아갈 수 있어.") : busy ? (locale === "en" ? "Returning to the room…" : "방으로 돌아가는 중…") : ""} exitLabel={locale === "en" ? "Leave" : "나가기"} onExit={() => action(exitSoloRoom)} />
       {/snippet}
     </LazyContent></main></SoloRoomLifecycle>{/key}
   {:else if !room}

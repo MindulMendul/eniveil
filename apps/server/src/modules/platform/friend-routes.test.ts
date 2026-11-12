@@ -58,6 +58,24 @@ test('rejection remains private and relationships persist across process restart
   const second=fixture(db);
   expect((await read(await second.request('',a.cookie))).friends).toEqual([{id:b.me.id,nickname:'Bobby'}]);
 });
+test('senders can cancel only their pending request and either friend can remove an accepted relationship', async () => {
+  const {store, request, account} = fixture(); const a=account('Alice'), b=account('Bobby'), c=account('Carol');
+  await request('/requests',a.cookie,{accountId:b.me.id});
+  expect((await request(`/requests/${b.me.id}/cancel`,c.cookie,{})).status).toBe(404);
+  expect((await request(`/requests/${a.me.id}/cancel`,b.cookie,{})).status).toBe(404);
+  expect((await request(`/requests/${b.me.id}/cancel`,a.cookie,{})).status).toBe(200);
+  expect((await read(await request('',a.cookie))).outgoing).toEqual([]);
+  expect((await read(await request('',b.cookie))).incoming).toEqual([]);
+  expect((await request(`/friends/${b.me.id}/remove`,a.cookie,{})).status).toBe(404);
+  await request('/requests',a.cookie,{accountId:b.me.id});
+  await request(`/requests/${a.me.id}/accept`,b.cookie,{});
+  expect(store.areFriends(a.me.id,b.me.id)).toBe(true);
+  expect((await request(`/friends/${b.me.id}/remove`,c.cookie,{})).status).toBe(404);
+  expect((await request(`/friends/${a.me.id}/remove`,b.cookie,{})).status).toBe(200);
+  expect(store.areFriends(a.me.id,b.me.id)).toBe(false);
+  expect((await read(await request('',a.cookie))).friends).toEqual([]);
+  expect((await read(await request('',b.cookie))).friends).toEqual([]);
+});
 test('presence is limited to accepted friends and reflects active connections', async () => {
   const online = new Set<string>();
   const {request,account} = fixture(':memory:', id => online.has(id));
