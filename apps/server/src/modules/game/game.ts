@@ -114,7 +114,7 @@ export class Game {
                   secret: "이 작품의 역할 정보를 불러오지 못했어.",
                 },
                 items: (story?.content.items ?? [])
-                  .filter((item) => item.ownerRoleIndex === participant.roleIndex)
+                  .filter((item) => session.itemOwners?.[item.id] === me.id || (!session.itemOwners && item.ownerRoleIndex === participant.roleIndex))
                   .map(({ name, description }) => ({ name, description })),
                 clues: this.visibleClues(session, story?.content),
                 availableClueCount: this.availableClues(session, story?.content).length,
@@ -625,6 +625,7 @@ export class Game {
         id,
         Object.fromEntries((this.roomStory(room).content.resources ?? []).map((resource) => [resource.id, resource.initialValue])),
       ])),
+      itemOwners: Object.fromEntries((this.roomStory(room).content.items ?? []).map((item) => [item.id, item.ownerRoleIndex === undefined ? null : ids.find((_, index) => index === item.ownerRoleIndex) ?? null])),
       collectedClueIds: [],
       phaseEndsAt: null,
       endedAt: null,

@@ -11,7 +11,7 @@ export type StoryContent = {
   resources?: { id: string; name: string; initialValue: number }[];
   answer: string;
   answerRoleIndex?: number;
-  items?: { name: string; description: string; ownerRoleIndex?: number }[];
+  items?: { id: string; name: string; description: string; ownerRoleIndex?: number }[];
 };
 
 export type StoryVersion = {

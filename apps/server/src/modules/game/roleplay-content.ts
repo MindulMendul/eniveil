@@ -53,6 +53,7 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
       items: source.content.items.map((item) => ({
+        id: item.id,
         name: item.name,
         description: item.description ?? "",
         ownerRoleIndex: item.initialOwnerRoleId ? roleIndex.get(item.initialOwnerRoleId) : undefined,
