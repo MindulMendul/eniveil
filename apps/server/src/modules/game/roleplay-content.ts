@@ -59,6 +59,7 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
         description: item.description ?? "",
         ownerRoleIndex: item.initialOwnerRoleId ? roleIndex.get(item.initialOwnerRoleId) : undefined,
         transfer: item.transfer.mode === "owner_choice" ? { mode: item.transfer.mode, targetRoleIndexes: item.transfer.toRoleIds.map((id) => roleIndex.get(id)).filter((id): id is number => id !== undefined) } : { mode: item.transfer.mode },
+        use: item.use,
       })),
     },
   };

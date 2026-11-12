@@ -44,6 +44,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("transfer-item"), itemId: z.string().max(80), targetId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({ type: z.literal("reveal-item"), itemId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({ type: z.literal("combine-items"), recipeId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("use-item"), itemId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({
     type: z.literal("vote"),
     targetId: z.string().max(80),
@@ -82,11 +83,12 @@ export type SessionView = {
   phaseEndsAt: number | null;
   role: { name: string; secret: string };
   /** Items the viewer's role owns; other roles' items are never sent. */
-  items: { id: string; name: string; description: string }[];
+  items: { id: string; name: string; description: string; useLabel: string | null }[];
   itemRecipes: { id: string; itemIds: string[]; resultItemId: string; resultName: string }[];
   transferTargets: { id: string; nickname: string }[];
   collectableItems: { id: string; name: string }[];
   revealedItems: { id: string; name: string; description: string }[];
+  itemUseResults: { itemId: string; text: string }[];
   clues: string[];
   availableClueCount: number;
   collectedClueCount: number;

@@ -268,7 +268,7 @@
       }, 8000),
     );
     const transfer = type === "transfer-item" && targetId ? targetId.split("|", 2) : null;
-    socket.send(JSON.stringify({ type, requestId, ...(targetId ? (type === "choose-final" ? { choiceId: targetId } : type === "move-room" ? { roomId: targetId } : type === "collect-item" || type === "reveal-item" ? { itemId: targetId } : type === "combine-items" ? { recipeId: targetId } : type === "transfer-item" && transfer ? { itemId: transfer[0], targetId: transfer[1] } : { targetId }) : {}), ...(mode ? { mode } : {}) }));
+    socket.send(JSON.stringify({ type, requestId, ...(targetId ? (type === "choose-final" ? { choiceId: targetId } : type === "move-room" ? { roomId: targetId } : type === "collect-item" || type === "reveal-item" || type === "use-item" ? { itemId: targetId } : type === "combine-items" ? { recipeId: targetId } : type === "transfer-item" && transfer ? { itemId: transfer[0], targetId: transfer[1] } : { targetId }) : {}), ...(mode ? { mode } : {}) }));
   }
 
   function changeLocale(next: "ko" | "en") {

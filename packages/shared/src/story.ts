@@ -95,6 +95,14 @@ const storyContentSchema = z.strictObject({
         z.strictObject({ mode: z.literal("owner_choice"), toRoleIds: z.array(storyId) }),
         z.strictObject({ mode: z.literal("anyone") }),
       ]),
+      /** Optional once-per-session action available only to the current owner. */
+      use: z
+        .strictObject({
+          label: text,
+          result: text,
+          consumes: z.boolean().default(true),
+        })
+        .optional(),
     }),
   ),
   mechanics: z.discriminatedUnion("type", [

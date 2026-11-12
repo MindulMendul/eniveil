@@ -58,6 +58,7 @@
               <span class="clue-label">{item.name}</span>
               <p class="clue-text">{item.description}</p>
               <Button variant="text" disabled={busy || !connected || session.revealedItems.some(revealed => revealed.id === item.id)} onclick={() => onCommand("reveal-item", item.id)}>공개하기</Button>
+              {#if item.useLabel}<Button variant="text" disabled={busy || !connected} onclick={() => onCommand("use-item", item.id)}>{item.useLabel}</Button>{/if}
               {#each session.transferTargets as target (target.id)}
                 <Button variant="text" disabled={busy || !connected} onclick={() => onCommand("transfer-item", `${item.id}|${target.id}`)}>전달: {target.nickname}</Button>
               {/each}
@@ -102,11 +103,15 @@
             <p class="clue-text">{clue}</p>
           </div>
         {/each}
+        {#each session.itemUseResults as result (result.itemId)}
+          <div class="clue"><span class="clue-label">아이템 사용 결과</span><p class="clue-text">{result.text}</p></div>
+        {/each}
 
       {:else if session.phase === "meeting"}
         <h2 class="heading-two">각자의 추리를 나눠 볼 시간</h2>
         <p class="muted">{session.meetingPrompt ?? "참가자들과 대화하며 단서를 정리해 봐."}</p>
         {#each session.revealedItems as item (item.id)}<div class="clue"><span class="clue-label">공개 아이템 · {item.name}</span><p class="clue-text">{item.description}</p></div>{/each}
+        {#each session.itemUseResults as result (result.itemId)}<div class="clue"><span class="clue-label">아이템 사용 결과</span><p class="clue-text">{result.text}</p></div>{/each}
       {:else if session.phase === "final_choice"}
         <h2 class="heading-two">누가 초대장을 옮겼을까?</h2>
         <p class="muted">투표는 한 번만 가능하고, 모두 완료하면 진상이 공개돼.</p>

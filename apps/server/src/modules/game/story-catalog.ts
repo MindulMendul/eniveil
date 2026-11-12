@@ -12,7 +12,7 @@ export type StoryContent = {
   itemRecipes?: { id: string; itemIds: string[]; resultItemId: string }[];
   answer: string;
   answerRoleIndex?: number;
-  items?: { id: string; name: string; description: string; ownerRoleIndex?: number; transfer: { mode: "never" | "anyone" | "owner_choice"; targetRoleIndexes?: number[] } }[];
+  items?: { id: string; name: string; description: string; ownerRoleIndex?: number; transfer: { mode: "never" | "anyone" | "owner_choice"; targetRoleIndexes?: number[] }; use?: { label: string; result: string; consumes: boolean } }[];
 };
 
 export type StoryVersion = {

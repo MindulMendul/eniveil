@@ -31,7 +31,7 @@ function roleplayPackage(): StoryPackage {
     answerRoleId: "r2",
   };
   source.content.items = [
-    { id: "key", name: "무대 서랍 열쇠", description: "서랍을 여는 열쇠다.", visibleTo: { type: "all" }, transfer: { mode: "owner_choice", toRoleIds: ["r1"] }, initialOwnerRoleId: "r2" },
+    { id: "key", name: "무대 서랍 열쇠", description: "서랍을 여는 열쇠다.", visibleTo: { type: "all" }, transfer: { mode: "owner_choice", toRoleIds: ["r1"] }, initialOwnerRoleId: "r2", use: { label: "서랍 열기", result: "서랍 안쪽에서 젖은 초대장을 발견했다." } },
     { id: "seal", name: "봉인 스티커", description: "조합에 쓰인다.", visibleTo: { type: "all" }, transfer: { mode: "anyone" }, initialOwnerRoleId: "r2" },
     { id: "drawer-open", name: "열린 서랍", description: "조합 결과다.", visibleTo: { type: "all" }, transfer: { mode: "never" } },
   ];
@@ -140,6 +140,19 @@ test("the server validates transfer and consumes recipe inputs", () => {
   expect(session.itemOwners["drawer-open"]).toBe(other.id);
   expect(session.consumedItemIds).toEqual(expect.arrayContaining(["key", "seal"]));
   expect(game.snapshot(owner).room!.session!.collectableItems.map((item) => item.id)).not.toContain("key");
+});
+
+test("only an owner can use an item once and the configured result is shared", () => {
+  const { game, a, b } = setup();
+  const session = game.state.sessions[game.needRoom(a.id).sessionId!]!;
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  const owner = session.itemOwners.key === a.id ? a : b;
+  const other = owner.id === a.id ? b : a;
+  expect(() => game.command(other, { type: "use-item", itemId: "key", requestId: crypto.randomUUID() })).toThrow("네가 가진");
+  game.command(owner, { type: "use-item", itemId: "key", requestId: crypto.randomUUID() });
+  expect(game.snapshot(other).room!.session!.itemUseResults).toEqual([{ itemId: "key", text: "서랍 안쪽에서 젖은 초대장을 발견했다." }]);
+  expect(game.snapshot(owner).room!.session!.items.map((item) => item.id)).not.toContain("key");
+  expect(() => game.command(owner, { type: "use-item", itemId: "key", requestId: crypto.randomUUID() })).toThrow("네가 가진");
 });
 
 test("an expired configured investigation advances on the server", () => {

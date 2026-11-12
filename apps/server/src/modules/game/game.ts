@@ -115,7 +115,7 @@ export class Game {
                 },
                 items: (story?.content.items ?? [])
                   .filter((item) => session.itemOwners?.[item.id] === me.id || (!session.itemOwners && item.ownerRoleIndex === participant.roleIndex))
-                  .map(({ id, name, description }) => ({ id, name, description })),
+                  .map(({ id, name, description, use }) => ({ id, name, description, useLabel: use && !(session.usedItemIds ?? []).includes(id) ? use.label : null })),
                 itemRecipes: (story?.content.itemRecipes ?? [])
                   .filter((recipe) => recipe.itemIds.every((id) => session.itemOwners?.[id] === me.id))
                   .map((recipe) => ({
@@ -131,6 +131,7 @@ export class Game {
                 revealedItems: (story?.content.items ?? [])
                   .filter((item) => (session.revealedItemIds ?? []).includes(item.id))
                   .map(({ id, name, description }) => ({ id, name, description })),
+                itemUseResults: session.itemUseResults ?? [],
                 clues: this.visibleClues(session, story?.content),
                 availableClueCount: this.availableClues(session, story?.content).length,
                 collectedClueCount: session.collectedClueIds?.length ?? 0,
@@ -564,6 +565,7 @@ export class Game {
       case "transfer-item": this.transferItem(me, session, command.itemId, command.targetId); break;
       case "reveal-item": this.revealItem(me, session, command.itemId); break;
       case "combine-items": this.combineItems(me, session, command.recipeId); break;
+      case "use-item": this.useItem(me, session, command.itemId); break;
       case "vote":
         this.vote(me, room, session, command.targetId);
         break;
@@ -646,6 +648,8 @@ export class Game {
       ])),
       itemOwners: Object.fromEntries((this.roomStory(room).content.items ?? []).map((item) => [item.id, item.ownerRoleIndex === undefined ? null : ids.find((_, index) => index === item.ownerRoleIndex) ?? null])),
       consumedItemIds: [],
+      usedItemIds: [],
+      itemUseResults: [],
       revealedItemIds: [],
       collectedClueIds: [],
       phaseEndsAt: null,
@@ -767,6 +771,20 @@ export class Game {
     if (!this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.some((item) => item.id === recipe.resultItemId)) throw new Error("조합 결과 아이템을 확인해 줘.");
     for (const itemId of recipe.itemIds) { session.itemOwners[itemId] = null; (session.consumedItemIds ??= []).push(itemId); }
     session.itemOwners[recipe.resultItemId] = me.id;
+  }
+  private useItem(me: Guest, session: Session | null, itemId: string) {
+    if (!session || !["first_investigation", "meeting", "second_investigation"].includes(session.phase)) throw new Error("진행 중에만 아이템을 사용할 수 있어.");
+    if (session.itemOwners?.[itemId] !== me.id) throw new Error("네가 가진 아이템만 사용할 수 있어.");
+    if ((session.usedItemIds ?? []).includes(itemId)) throw new Error("이미 사용한 아이템이야.");
+    const item = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.find((entry) => entry.id === itemId);
+    if (!item?.use) throw new Error("사용할 수 없는 아이템이야.");
+    (session.usedItemIds ??= []).push(itemId);
+    (session.itemUseResults ??= []).push({ itemId, text: item.use.result });
+    if (item.use.consumes) {
+      session.itemOwners[itemId] = null;
+      (session.consumedItemIds ??= []).push(itemId);
+    }
+    this.analytics?.record(session.id, me.id, "use_item", session.phase, itemId);
   }
   private vote(
     me: Guest,

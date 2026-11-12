@@ -30,6 +30,8 @@ export type Session = {
   resources: Record<string, Record<string, number>>;
   itemOwners: Record<string, string | null>;
   consumedItemIds: string[];
+  usedItemIds: string[];
+  itemUseResults: { itemId: string; text: string }[];
   revealedItemIds: string[];
   collectedClueIds: string[];
   phaseEndsAt: number | null;
