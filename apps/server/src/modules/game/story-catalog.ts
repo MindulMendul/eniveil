@@ -2,8 +2,8 @@ import type { Scenario } from "@festival/shared";
 
 export type StoryContent = {
   roles: { name: string; secret: string }[];
-  firstClues: { id: string; text: string }[];
-  secondClues: { id: string; text: string }[];
+  firstClues: { id: string; text: string; resourceCost?: { resourceId: string; amount: number }; resourceReward?: { resourceId: string; amount: number } }[];
+  secondClues: { id: string; text: string; resourceCost?: { resourceId: string; amount: number }; resourceReward?: { resourceId: string; amount: number } }[];
   stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number };
   meetingPrompt?: string;
   finalChoices?: { id: string; label: string; outcome: string }[];

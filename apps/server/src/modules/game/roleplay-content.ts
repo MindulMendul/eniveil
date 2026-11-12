@@ -12,7 +12,7 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
   const memoryByRole = new Map(mechanics.memories.map((item) => [item.roleId, item.text]));
   const roleIndex = new Map(source.content.roles.map((role, index) => [role.id, index]));
   const normalizeClues = (
-    clues: (string | { id: string; text: string })[],
+    clues: (string | { id: string; text: string; resourceCost?: { resourceId: string; amount: number }; resourceReward?: { resourceId: string; amount: number } })[],
     stage: "first" | "second",
   ) =>
     clues.map((clue, index) =>

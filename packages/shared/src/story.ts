@@ -149,9 +149,9 @@ const storyContentSchema = z.strictObject({
       /** One memory per role. Shown only to the role's owner; never sent to other players. */
       memories: z.array(z.strictObject({ roleId: storyId, text })).min(2),
       /** Clues visible from the first investigation onward. */
-      firstClues: z.array(z.union([text, z.strictObject({ id: storyId, text })])).default([]),
+      firstClues: z.array(z.union([text, z.strictObject({ id: storyId, text, resourceCost: z.strictObject({ resourceId: storyId, amount: z.number().int().positive() }).optional(), resourceReward: z.strictObject({ resourceId: storyId, amount: z.number().int().positive() }).optional() })])).default([]),
       /** Clues that unlock only after the meeting, in the second investigation. */
-      secondClues: z.array(z.union([text, z.strictObject({ id: storyId, text })])).default([]),
+      secondClues: z.array(z.union([text, z.strictObject({ id: storyId, text, resourceCost: z.strictObject({ resourceId: storyId, amount: z.number().int().positive() }).optional(), resourceReward: z.strictObject({ resourceId: storyId, amount: z.number().int().positive() }).optional() })])).default([]),
       /** Legacy one-stage clue list. New packages use firstClues or secondClues. */
       clues: z.array(text).optional(),
       stageDurations: z

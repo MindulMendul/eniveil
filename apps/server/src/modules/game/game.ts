@@ -743,6 +743,14 @@ export class Game {
       (item) => !(session.collectedClueIds ?? []).includes(item.id),
     );
     if (!clue) throw new Error("이 단계에서 확인할 단서를 모두 찾았어.");
+    const resources = (session.resources ??= {})[me.id] ??= {};
+    if (clue.resourceCost) {
+      const remaining = resources[clue.resourceCost.resourceId] ?? 0;
+      if (remaining < clue.resourceCost.amount) throw new Error("자원이 부족해서 이 단서를 조사할 수 없어.");
+      resources[clue.resourceCost.resourceId] = remaining - clue.resourceCost.amount;
+    }
+    if (clue.resourceReward)
+      resources[clue.resourceReward.resourceId] = (resources[clue.resourceReward.resourceId] ?? 0) + clue.resourceReward.amount;
     (session.collectedClueIds ??= []).push(clue.id);
     this.analytics?.record(session.id, me.id, "inspect", session.phase, clue.id);
   }
