@@ -27,6 +27,7 @@ export type Session = {
   votes: Record<string, string>;
   finalChoices: Record<string, string>;
   currentRoomIds: Record<string, string>;
+  resources: Record<string, Record<string, number>>;
   collectedClueIds: string[];
   phaseEndsAt: number | null;
   endedAt: string | null;

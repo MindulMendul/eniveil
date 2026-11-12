@@ -129,6 +129,11 @@ export class Game {
                   available: item.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)),
                 })),
                 currentRoomId: session.currentRoomIds?.[me.id] ?? null,
+                resources: (story?.content.resources ?? []).map((resource) => ({
+                  id: resource.id,
+                  name: resource.name,
+                  value: session.resources?.[me.id]?.[resource.id] ?? resource.initialValue,
+                })),
                 voteCount: r.memberIds.filter((id) => !!session.votes[id])
                   .length,
                 hasVoted: !!session.votes[me.id],
@@ -616,6 +621,10 @@ export class Game {
       votes: {},
       finalChoices: {},
       currentRoomIds: {},
+      resources: Object.fromEntries(ids.map((id) => [
+        id,
+        Object.fromEntries((this.roomStory(room).content.resources ?? []).map((resource) => [resource.id, resource.initialValue])),
+      ])),
       collectedClueIds: [],
       phaseEndsAt: null,
       endedAt: null,

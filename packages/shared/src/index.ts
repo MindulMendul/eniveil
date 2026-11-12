@@ -87,6 +87,7 @@ export type SessionView = {
   selectedFinalChoiceId: string | null;
   rooms: { id: string; name: string; description: string | null; available: boolean }[];
   currentRoomId: string | null;
+  resources: { id: string; name: string; value: number }[];
   voteCount: number;
   hasVoted: boolean;
   result: null | { answer: string; votes: { voter: string; target: string }[]; choices: { player: string; outcome: string }[] };

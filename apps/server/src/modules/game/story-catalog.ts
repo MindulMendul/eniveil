@@ -8,6 +8,7 @@ export type StoryContent = {
   meetingPrompt?: string;
   finalChoices?: { id: string; label: string; outcome: string }[];
   rooms?: { id: string; name: string; description?: string; requiredClueIds: string[] }[];
+  resources?: { id: string; name: string; initialValue: number }[];
   answer: string;
   answerRoleIndex?: number;
   items?: { name: string; description: string; ownerRoleIndex?: number }[];

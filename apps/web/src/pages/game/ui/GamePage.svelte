@@ -129,6 +129,14 @@
           <p class="muted detail-copy">{session.role.secret}</p>
         </details>
       </Panel>
+      {#if session.resources.length}
+        <Panel>
+          <p class="eyebrow">RESOURCES</p>
+          {#each session.resources as resource (resource.id)}
+            <p class="muted">{resource.name}: {resource.value}</p>
+          {/each}
+        </Panel>
+      {/if}
       <Panel>
         <h3 class="heading-three">다음 진행</h3>
         {#if host}

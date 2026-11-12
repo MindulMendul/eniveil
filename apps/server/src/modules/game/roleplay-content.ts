@@ -49,6 +49,7 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
       meetingPrompt: mechanics.meetingPrompt,
       finalChoices: mechanics.finalChoices,
       rooms: mechanics.rooms,
+      resources: mechanics.resources,
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
       items: source.content.items.map((item) => ({

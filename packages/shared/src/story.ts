@@ -169,6 +169,11 @@ const storyContentSchema = z.strictObject({
         description: text.optional(),
         requiredClueIds: z.array(storyId).default([]),
       })).max(30).optional(),
+      resources: z.array(z.strictObject({
+        id: storyId,
+        name: text,
+        initialValue: z.number().int().min(0).max(999),
+      })).max(12).optional(),
       answer: text,
       answerRoleId: storyId,
     }),
