@@ -267,7 +267,7 @@
         error = "응답이 지연됐어. 현재 상태를 확인하고 다시 시도해 줘.";
       }, 8000),
     );
-    socket.send(JSON.stringify({ type, requestId, ...(targetId ? (type === "choose-final" ? { choiceId: targetId } : { targetId }) : {}), ...(mode ? { mode } : {}) }));
+    socket.send(JSON.stringify({ type, requestId, ...(targetId ? (type === "choose-final" ? { choiceId: targetId } : type === "move-room" ? { roomId: targetId } : { targetId }) : {}), ...(mode ? { mode } : {}) }));
   }
 
   function changeLocale(next: "ko" | "en") {

@@ -122,6 +122,13 @@ export class Game {
                 meetingPrompt: story?.content.meetingPrompt ?? null,
                 finalChoices: (story?.content.finalChoices ?? []).map(({ id, label }) => ({ id, label })),
                 selectedFinalChoiceId: session.finalChoices?.[me.id] ?? null,
+                rooms: (story?.content.rooms ?? []).map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  description: item.description ?? null,
+                  available: item.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)),
+                })),
+                currentRoomId: session.currentRoomIds?.[me.id] ?? null,
                 voteCount: r.memberIds.filter((id) => !!session.votes[id])
                   .length,
                 hasVoted: !!session.votes[me.id],
@@ -530,6 +537,9 @@ export class Game {
       case "choose-final":
         this.chooseFinal(me, room, session, command.choiceId);
         break;
+      case "move-room":
+        this.moveRoom(me, session, command.roomId);
+        break;
       case "vote":
         this.vote(me, room, session, command.targetId);
         break;
@@ -605,6 +615,7 @@ export class Game {
       phase: "briefing",
       votes: {},
       finalChoices: {},
+      currentRoomIds: {},
       collectedClueIds: [],
       phaseEndsAt: null,
       endedAt: null,
@@ -690,6 +701,15 @@ export class Game {
         })),
       });
     }
+  }
+  private moveRoom(me: Guest, session: Session | null, roomId: string) {
+    if (!session || (session.phase !== "first_investigation" && session.phase !== "second_investigation"))
+      throw new Error("조사 단계에서만 방을 이동할 수 있어.");
+    const target = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.rooms?.find((item) => item.id === roomId);
+    if (!target) throw new Error("방을 찾을 수 없어.");
+    if (!target.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)))
+      throw new Error("아직 이 방을 열 조건을 충족하지 못했어.");
+    (session.currentRoomIds ??= {})[me.id] = roomId;
   }
   private vote(
     me: Guest,

@@ -39,6 +39,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("advance"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("collect-clue"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("choose-final"), choiceId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("move-room"), roomId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({
     type: z.literal("vote"),
     targetId: z.string().max(80),
@@ -84,6 +85,8 @@ export type SessionView = {
   meetingPrompt: string | null;
   finalChoices: { id: string; label: string }[];
   selectedFinalChoiceId: string | null;
+  rooms: { id: string; name: string; description: string | null; available: boolean }[];
+  currentRoomId: string | null;
   voteCount: number;
   hasVoted: boolean;
   result: null | { answer: string; votes: { voter: string; target: string }[]; choices: { player: string; outcome: string }[] };

@@ -66,6 +66,15 @@
         {#if session.collectedClueCount < session.availableClueCount}
           <Button disabled={busy || !connected} onclick={() => onCommand("collect-clue")}>단서 조사하기 →</Button>
         {/if}
+        {#if session.rooms.length}
+          <div class="mt-4 flex flex-wrap gap-2" aria-label="조사 방">
+            {#each session.rooms as investigationRoom (investigationRoom.id)}
+              <Button variant="secondary" disabled={busy || !connected || !investigationRoom.available || session.currentRoomId === investigationRoom.id} onclick={() => onCommand("move-room", investigationRoom.id)}>
+                {investigationRoom.name}{investigationRoom.available ? "" : " · 잠김"}
+              </Button>
+            {/each}
+          </div>
+        {/if}
         {#each session.clues as clue, index (index)}
           <div class="clue">
             <span class="clue-label">단서 {index + 1}</span>
