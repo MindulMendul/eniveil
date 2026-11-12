@@ -29,11 +29,11 @@ function setup(inLobby: (id: string) => boolean = () => true) {
 test('PIN preserves leading zeroes and never leaks; friends-only checks all joins', () => {
   const {store,game,host,friend,other} = setup();
   try {
-    const secret = game.create(host,'rehearsal','secret','0001');
+    const secret = game.create(host,'rehearsal','secret','1234');
     expect(() => game.join(friend,secret.code,'1')).toThrow();
     expect(() => game.join(friend,secret.code,'0002')).toThrow();
     expect(JSON.stringify(game.snapshot(friend))).not.toContain('pinHash');
-    game.join(friend,secret.code,'0001');
+    game.join(friend,secret.code,'1234');
     expect(secret.memberIds.length).toBe(2);
     game.command(friend,{type:'leave',requestId:'leave'});
     game.command(host,{type:'leave',requestId:'leave'});
