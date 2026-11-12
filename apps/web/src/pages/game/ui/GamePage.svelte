@@ -77,6 +77,7 @@
               <Button variant="secondary" disabled={busy || !connected || !investigationRoom.available || session.currentRoomId === investigationRoom.id} onclick={() => onCommand("move-room", investigationRoom.id)}>
                 {investigationRoom.name}{investigationRoom.available ? "" : " · 잠김"}
               </Button>
+              {#if investigationRoom.resourceChanges.length}<p class="fine">{investigationRoom.resourceChanges.map(change => `${change.kind === "reward" ? "+" : "-"}${change.amount} ${change.name}`).join(" · ")}</p>{/if}
             {/each}
           </div>
         {/if}
@@ -160,7 +161,7 @@
         <Panel>
           <p class="eyebrow">RESOURCES</p>
           {#each session.resources as resource (resource.id)}
-            <p class="muted">{resource.name}: {resource.value}</p>
+            <p class="muted">{resource.scope === "shared" ? "공용" : "개인"} · {resource.name}: {resource.value}</p>
           {/each}
         </Panel>
       {/if}

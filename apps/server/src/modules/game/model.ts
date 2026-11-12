@@ -28,6 +28,8 @@ export type Session = {
   finalChoices: Record<string, string>;
   currentRoomIds: Record<string, string>;
   resources: Record<string, Record<string, number>>;
+  sharedResources: Record<string, number>;
+  visitedRoomIds: Record<string, string[]>;
   itemOwners: Record<string, string | null>;
   consumedItemIds: string[];
   usedItemIds: string[];

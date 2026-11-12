@@ -53,6 +53,15 @@ export class Game {
       .filter((clue) => collected.has(clue.id))
       .map((clue) => clue.text);
   }
+  private resourceValue(session: Session, userId: string, resourceId: string, scope: "personal" | "shared") {
+    return scope === "shared" ? session.sharedResources?.[resourceId] ?? 0 : session.resources?.[userId]?.[resourceId] ?? 0;
+  }
+  private canPay(session: Session, userId: string, changes: { resourceId: string; amount: number }[], story?: StoryContent) {
+    return changes.every((change) => {
+      const scope = story?.resources?.find((resource) => resource.id === change.resourceId)?.scope ?? "personal";
+      return this.resourceValue(session, userId, change.resourceId, scope) >= change.amount;
+    });
+  }
   soloRoomForStory(owner: string, story: string) {
     const room=this.roomFor(owner);
     return room?.soloStarted && room.mode === 'solo' && story === supportedSoloStory.id ? room.id : null;
@@ -126,8 +135,8 @@ export class Game {
                   .filter((participant) => participant.id !== me.id)
                   .map(({ id, nickname }) => ({ id, nickname })),
                 collectableItems: (story?.content.items ?? [])
-                  .filter((item) => session.itemOwners?.[item.id] === null && !(session.consumedItemIds ?? []).includes(item.id))
-                  .map(({ id, name }) => ({ id, name })),
+                  .filter((item) => session.itemOwners?.[item.id] === null && !(session.consumedItemIds ?? []).includes(item.id) && (() => { const roomId = (story?.content.rooms ?? []).find((room) => room.itemIds.includes(item.id))?.id; return !roomId || session.currentRoomIds?.[me.id] === roomId; })())
+                  .map(({ id, name }) => ({ id, name, roomId: (story?.content.rooms ?? []).find((room) => room.itemIds.includes(id))?.id ?? null })),
                 revealedItems: (story?.content.items ?? [])
                   .filter((item) => (session.revealedItemIds ?? []).includes(item.id))
                   .map(({ id, name, description }) => ({ id, name, description })),
@@ -142,13 +151,19 @@ export class Game {
                   id: item.id,
                   name: item.name,
                   description: item.description ?? null,
-                  available: item.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)),
+                  available: item.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)) && this.canPay(session, me.id, [...item.entryCost, ...item.entryPenalty], story?.content),
+                  resourceChanges: [
+                    ...item.entryCost.map((change) => ({ name: story?.content.resources?.find((resource) => resource.id === change.resourceId)?.name ?? change.resourceId, amount: change.amount, kind: "cost" as const })),
+                    ...item.entryReward.map((change) => ({ name: story?.content.resources?.find((resource) => resource.id === change.resourceId)?.name ?? change.resourceId, amount: change.amount, kind: "reward" as const })),
+                    ...item.entryPenalty.map((change) => ({ name: story?.content.resources?.find((resource) => resource.id === change.resourceId)?.name ?? change.resourceId, amount: change.amount, kind: "penalty" as const })),
+                  ],
                 })),
                 currentRoomId: session.currentRoomIds?.[me.id] ?? null,
                 resources: (story?.content.resources ?? []).map((resource) => ({
                   id: resource.id,
                   name: resource.name,
-                  value: session.resources?.[me.id]?.[resource.id] ?? resource.initialValue,
+                  value: this.resourceValue(session, me.id, resource.id, resource.scope),
+                  scope: resource.scope,
                 })),
                 voteCount: r.memberIds.filter((id) => !!session.votes[id])
                   .length,
@@ -644,8 +659,10 @@ export class Game {
       currentRoomIds: {},
       resources: Object.fromEntries(ids.map((id) => [
         id,
-        Object.fromEntries((this.roomStory(room).content.resources ?? []).map((resource) => [resource.id, resource.initialValue])),
+        Object.fromEntries((this.roomStory(room).content.resources ?? []).filter((resource) => resource.scope === "personal").map((resource) => [resource.id, resource.initialValue])),
       ])),
+      sharedResources: Object.fromEntries((this.roomStory(room).content.resources ?? []).filter((resource) => resource.scope === "shared").map((resource) => [resource.id, resource.initialValue])),
+      visitedRoomIds: {},
       itemOwners: Object.fromEntries((this.roomStory(room).content.items ?? []).map((item) => [item.id, item.ownerRoleIndex === undefined ? null : ids.find((_, index) => index === item.ownerRoleIndex) ?? null])),
       consumedItemIds: [],
       usedItemIds: [],
@@ -744,12 +761,31 @@ export class Game {
     if (!target) throw new Error("방을 찾을 수 없어.");
     if (!target.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)))
       throw new Error("아직 이 방을 열 조건을 충족하지 못했어.");
+    const story = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content;
+    const charge = [...target.entryCost, ...target.entryPenalty];
+    if (!this.canPay(session, me.id, charge, story)) throw new Error("자원이 부족해서 이 방에 들어갈 수 없어.");
+    for (const change of charge) this.changeResource(session, me.id, change.resourceId, -change.amount, story);
+    const visited = (session.visitedRoomIds ??= {})[me.id] ??= [];
+    if (!visited.includes(roomId)) {
+      for (const change of target.entryReward) this.changeResource(session, me.id, change.resourceId, change.amount, story);
+      visited.push(roomId);
+    }
     (session.currentRoomIds ??= {})[me.id] = roomId;
+  }
+  private changeResource(session: Session, userId: string, resourceId: string, amount: number, story?: StoryContent) {
+    const scope = story?.resources?.find((resource) => resource.id === resourceId)?.scope ?? "personal";
+    if (scope === "shared") session.sharedResources[resourceId] = (session.sharedResources[resourceId] ?? 0) + amount;
+    else {
+      const resources = (session.resources ??= {})[userId] ??= {};
+      resources[resourceId] = (resources[resourceId] ?? 0) + amount;
+    }
   }
   private collectItem(me: Guest, session: Session | null, itemId: string) {
     if (!session || (session.phase !== "first_investigation" && session.phase !== "second_investigation")) throw new Error("조사 단계에서만 아이템을 수집할 수 있어.");
     const item = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.find((item) => item.id === itemId);
     if (!item || session.itemOwners?.[itemId] !== null) throw new Error("수집할 수 없는 아이템이야.");
+    const room = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.rooms?.find((entry) => entry.itemIds.includes(itemId));
+    if (room && session.currentRoomIds?.[me.id] !== room.id) throw new Error("이 아이템이 있는 방으로 이동해 줘.");
     session.itemOwners[itemId] = me.id;
   }
   private transferItem(me: Guest, session: Session | null, itemId: string, targetId: string) {
@@ -809,14 +845,14 @@ export class Game {
       (item) => !(session.collectedClueIds ?? []).includes(item.id),
     );
     if (!clue) throw new Error("이 단계에서 확인할 단서를 모두 찾았어.");
-    const resources = (session.resources ??= {})[me.id] ??= {};
     if (clue.resourceCost) {
-      const remaining = resources[clue.resourceCost.resourceId] ?? 0;
+      const resource = story?.resources?.find((item) => item.id === clue.resourceCost!.resourceId);
+      const remaining = this.resourceValue(session, me.id, clue.resourceCost.resourceId, resource?.scope ?? "personal");
       if (remaining < clue.resourceCost.amount) throw new Error("자원이 부족해서 이 단서를 조사할 수 없어.");
-      resources[clue.resourceCost.resourceId] = remaining - clue.resourceCost.amount;
+      this.changeResource(session, me.id, clue.resourceCost.resourceId, -clue.resourceCost.amount, story);
     }
     if (clue.resourceReward)
-      resources[clue.resourceReward.resourceId] = (resources[clue.resourceReward.resourceId] ?? 0) + clue.resourceReward.amount;
+      this.changeResource(session, me.id, clue.resourceReward.resourceId, clue.resourceReward.amount, story);
     (session.collectedClueIds ??= []).push(clue.id);
     this.analytics?.record(session.id, me.id, "inspect", session.phase, clue.id);
   }

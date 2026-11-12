@@ -7,8 +7,8 @@ export type StoryContent = {
   stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number };
   meetingPrompt?: string;
   finalChoices?: { id: string; label: string; outcome: string }[];
-  rooms?: { id: string; name: string; description?: string; requiredClueIds: string[] }[];
-  resources?: { id: string; name: string; initialValue: number }[];
+  rooms?: { id: string; name: string; description?: string; requiredClueIds: string[]; itemIds: string[]; entryCost: { resourceId: string; amount: number }[]; entryReward: { resourceId: string; amount: number }[]; entryPenalty: { resourceId: string; amount: number }[] }[];
+  resources?: { id: string; name: string; initialValue: number; scope: "personal" | "shared" }[];
   itemRecipes?: { id: string; itemIds: string[]; resultItemId: string }[];
   answer: string;
   answerRoleIndex?: number;

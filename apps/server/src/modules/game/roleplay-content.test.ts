@@ -39,7 +39,7 @@ function roleplayPackage(): StoryPackage {
   return storyPackageSchema.parse(source);
 }
 
-function setup(stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number }, meetingPrompt?: string) {
+function setup(stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number }, meetingPrompt?: string, configure?: (pkg: StoryPackage) => void) {
   const store = new Store(":memory:");
   stores.push(store);
   const pkg = roleplayPackage();
@@ -47,6 +47,7 @@ function setup(stageDurations?: { firstInvestigationSeconds?: number; meetingSec
     pkg.content.mechanics.stageDurations = stageDurations;
     pkg.content.mechanics.meetingPrompt = meetingPrompt;
   }
+  configure?.(pkg);
   const catalog = withRoleplayPackages(storyCatalog, {
     list: () => [{ id: pkg.story.id, version: pkg.story.version, mode: "multiplayer" }],
     get: () => pkg,
@@ -153,6 +154,26 @@ test("only an owner can use an item once and the configured result is shared", (
   expect(game.snapshot(other).room!.session!.itemUseResults).toEqual([{ itemId: "key", text: "서랍 안쪽에서 젖은 초대장을 발견했다." }]);
   expect(game.snapshot(owner).room!.session!.items.map((item) => item.id)).not.toContain("key");
   expect(() => game.command(owner, { type: "use-item", itemId: "key", requestId: crypto.randomUUID() })).toThrow("네가 가진");
+});
+
+test("room resources are server-checked, shared rewards apply once, and room items require entry", () => {
+  const { game, a, b } = setup(undefined, undefined, (pkg) => {
+    if (pkg.content.mechanics.type === "roleplay") {
+      pkg.content.mechanics.resources = [
+        { id: "focus", name: "집중력", initialValue: 2, scope: "personal" },
+        { id: "trust", name: "신뢰", initialValue: 0, scope: "shared" },
+      ];
+      pkg.content.mechanics.rooms = [{ id: "drawer", name: "무대 서랍", requiredClueIds: [], itemIds: ["drawer-open"], entryCost: [{ resourceId: "focus", amount: 2 }], entryReward: [{ resourceId: "trust", amount: 1 }], entryPenalty: [] }];
+    }
+  });
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(() => game.command(a, { type: "collect-item", itemId: "drawer-open", requestId: crypto.randomUUID() })).toThrow("방으로 이동");
+  game.command(a, { type: "move-room", roomId: "drawer", requestId: crypto.randomUUID() });
+  const first = game.snapshot(a).room!.session!;
+  expect(first.resources).toEqual(expect.arrayContaining([{ id: "focus", name: "집중력", value: 0, scope: "personal" }, { id: "trust", name: "신뢰", value: 1, scope: "shared" }]));
+  expect(game.snapshot(b).room!.session!.resources.find((resource) => resource.id === "trust")?.value).toBe(1);
+  game.command(a, { type: "collect-item", itemId: "drawer-open", requestId: crypto.randomUUID() });
+  expect(() => game.command(a, { type: "move-room", roomId: "drawer", requestId: crypto.randomUUID() })).toThrow("자원이 부족");
 });
 
 test("an expired configured investigation advances on the server", () => {

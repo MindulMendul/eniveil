@@ -176,11 +176,16 @@ const storyContentSchema = z.strictObject({
         name: text,
         description: text.optional(),
         requiredClueIds: z.array(storyId).default([]),
+        itemIds: z.array(storyId).default([]),
+        entryCost: z.array(z.strictObject({ resourceId: storyId, amount: z.number().int().positive() })).default([]),
+        entryReward: z.array(z.strictObject({ resourceId: storyId, amount: z.number().int().positive() })).default([]),
+        entryPenalty: z.array(z.strictObject({ resourceId: storyId, amount: z.number().int().positive() })).default([]),
       })).max(30).optional(),
       resources: z.array(z.strictObject({
         id: storyId,
         name: text,
         initialValue: z.number().int().min(0).max(999),
+        scope: z.enum(["personal", "shared"]).default("personal"),
       })).max(12).optional(),
       itemRecipes: z.array(z.strictObject({ id: storyId, itemIds: z.array(storyId).min(2), resultItemId: storyId })).max(20).optional(),
       answer: text,
@@ -331,6 +336,20 @@ export const storyPackageSchema = z
       if (!exists(mechanics.answerRoleId, roleIds)) {
         ctx.addIssue({ code: "custom", path: ["content", "mechanics", "answerRoleId"], message: "정답 역할을 찾을 수 없어." });
       }
+      const resourceIds = (mechanics.resources ?? []).map((resource) => resource.id);
+      (mechanics.rooms ?? []).forEach((room, index) => {
+        if (room.requiredClueIds.some((id) => !mechanics.firstClues.concat(mechanics.secondClues).some((clue) => (typeof clue === "string" ? false : clue.id === id)))) {
+          ctx.addIssue({ code: "custom", path: ["content", "mechanics", "rooms", index, "requiredClueIds"], message: "방 해금에 필요한 단서를 찾을 수 없어." });
+        }
+        if (room.itemIds.some((id) => !exists(id, itemIds))) {
+          ctx.addIssue({ code: "custom", path: ["content", "mechanics", "rooms", index, "itemIds"], message: "방 아이템을 찾을 수 없어." });
+        }
+        for (const [kind, changes] of [["entryCost", room.entryCost], ["entryReward", room.entryReward], ["entryPenalty", room.entryPenalty]] as const) {
+          if (changes.some((change) => !exists(change.resourceId, resourceIds))) {
+            ctx.addIssue({ code: "custom", path: ["content", "mechanics", "rooms", index, kind], message: "방 자원을 찾을 수 없어." });
+          }
+        }
+      });
     }
   });
 

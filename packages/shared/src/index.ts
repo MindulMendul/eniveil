@@ -86,7 +86,7 @@ export type SessionView = {
   items: { id: string; name: string; description: string; useLabel: string | null }[];
   itemRecipes: { id: string; itemIds: string[]; resultItemId: string; resultName: string }[];
   transferTargets: { id: string; nickname: string }[];
-  collectableItems: { id: string; name: string }[];
+  collectableItems: { id: string; name: string; roomId: string | null }[];
   revealedItems: { id: string; name: string; description: string }[];
   itemUseResults: { itemId: string; text: string }[];
   clues: string[];
@@ -95,9 +95,9 @@ export type SessionView = {
   meetingPrompt: string | null;
   finalChoices: { id: string; label: string }[];
   selectedFinalChoiceId: string | null;
-  rooms: { id: string; name: string; description: string | null; available: boolean }[];
+  rooms: { id: string; name: string; description: string | null; available: boolean; resourceChanges: { name: string; amount: number; kind: "cost" | "reward" | "penalty" }[] }[];
   currentRoomId: string | null;
-  resources: { id: string; name: string; value: number }[];
+  resources: { id: string; name: string; value: number; scope: "personal" | "shared" }[];
   voteCount: number;
   hasVoted: boolean;
   result: null | { answer: string; votes: { voter: string; target: string }[]; choices: { player: string; outcome: string }[] };

@@ -49,7 +49,7 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
       meetingPrompt: mechanics.meetingPrompt,
       finalChoices: mechanics.finalChoices,
       rooms: mechanics.rooms,
-      resources: mechanics.resources,
+      resources: mechanics.resources?.map((resource) => ({ ...resource, scope: resource.scope ?? "personal" })),
       itemRecipes: mechanics.itemRecipes,
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
