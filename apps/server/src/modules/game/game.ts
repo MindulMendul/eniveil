@@ -554,6 +554,7 @@ export class Game {
       case "collect-item": this.collectItem(me, session, command.itemId); break;
       case "transfer-item": this.transferItem(me, session, command.itemId, command.targetId); break;
       case "reveal-item": this.revealItem(me, session, command.itemId); break;
+      case "combine-items": this.combineItems(me, session, command.recipeId); break;
       case "vote":
         this.vote(me, room, session, command.targetId);
         break;
@@ -748,6 +749,13 @@ export class Game {
     if (!session || session.itemOwners?.[itemId] !== me.id) throw new Error("네가 가진 아이템만 공개할 수 있어.");
     if ((session.revealedItemIds ?? []).includes(itemId)) throw new Error("이미 공개한 아이템이야.");
     (session.revealedItemIds ??= []).push(itemId);
+  }
+  private combineItems(me: Guest, session: Session | null, recipeId: string) {
+    if (!session) throw new Error("진행 중인 게임이 없어.");
+    const recipe = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.itemRecipes?.find((item) => item.id === recipeId);
+    if (!recipe || recipe.itemIds.some((id) => session.itemOwners?.[id] !== me.id)) throw new Error("조합 재료를 모두 가지고 있지 않아.");
+    for (const itemId of recipe.itemIds) session.itemOwners[itemId] = null;
+    session.itemOwners[recipe.resultItemId] = me.id;
   }
   private vote(
     me: Guest,

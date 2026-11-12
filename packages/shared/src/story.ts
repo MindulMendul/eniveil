@@ -174,6 +174,7 @@ const storyContentSchema = z.strictObject({
         name: text,
         initialValue: z.number().int().min(0).max(999),
       })).max(12).optional(),
+      itemRecipes: z.array(z.strictObject({ id: storyId, itemIds: z.array(storyId).min(2), resultItemId: storyId })).max(20).optional(),
       answer: text,
       answerRoleId: storyId,
     }),

@@ -9,6 +9,7 @@ export type StoryContent = {
   finalChoices?: { id: string; label: string; outcome: string }[];
   rooms?: { id: string; name: string; description?: string; requiredClueIds: string[] }[];
   resources?: { id: string; name: string; initialValue: number }[];
+  itemRecipes?: { id: string; itemIds: string[]; resultItemId: string }[];
   answer: string;
   answerRoleIndex?: number;
   items?: { id: string; name: string; description: string; ownerRoleIndex?: number; transfer: { mode: "never" | "anyone" | "owner_choice"; targetRoleIndexes?: number[] } }[];

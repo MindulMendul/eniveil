@@ -43,6 +43,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("collect-item"), itemId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({ type: z.literal("transfer-item"), itemId: z.string().max(80), targetId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({ type: z.literal("reveal-item"), itemId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("combine-items"), recipeId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({
     type: z.literal("vote"),
     targetId: z.string().max(80),

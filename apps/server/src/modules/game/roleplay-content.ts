@@ -50,6 +50,7 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
       finalChoices: mechanics.finalChoices,
       rooms: mechanics.rooms,
       resources: mechanics.resources,
+      itemRecipes: mechanics.itemRecipes,
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
       items: source.content.items.map((item) => ({
