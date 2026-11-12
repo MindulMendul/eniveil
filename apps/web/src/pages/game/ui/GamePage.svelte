@@ -58,6 +58,9 @@
               <span class="clue-label">{item.name}</span>
               <p class="clue-text">{item.description}</p>
               <Button variant="text" disabled={busy || !connected || session.revealedItems.some(revealed => revealed.id === item.id)} onclick={() => onCommand("reveal-item", item.id)}>공개하기</Button>
+              {#each session.transferTargets as target (target.id)}
+                <Button variant="text" disabled={busy || !connected} onclick={() => onCommand("transfer-item", `${item.id}|${target.id}`)}>전달: {target.nickname}</Button>
+              {/each}
             </div>
           {/each}
         {/if}
@@ -80,6 +83,16 @@
           <div class="mt-4 flex flex-wrap gap-2">
             {#each session.collectableItems as item (item.id)}
               <Button variant="secondary" disabled={busy || !connected} onclick={() => onCommand("collect-item", item.id)}>{item.name} 수집 →</Button>
+            {/each}
+          </div>
+        {/if}
+        {#if session.itemRecipes.length}
+          <div class="mt-4" aria-label="아이템 조합">
+            <p class="eyebrow">조합 가능한 아이템</p>
+            {#each session.itemRecipes as recipe (recipe.id)}
+              <Button variant="secondary" disabled={busy || !connected} onclick={() => onCommand("combine-items", recipe.id)}>
+                {recipe.itemIds.join(" + ")} → {recipe.resultName}
+              </Button>
             {/each}
           </div>
         {/if}

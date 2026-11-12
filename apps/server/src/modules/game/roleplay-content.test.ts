@@ -30,7 +30,12 @@ function roleplayPackage(): StoryPackage {
     answer: ANSWER,
     answerRoleId: "r2",
   };
-  source.content.items = [{ id: "key", name: "무대 서랍 열쇠", description: "서랍을 여는 열쇠다.", visibleTo: { type: "all" }, transfer: { mode: "never" }, initialOwnerRoleId: "r2" }];
+  source.content.items = [
+    { id: "key", name: "무대 서랍 열쇠", description: "서랍을 여는 열쇠다.", visibleTo: { type: "all" }, transfer: { mode: "owner_choice", toRoleIds: ["r1"] }, initialOwnerRoleId: "r2" },
+    { id: "seal", name: "봉인 스티커", description: "조합에 쓰인다.", visibleTo: { type: "all" }, transfer: { mode: "anyone" }, initialOwnerRoleId: "r2" },
+    { id: "drawer-open", name: "열린 서랍", description: "조합 결과다.", visibleTo: { type: "all" }, transfer: { mode: "never" } },
+  ];
+  source.content.mechanics.itemRecipes = [{ id: "open-drawer", itemIds: ["key", "seal"], resultItemId: "drawer-open" }];
   return storyPackageSchema.parse(source);
 }
 
@@ -117,6 +122,24 @@ test("an item reaches only the role that owns it", () => {
   expect(nonOwner.items).toEqual([]);
   const nonOwnerViewer = owners[0] === viewA ? b : a;
   expect(JSON.stringify(game.snapshot(nonOwnerViewer))).not.toContain("무대 서랍 열쇠");
+});
+
+test("the server validates transfer and consumes recipe inputs", () => {
+  const { game, a, b } = setup();
+  const session = game.state.sessions[game.needRoom(a.id).sessionId!]!;
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  const ownerId = session.itemOwners.key!;
+  const owner = ownerId === a.id ? a : b;
+  const other = (session.participants.find((p) => p.roleIndex === 0)!.id === a.id ? a : b);
+  expect(() => game.command(other, { type: "transfer-item", itemId: "key", targetId: owner.id, requestId: crypto.randomUUID() })).toThrow("네가 가진");
+  game.command(owner, { type: "transfer-item", itemId: "key", targetId: other.id, requestId: crypto.randomUUID() });
+  game.command(owner, { type: "transfer-item", itemId: "seal", targetId: other.id, requestId: crypto.randomUUID() });
+  expect(session.itemOwners.key).toBe(other.id);
+  expect(() => game.command(owner, { type: "combine-items", recipeId: "open-drawer", requestId: crypto.randomUUID() })).toThrow("재료");
+  game.command(other, { type: "combine-items", recipeId: "open-drawer", requestId: crypto.randomUUID() });
+  expect(session.itemOwners["drawer-open"]).toBe(other.id);
+  expect(session.consumedItemIds).toEqual(expect.arrayContaining(["key", "seal"]));
+  expect(game.snapshot(owner).room!.session!.collectableItems.map((item) => item.id)).not.toContain("key");
 });
 
 test("an expired configured investigation advances on the server", () => {

@@ -116,8 +116,17 @@ export class Game {
                 items: (story?.content.items ?? [])
                   .filter((item) => session.itemOwners?.[item.id] === me.id || (!session.itemOwners && item.ownerRoleIndex === participant.roleIndex))
                   .map(({ id, name, description }) => ({ id, name, description })),
+                itemRecipes: (story?.content.itemRecipes ?? [])
+                  .filter((recipe) => recipe.itemIds.every((id) => session.itemOwners?.[id] === me.id))
+                  .map((recipe) => ({
+                    ...recipe,
+                    resultName: story?.content.items?.find((item) => item.id === recipe.resultItemId)?.name ?? recipe.resultItemId,
+                  })),
+                transferTargets: session.participants
+                  .filter((participant) => participant.id !== me.id)
+                  .map(({ id, nickname }) => ({ id, nickname })),
                 collectableItems: (story?.content.items ?? [])
-                  .filter((item) => session.itemOwners?.[item.id] === null)
+                  .filter((item) => session.itemOwners?.[item.id] === null && !(session.consumedItemIds ?? []).includes(item.id))
                   .map(({ id, name }) => ({ id, name })),
                 revealedItems: (story?.content.items ?? [])
                   .filter((item) => (session.revealedItemIds ?? []).includes(item.id))
@@ -636,6 +645,7 @@ export class Game {
         Object.fromEntries((this.roomStory(room).content.resources ?? []).map((resource) => [resource.id, resource.initialValue])),
       ])),
       itemOwners: Object.fromEntries((this.roomStory(room).content.items ?? []).map((item) => [item.id, item.ownerRoleIndex === undefined ? null : ids.find((_, index) => index === item.ownerRoleIndex) ?? null])),
+      consumedItemIds: [],
       revealedItemIds: [],
       collectedClueIds: [],
       phaseEndsAt: null,
@@ -751,10 +761,11 @@ export class Game {
     (session.revealedItemIds ??= []).push(itemId);
   }
   private combineItems(me: Guest, session: Session | null, recipeId: string) {
-    if (!session) throw new Error("진행 중인 게임이 없어.");
+    if (!session || (session.phase !== "first_investigation" && session.phase !== "meeting" && session.phase !== "second_investigation")) throw new Error("조사 중에만 아이템을 조합할 수 있어.");
     const recipe = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.itemRecipes?.find((item) => item.id === recipeId);
-    if (!recipe || recipe.itemIds.some((id) => session.itemOwners?.[id] !== me.id)) throw new Error("조합 재료를 모두 가지고 있지 않아.");
-    for (const itemId of recipe.itemIds) session.itemOwners[itemId] = null;
+    if (!recipe || recipe.itemIds.length < 2 || new Set(recipe.itemIds).size !== recipe.itemIds.length || recipe.itemIds.some((id) => session.itemOwners?.[id] !== me.id)) throw new Error("조합 재료를 모두 가지고 있지 않아.");
+    if (!this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.some((item) => item.id === recipe.resultItemId)) throw new Error("조합 결과 아이템을 확인해 줘.");
+    for (const itemId of recipe.itemIds) { session.itemOwners[itemId] = null; (session.consumedItemIds ??= []).push(itemId); }
     session.itemOwners[recipe.resultItemId] = me.id;
   }
   private vote(

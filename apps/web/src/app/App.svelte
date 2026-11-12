@@ -267,7 +267,8 @@
         error = "응답이 지연됐어. 현재 상태를 확인하고 다시 시도해 줘.";
       }, 8000),
     );
-    socket.send(JSON.stringify({ type, requestId, ...(targetId ? (type === "choose-final" ? { choiceId: targetId } : type === "move-room" ? { roomId: targetId } : type === "collect-item" || type === "reveal-item" ? { itemId: targetId } : { targetId }) : {}), ...(mode ? { mode } : {}) }));
+    const transfer = type === "transfer-item" && targetId ? targetId.split("|", 2) : null;
+    socket.send(JSON.stringify({ type, requestId, ...(targetId ? (type === "choose-final" ? { choiceId: targetId } : type === "move-room" ? { roomId: targetId } : type === "collect-item" || type === "reveal-item" ? { itemId: targetId } : type === "combine-items" ? { recipeId: targetId } : type === "transfer-item" && transfer ? { itemId: transfer[0], targetId: transfer[1] } : { targetId }) : {}), ...(mode ? { mode } : {}) }));
   }
 
   function changeLocale(next: "ko" | "en") {

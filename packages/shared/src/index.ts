@@ -83,6 +83,8 @@ export type SessionView = {
   role: { name: string; secret: string };
   /** Items the viewer's role owns; other roles' items are never sent. */
   items: { id: string; name: string; description: string }[];
+  itemRecipes: { id: string; itemIds: string[]; resultItemId: string; resultName: string }[];
+  transferTargets: { id: string; nickname: string }[];
   collectableItems: { id: string; name: string }[];
   revealedItems: { id: string; name: string; description: string }[];
   clues: string[];
