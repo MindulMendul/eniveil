@@ -79,5 +79,25 @@ export function createFriendRoutes(store: Store, options: { isOnline?: (id: stri
   };
   app.post('/requests/:id/accept', c => act(c, true));
   app.post('/requests/:id/reject', c => act(c, false));
+  app.post('/requests/:id/cancel', c => {
+    const me = c.get('me'), recipient = friendAccountIdSchema.parse(c.req.param('id'));
+    const changed = store.db.transaction(() => {
+      const row = connection(me.id, recipient);
+      if (!row || row.status !== 'pending' || row.sender_id !== me.id || !member(recipient)) return false;
+      store.db.query('DELETE FROM friend_connections WHERE low_id=? AND high_id=?').run(...pair(me.id, recipient));
+      return true;
+    })();
+    return changed ? c.json({ cancelled: true }) : c.json({ error: '보낸 요청을 찾을 수 없어요.' }, 404);
+  });
+  app.post('/friends/:id/remove', c => {
+    const me = c.get('me'), friend = friendAccountIdSchema.parse(c.req.param('id'));
+    const changed = store.db.transaction(() => {
+      const row = connection(me.id, friend);
+      if (!row || row.status !== 'accepted' || !member(friend)) return false;
+      store.db.query('DELETE FROM friend_connections WHERE low_id=? AND high_id=?').run(...pair(me.id, friend));
+      return true;
+    })();
+    return changed ? c.json({ removed: true }) : c.json({ error: '친구 관계를 찾을 수 없어요.' }, 404);
+  });
   return app;
 }
