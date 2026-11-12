@@ -26,6 +26,14 @@ function setup(){
 }
 const evt=(sequence:number,stage:PlayEvent['stage']='explore',type:PlayEvent['type']='stage'):PlayEvent=>({id:crypto.randomUUID(),sequence,stage,type});
 
+test('only completed participants can save a story review',()=>{
+ const{analytics,users}=setup(),user=users[0].id;
+ analytics.start('review','story',1,'solo',null,[{id:user,role:'detective'}],{});
+ expect(()=>analytics.review('review',user,'좋았어요')).toThrow('결말');
+ analytics.finish('review','completed',{});analytics.ending('review',user,'completed');analytics.review('review',user,'좋았어요');
+ expect(analytics.reviews('story')).toEqual([{text:'좋았어요',created_at:100000}]);
+});
+
 test('duplicate and late events preserve visits, separate active/unknown time and keep internal MMR private',()=>{
  const{analytics,users,setTime}=setup();const user=users[0].id;
  analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{title:'Story'});
@@ -74,10 +82,12 @@ test('anonymous runs use an HttpOnly owner cookie, not possession of a run ID',a
 test('multiplayer chat and independent endings retain records after the room is destroyed',async()=>{
  const{analytics,game,users,request}=setup();const[a,b,c]=users;
  const room=game.create(a!,'rehearsal');game.join(b!,room.code);game.command(a!,{type:'start',requestId:'s'});const id=room.sessionId!;
+ expect((await request(`/api/play/sessions/${id}/chat`,{id:crypto.randomUUID(),text:'아직은 기다리자'})).status).toBe(400);
+ game.command(a!,{type:'advance',requestId:'chat-stage'});
  expect((await request(`/api/play/sessions/${id}/chat`,{id:crypto.randomUUID(),text:'단서를 같이 보자'})).status).toBe(200);
  expect((await request(`/api/play/sessions/${id}/chat`,undefined,2)).status).toBe(400);
- game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});
- game.command(a!,{type:'vote',requestId:'3',targetId:b!.id});game.command(b!,{type:'vote',requestId:'4',targetId:a!.id});
+ game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});game.command(a!,{type:'advance',requestId:'3'});
+ game.command(a!,{type:'vote',requestId:'4',targetId:b!.id});game.command(b!,{type:'vote',requestId:'4',targetId:a!.id});
  expect(game.state.sessions[id]!.endedAt).not.toBeNull();expect(analytics.play(id)?.correct).toBeNull();expect(analytics.pending(b!.id)).toBe(id);
  expect(()=>game.command(a!,{type:'return',requestId:'5'})).toThrow();
  await request(`/api/play/sessions/${id}/ending`,{action:'completed'});await request(`/api/play/sessions/${id}/rating`,{rating:5});
@@ -99,7 +109,7 @@ test('abandonment excludes ratings and stale/retention queries distinguish missi
 test('failed room persistence rolls back both the rating and room membership',()=>{
  const{analytics,game,store,users}=setup();const[a,b]=users;
  const room=game.create(a!,'rehearsal');game.join(b!,room.code);game.command(a!,{type:'start',requestId:'s'});const id=room.sessionId!;
- game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});game.command(a!,{type:'vote',requestId:'3',targetId:b!.id});game.command(b!,{type:'vote',requestId:'4',targetId:a!.id});
+ game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});game.command(a!,{type:'advance',requestId:'3'});game.command(a!,{type:'advance',requestId:'4'});game.command(a!,{type:'vote',requestId:'5',targetId:b!.id});game.command(b!,{type:'vote',requestId:'4',targetId:a!.id});
  analytics.ending(id,a!.id,'completed');const save=store.save;store.save=()=>{throw Error('disk full');};
  expect(()=>game.completeRating(a!.id,id,5)).toThrow('disk full');
  expect(game.roomFor(a!.id)?.memberIds).toHaveLength(2);expect(analytics.member(id,a!.id).finished_at).toBeNull();
@@ -164,7 +174,7 @@ test('raw legacy events expire at 90 days while long-lived action totals stay in
 test('wrong or tied multiplayer votes separate completion from assessed correctness',()=>{
  const{analytics,game,users}=setup();const[a,b]=users;const room=game.create(a!,'rehearsal');game.join(b!,room.code);game.command(a!,{type:'start',requestId:'s'});
  const id=room.sessionId!,session=game.state.sessions[id]!;const wrong=session.participants.find(p=>p.roleIndex===0)!.id;
- game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});game.command(a!,{type:'vote',requestId:'3',targetId:wrong});game.command(b!,{type:'vote',requestId:'4',targetId:wrong});
+ game.command(a!,{type:'advance',requestId:'1'});game.command(a!,{type:'advance',requestId:'2'});game.command(a!,{type:'advance',requestId:'3'});game.command(a!,{type:'advance',requestId:'4'});game.command(a!,{type:'vote',requestId:'3',targetId:wrong});game.command(b!,{type:'vote',requestId:'4',targetId:wrong});
  expect(analytics.play(id)?.outcome).toBe('completed');expect(analytics.play(id)?.correct).toBe(0);
  const row=analytics.report('rehearsal').skills[0] as {completionRate:number;successRate:number};expect(row.completionRate).toBe(1);expect(row.successRate).toBe(0);
 });
@@ -211,7 +221,7 @@ test('ongoing legacy multiplayer sessions retain known participants and their ro
  const{store,analytics,game,users}=setup();const previous=new Game(store,storyCatalog);for(const user of users)previous.online.set(user.id,1);
  const[a,b]=users;const room=previous.create(a!,'rehearsal');previous.join(b!,room.code);previous.command(a!,{type:'start',requestId:'old'});previous.command(a!,{type:'advance',requestId:'old-advance'});const id=room.sessionId!,role=previous.snapshot(a!).room!.session!.role;
  game.recoverLegacySessions();expect(analytics.play(id)?.timing_status).toBe('partial');expect(game.snapshot(a!).room!.session!.role).toEqual(role);
- game.command(a!,{type:'advance',requestId:'new-advance'});expect(game.state.sessions[id]!.phase).toBe('voting');expect(analytics.members(id)).toHaveLength(2);
+ game.command(a!,{type:'advance',requestId:'new-advance'});game.command(a!,{type:'advance',requestId:'new-advance-2'});game.command(a!,{type:'advance',requestId:'new-advance-3'});expect(game.state.sessions[id]!.phase).toBe('final_choice');expect(analytics.members(id)).toHaveLength(2);
 });
 
 test('completed legacy recovery uses only the recorded outcome when its immutable ending source is gone',async()=>{

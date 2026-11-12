@@ -23,8 +23,20 @@ export type Session = {
   scenarioId: string;
   scenarioVersion: number;
   participants: { id: string; nickname: string; roleIndex: number }[];
-  phase: "briefing" | "discussion" | "voting" | "reveal";
+  phase: "briefing" | "first_investigation" | "meeting" | "second_investigation" | "final_choice" | "reveal";
   votes: Record<string, string>;
+  finalChoices: Record<string, string>;
+  currentRoomIds: Record<string, string>;
+  resources: Record<string, Record<string, number>>;
+  sharedResources: Record<string, number>;
+  visitedRoomIds: Record<string, string[]>;
+  itemOwners: Record<string, string | null>;
+  consumedItemIds: string[];
+  usedItemIds: string[];
+  itemUseResults: { itemId: string; text: string }[];
+  revealedItemIds: string[];
+  collectedClueIds: string[];
+  phaseEndsAt: number | null;
   endedAt: string | null;
 };
 

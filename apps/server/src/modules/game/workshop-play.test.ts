@@ -108,7 +108,7 @@ test("private, absent, malformed, multiplayer and unsupported branching packages
   expect((await request(f.app, "/sessions", { storyId: hidden.id })).response.status).toBe(400);
   expect((await request(f.app, "/sessions", { storyId: "community-missing" })).response.status).toBe(400);
   const multiplayer = structuredClone(f.source); multiplayer.story.mode = "multiplayer"; multiplayer.story.playerCount = { min: 2, max: 2 }; multiplayer.content.roles = [{ id: "r1", name: "A" }, { id: "r2", name: "B" }];
-  multiplayer.content.mechanics = { type: "roleplay", memories: [{ roleId: "r1", text: "m1" }, { roleId: "r2", text: "m2" }], clues: ["c"], answer: "a", answerRoleId: "r1" };
+  multiplayer.content.mechanics = { type: "roleplay", memories: [{ roleId: "r1", text: "m1" }, { roleId: "r2", text: "m2" }], firstClues: ["c"], secondClues: [], answer: "a", answerRoleId: "r1" };
   const multi = f.create(multiplayer);
   expect((await request(f.app, `/stories/${multi.id}`)).response.status).toBe(422);
   expect(() => f.sessions.start(multi.id)).toThrow();

@@ -13,6 +13,7 @@ afterEach(() => { for (const store of stores.splice(0)) store.close(); });
 const MEMORY_A = "MEMORY-A: 너는 6시에 매표소를 떠났다.";
 const MEMORY_B = "MEMORY-B: 너는 6시 5분에 무대 서랍을 열었다.";
 const CLUE = "CLUE-1: 출입 기록에는 무대 담당자의 이름이 있다.";
+const SECOND_CLUE = "CLUE-2: 서랍 손잡이에 빗물이 남아 있다.";
 const ANSWER = "ANSWER-SECRET: 초대장을 옮긴 사람은 무대 담당자다.";
 
 function roleplayPackage(): StoryPackage {
@@ -24,18 +25,29 @@ function roleplayPackage(): StoryPackage {
   source.content.mechanics = {
     type: "roleplay",
     memories: [{ roleId: "r1", text: MEMORY_A }, { roleId: "r2", text: MEMORY_B }],
-    clues: [CLUE],
+    firstClues: [CLUE],
+    secondClues: [SECOND_CLUE],
     answer: ANSWER,
     answerRoleId: "r2",
   };
-  source.content.items = [{ id: "key", name: "무대 서랍 열쇠", description: "서랍을 여는 열쇠다.", visibleTo: { type: "all" }, transfer: { mode: "never" }, initialOwnerRoleId: "r2" }];
+  source.content.items = [
+    { id: "key", name: "무대 서랍 열쇠", description: "서랍을 여는 열쇠다.", visibleTo: { type: "all" }, transfer: { mode: "owner_choice", toRoleIds: ["r1"] }, initialOwnerRoleId: "r2", use: { label: "서랍 열기", result: "서랍 안쪽에서 젖은 초대장을 발견했다." } },
+    { id: "seal", name: "봉인 스티커", description: "조합에 쓰인다.", visibleTo: { type: "all" }, transfer: { mode: "anyone" }, initialOwnerRoleId: "r2" },
+    { id: "drawer-open", name: "열린 서랍", description: "조합 결과다.", visibleTo: { type: "all" }, transfer: { mode: "never" } },
+  ];
+  source.content.mechanics.itemRecipes = [{ id: "open-drawer", itemIds: ["key", "seal"], resultItemId: "drawer-open" }];
   return storyPackageSchema.parse(source);
 }
 
-function setup() {
+function setup(stageDurations?: { firstInvestigationSeconds?: number; meetingSeconds?: number; secondInvestigationSeconds?: number }, meetingPrompt?: string, configure?: (pkg: StoryPackage) => void) {
   const store = new Store(":memory:");
   stores.push(store);
   const pkg = roleplayPackage();
+  if (pkg.content.mechanics.type === "roleplay") {
+    pkg.content.mechanics.stageDurations = stageDurations;
+    pkg.content.mechanics.meetingPrompt = meetingPrompt;
+  }
+  configure?.(pkg);
   const catalog = withRoleplayPackages(storyCatalog, {
     list: () => [{ id: pkg.story.id, version: pkg.story.version, mode: "multiplayer" }],
     get: () => pkg,
@@ -46,14 +58,15 @@ function setup() {
   const room = game.create(a, pkg.story.id);
   game.join(b, room.code);
   game.command(a, { type: "start", requestId: crypto.randomUUID() });
-  return { game, a, b };
+  return { game, a, b, pkg };
 }
 
-test("a roleplay package maps each role to its own memory, shared clues and the answer role", () => {
+test("a roleplay package maps each role to its own memory, staged clues and the answer role", () => {
   const version = roleplayStoryVersion(roleplayPackage());
   expect(version?.scenario.players).toBe(2);
   expect(version?.content.roles.map((role) => role.secret)).toEqual([MEMORY_A, MEMORY_B]);
-  expect(version?.content.clues).toEqual([CLUE]);
+  expect(version?.content.firstClues).toEqual([{ id: "first-1", text: CLUE }]);
+  expect(version?.content.secondClues).toEqual([{ id: "second-1", text: SECOND_CLUE }]);
   expect(version?.content.answerRoleIndex).toBe(1);
 });
 
@@ -80,13 +93,23 @@ test("each participant sees only their own memory during the briefing", () => {
   expect(JSON.stringify(game.snapshot(b))).not.toContain(viewA.role.secret);
 });
 
-test("clues stay hidden in the briefing and the answer stays hidden until the reveal", () => {
+test("clues unlock in their investigation stages and the answer stays hidden until the reveal", () => {
   const { game, a, b } = setup();
   expect(game.snapshot(a).room!.session!.clues).toEqual([]);
   expect(JSON.stringify(game.snapshot(a))).not.toContain(ANSWER);
   expect(JSON.stringify(game.snapshot(b))).not.toContain(ANSWER);
   game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.clues).toEqual([]);
+  expect(() => game.command(a, { type: "collect-clue", requestId: crypto.randomUUID() })).not.toThrow();
   expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE]);
+  game.command(b, { type: "collect-clue", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.clues).toEqual([CLUE, SECOND_CLUE]);
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(() => game.command(a, { type: "collect-clue", requestId: crypto.randomUUID() })).toThrow("조사 단계");
   expect(JSON.stringify(game.snapshot(b))).not.toContain(ANSWER);
 });
 
@@ -100,6 +123,75 @@ test("an item reaches only the role that owns it", () => {
   expect(nonOwner.items).toEqual([]);
   const nonOwnerViewer = owners[0] === viewA ? b : a;
   expect(JSON.stringify(game.snapshot(nonOwnerViewer))).not.toContain("무대 서랍 열쇠");
+});
+
+test("the server validates transfer and consumes recipe inputs", () => {
+  const { game, a, b } = setup();
+  const session = game.state.sessions[game.needRoom(a.id).sessionId!]!;
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  const ownerId = session.itemOwners.key!;
+  const owner = ownerId === a.id ? a : b;
+  const other = (session.participants.find((p) => p.roleIndex === 0)!.id === a.id ? a : b);
+  expect(() => game.command(other, { type: "transfer-item", itemId: "key", targetId: owner.id, requestId: crypto.randomUUID() })).toThrow("네가 가진");
+  game.command(owner, { type: "transfer-item", itemId: "key", targetId: other.id, requestId: crypto.randomUUID() });
+  game.command(owner, { type: "transfer-item", itemId: "seal", targetId: other.id, requestId: crypto.randomUUID() });
+  expect(session.itemOwners.key).toBe(other.id);
+  expect(() => game.command(owner, { type: "combine-items", recipeId: "open-drawer", requestId: crypto.randomUUID() })).toThrow("재료");
+  game.command(other, { type: "combine-items", recipeId: "open-drawer", requestId: crypto.randomUUID() });
+  expect(session.itemOwners["drawer-open"]).toBe(other.id);
+  expect(session.consumedItemIds).toEqual(expect.arrayContaining(["key", "seal"]));
+  expect(game.snapshot(owner).room!.session!.collectableItems.map((item) => item.id)).not.toContain("key");
+});
+
+test("only an owner can use an item once and the configured result is shared", () => {
+  const { game, a, b } = setup();
+  const session = game.state.sessions[game.needRoom(a.id).sessionId!]!;
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  const owner = session.itemOwners.key === a.id ? a : b;
+  const other = owner.id === a.id ? b : a;
+  expect(() => game.command(other, { type: "use-item", itemId: "key", requestId: crypto.randomUUID() })).toThrow("네가 가진");
+  game.command(owner, { type: "use-item", itemId: "key", requestId: crypto.randomUUID() });
+  expect(game.snapshot(other).room!.session!.itemUseResults).toEqual([{ itemId: "key", text: "서랍 안쪽에서 젖은 초대장을 발견했다." }]);
+  expect(game.snapshot(owner).room!.session!.items.map((item) => item.id)).not.toContain("key");
+  expect(() => game.command(owner, { type: "use-item", itemId: "key", requestId: crypto.randomUUID() })).toThrow("네가 가진");
+});
+
+test("room resources are server-checked, shared rewards apply once, and room items require entry", () => {
+  const { game, a, b } = setup(undefined, undefined, (pkg) => {
+    if (pkg.content.mechanics.type === "roleplay") {
+      pkg.content.mechanics.resources = [
+        { id: "focus", name: "집중력", initialValue: 2, scope: "personal" },
+        { id: "trust", name: "신뢰", initialValue: 0, scope: "shared" },
+      ];
+      pkg.content.mechanics.rooms = [{ id: "drawer", name: "무대 서랍", requiredClueIds: [], itemIds: ["drawer-open"], entryCost: [{ resourceId: "focus", amount: 2 }], entryReward: [{ resourceId: "trust", amount: 1 }], entryPenalty: [] }];
+    }
+  });
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(() => game.command(a, { type: "collect-item", itemId: "drawer-open", requestId: crypto.randomUUID() })).toThrow("방으로 이동");
+  game.command(a, { type: "move-room", roomId: "drawer", requestId: crypto.randomUUID() });
+  const first = game.snapshot(a).room!.session!;
+  expect(first.resources).toEqual(expect.arrayContaining([{ id: "focus", name: "집중력", value: 0, scope: "personal" }, { id: "trust", name: "신뢰", value: 1, scope: "shared" }]));
+  expect(game.snapshot(b).room!.session!.resources.find((resource) => resource.id === "trust")?.value).toBe(1);
+  game.command(a, { type: "collect-item", itemId: "drawer-open", requestId: crypto.randomUUID() });
+  expect(() => game.command(a, { type: "move-room", roomId: "drawer", requestId: crypto.randomUUID() })).toThrow("자원이 부족");
+});
+
+test("an expired configured investigation advances on the server", () => {
+  const { game, a } = setup({ firstInvestigationSeconds: 30 });
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  const session = game.state.sessions[game.needRoom(a.id).sessionId!]!;
+  expect(session.phaseEndsAt).not.toBeNull();
+  expect(game.expireTimedStages(session.phaseEndsAt! - 1)).toEqual([]);
+  expect(game.expireTimedStages(session.phaseEndsAt!)).toHaveLength(1);
+  expect(session.phase).toBe("meeting");
+  expect(session.phaseEndsAt).toBeNull();
+});
+
+test("a meeting shows only the configured prompt to participants", () => {
+  const { game, a, b } = setup(undefined, "발견한 사실만 말하고, 추측은 나중에 정리하세요.");
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  game.command(a, { type: "advance", requestId: crypto.randomUUID() });
+  expect(game.snapshot(b).room!.session!.meetingPrompt).toBe("발견한 사실만 말하고, 추측은 나중에 정리하세요.");
 });
 
 test("a newer published version is offered, while an older session can still load its own version", () => {

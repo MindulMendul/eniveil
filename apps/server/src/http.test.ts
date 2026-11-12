@@ -146,6 +146,8 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, independ
     expect(reconnected.latest.room!.session!.id).toBe(id);
     await send(aa, "advance");
     await send(aa, "advance");
+    await send(aa, "advance");
+    await send(aa, "advance");
     await send(aa, "vote", b.me.id);
     expect(aa.latest.room!.session!.result).toBeNull();
     await send(reconnected, "vote", a.me.id);
@@ -199,9 +201,9 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, independ
     process.kill();
     await process.exited;
   }
-}, 15000);
+}, 25000);
 async function wait(predicate: () => boolean) {
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 500; i++) {
     if (predicate()) return;
     await Bun.sleep(20);
   }

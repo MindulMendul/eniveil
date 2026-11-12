@@ -95,6 +95,14 @@ const storyContentSchema = z.strictObject({
         z.strictObject({ mode: z.literal("owner_choice"), toRoleIds: z.array(storyId) }),
         z.strictObject({ mode: z.literal("anyone") }),
       ]),
+      /** Optional once-per-session action available only to the current owner. */
+      use: z
+        .strictObject({
+          label: text,
+          result: text,
+          consumes: z.boolean().default(true),
+        })
+        .optional(),
     }),
   ),
   mechanics: z.discriminatedUnion("type", [
@@ -148,8 +156,38 @@ const storyContentSchema = z.strictObject({
       type: z.literal("roleplay"),
       /** One memory per role. Shown only to the role's owner; never sent to other players. */
       memories: z.array(z.strictObject({ roleId: storyId, text })).min(2),
-      /** Shared clues opened during the investigation stages. */
-      clues: z.array(text).min(1),
+      /** Clues visible from the first investigation onward. */
+      firstClues: z.array(z.union([text, z.strictObject({ id: storyId, text, resourceCost: z.strictObject({ resourceId: storyId, amount: z.number().int().positive() }).optional(), resourceReward: z.strictObject({ resourceId: storyId, amount: z.number().int().positive() }).optional() })])).default([]),
+      /** Clues that unlock only after the meeting, in the second investigation. */
+      secondClues: z.array(z.union([text, z.strictObject({ id: storyId, text, resourceCost: z.strictObject({ resourceId: storyId, amount: z.number().int().positive() }).optional(), resourceReward: z.strictObject({ resourceId: storyId, amount: z.number().int().positive() }).optional() })])).default([]),
+      /** Legacy one-stage clue list. New packages use firstClues or secondClues. */
+      clues: z.array(text).optional(),
+      stageDurations: z
+        .strictObject({
+          firstInvestigationSeconds: z.number().int().min(30).max(3600).optional(),
+          meetingSeconds: z.number().int().min(30).max(3600).optional(),
+          secondInvestigationSeconds: z.number().int().min(30).max(3600).optional(),
+        })
+        .optional(),
+      meetingPrompt: text.optional(),
+      finalChoices: z.array(z.strictObject({ id: storyId, label: text, outcome: text })).max(12).optional(),
+      rooms: z.array(z.strictObject({
+        id: storyId,
+        name: text,
+        description: text.optional(),
+        requiredClueIds: z.array(storyId).default([]),
+        itemIds: z.array(storyId).default([]),
+        entryCost: z.array(z.strictObject({ resourceId: storyId, amount: z.number().int().positive() })).default([]),
+        entryReward: z.array(z.strictObject({ resourceId: storyId, amount: z.number().int().positive() })).default([]),
+        entryPenalty: z.array(z.strictObject({ resourceId: storyId, amount: z.number().int().positive() })).default([]),
+      })).max(30).optional(),
+      resources: z.array(z.strictObject({
+        id: storyId,
+        name: text,
+        initialValue: z.number().int().min(0).max(999),
+        scope: z.enum(["personal", "shared"]).default("personal"),
+      })).max(12).optional(),
+      itemRecipes: z.array(z.strictObject({ id: storyId, itemIds: z.array(storyId).min(2), resultItemId: storyId })).max(20).optional(),
       answer: text,
       answerRoleId: storyId,
     }),
@@ -289,12 +327,29 @@ export const storyPackageSchema = z
       if (roleIds.some((id) => !memoryRoleIds.includes(id))) {
         ctx.addIssue({ code: "custom", path: ["content", "mechanics", "memories"], message: "모든 역할에 기억 내용이 하나씩 필요해." });
       }
+      if (mechanics.firstClues.length + mechanics.secondClues.length + (mechanics.clues?.length ?? 0) < 1) {
+        ctx.addIssue({ code: "custom", path: ["content", "mechanics"], message: "1차 또는 2차 조사에 공개할 단서가 하나 이상 필요해." });
+      }
       if (roleIds.length !== story.story.playerCount.max) {
         ctx.addIssue({ code: "custom", path: ["content", "roles"], message: "역할 수는 최대 인원과 같아야 해." });
       }
       if (!exists(mechanics.answerRoleId, roleIds)) {
         ctx.addIssue({ code: "custom", path: ["content", "mechanics", "answerRoleId"], message: "정답 역할을 찾을 수 없어." });
       }
+      const resourceIds = (mechanics.resources ?? []).map((resource) => resource.id);
+      (mechanics.rooms ?? []).forEach((room, index) => {
+        if (room.requiredClueIds.some((id) => !mechanics.firstClues.concat(mechanics.secondClues).some((clue) => (typeof clue === "string" ? false : clue.id === id)))) {
+          ctx.addIssue({ code: "custom", path: ["content", "mechanics", "rooms", index, "requiredClueIds"], message: "방 해금에 필요한 단서를 찾을 수 없어." });
+        }
+        if (room.itemIds.some((id) => !exists(id, itemIds))) {
+          ctx.addIssue({ code: "custom", path: ["content", "mechanics", "rooms", index, "itemIds"], message: "방 아이템을 찾을 수 없어." });
+        }
+        for (const [kind, changes] of [["entryCost", room.entryCost], ["entryReward", room.entryReward], ["entryPenalty", room.entryPenalty]] as const) {
+          if (changes.some((change) => !exists(change.resourceId, resourceIds))) {
+            ctx.addIssue({ code: "custom", path: ["content", "mechanics", "rooms", index, kind], message: "방 자원을 찾을 수 없어." });
+          }
+        }
+      });
     }
   });
 

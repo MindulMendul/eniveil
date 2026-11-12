@@ -33,8 +33,10 @@ export const playEventSchema = z.object({
     "fail",
     "rating",
     "briefing",
-    "discussion",
-    "voting",
+    "first_investigation",
+    "meeting",
+    "second_investigation",
+    "final_choice",
     "reveal",
   ]),
   target: z.string().max(100).optional(),
@@ -46,6 +48,7 @@ export const playEventBatchSchema = z.object({
 export const playRatingSchema = z.object({
   rating: z.number().int().min(1).max(5).nullable(),
 });
+export const playReviewSchema = z.object({ text: z.string().trim().min(1).max(1000) });
 export const playChatSchema = z.object({
   id: z.uuid(),
   text: z.string().trim().min(1).max(1000),

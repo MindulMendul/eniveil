@@ -11,6 +11,15 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
   if (source.story.mode !== "multiplayer" || mechanics.type !== "roleplay") return null;
   const memoryByRole = new Map(mechanics.memories.map((item) => [item.roleId, item.text]));
   const roleIndex = new Map(source.content.roles.map((role, index) => [role.id, index]));
+  const normalizeClues = (
+    clues: (string | { id: string; text: string; resourceCost?: { resourceId: string; amount: number }; resourceReward?: { resourceId: string; amount: number } })[],
+    stage: "first" | "second",
+  ) =>
+    clues.map((clue, index) =>
+      typeof clue === "string"
+        ? { id: `${stage}-${index + 1}`, text: clue }
+        : clue,
+    );
   const scenario: Scenario = {
     id: source.story.id,
     version: source.story.version,
@@ -29,13 +38,28 @@ export function roleplayStoryVersion(source: StoryPackage): StoryVersion | null 
         name: role.name,
         secret: memoryByRole.get(role.id) ?? "",
       })),
-      clues: mechanics.clues,
+      // `clues` keeps already published one-stage packages playable. New packages
+      // declare each investigation's clues separately.
+      firstClues: normalizeClues(
+        mechanics.firstClues.length ? mechanics.firstClues : (mechanics.clues ?? []),
+        "first",
+      ),
+      secondClues: normalizeClues(mechanics.secondClues, "second"),
+      stageDurations: mechanics.stageDurations,
+      meetingPrompt: mechanics.meetingPrompt,
+      finalChoices: mechanics.finalChoices,
+      rooms: mechanics.rooms,
+      resources: mechanics.resources?.map((resource) => ({ ...resource, scope: resource.scope ?? "personal" })),
+      itemRecipes: mechanics.itemRecipes,
       answer: mechanics.answer,
       answerRoleIndex: roleIndex.get(mechanics.answerRoleId),
       items: source.content.items.map((item) => ({
+        id: item.id,
         name: item.name,
         description: item.description ?? "",
         ownerRoleIndex: item.initialOwnerRoleId ? roleIndex.get(item.initialOwnerRoleId) : undefined,
+        transfer: item.transfer.mode === "owner_choice" ? { mode: item.transfer.mode, targetRoleIndexes: item.transfer.toRoleIds.map((id) => roleIndex.get(id)).filter((id): id is number => id !== undefined) } : { mode: item.transfer.mode },
+        use: item.use,
       })),
     },
   };

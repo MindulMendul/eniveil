@@ -50,6 +50,8 @@ export class PlayAnalytics {
       CREATE INDEX IF NOT EXISTS play_ui_open ON play_ui_visits(session_id,user_id,client_id,exited);
       CREATE TABLE IF NOT EXISTS play_action_totals(session_id TEXT NOT NULL,user_id TEXT NOT NULL,stage TEXT NOT NULL,type TEXT NOT NULL,count INTEGER NOT NULL,PRIMARY KEY(session_id,user_id,stage,type));
       CREATE TABLE IF NOT EXISTS play_skill(user_id TEXT PRIMARY KEY,completed INTEGER NOT NULL,wins INTEGER NOT NULL,mmr REAL);
+      CREATE TABLE IF NOT EXISTS play_reviews(session_id TEXT NOT NULL,user_id TEXT NOT NULL,story_id TEXT NOT NULL,text TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(session_id,user_id));
+      CREATE INDEX IF NOT EXISTS play_reviews_story ON play_reviews(story_id,created_at);
     `);
     if (
       !(
@@ -665,6 +667,14 @@ export class PlayAnalytics {
         { rating },
       );
     });
+  }
+  review(id: string, user: string, text: string) {
+    const play = this.play(id), member = this.member(id, user);
+    if (!play?.ended || play.outcome !== "completed" || !member.ending_at) throw new Error("결말을 완료한 참가자만 후기를 남길 수 있어.");
+    this.db.query("INSERT INTO play_reviews(session_id,user_id,story_id,text,created_at) VALUES(?,?,?,?,?) ON CONFLICT(session_id,user_id) DO UPDATE SET text=excluded.text,created_at=excluded.created_at").run(id, user, play.story_id, text, this.now());
+  }
+  reviews(storyId: string) {
+    return this.db.query("SELECT text,created_at FROM play_reviews WHERE story_id=? ORDER BY created_at DESC LIMIT 20").all(storyId) as { text: string; created_at: number }[];
   }
   view(id: string, user: string) {
     const play = this.play(id),
