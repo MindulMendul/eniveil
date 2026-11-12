@@ -3,13 +3,16 @@ import type { Guest } from "@festival/shared";
 export type Room = {
   access?: import("@festival/shared").RoomAccess;
   pinHash?: string;
-  pinFailures?: { count: number; until: number };
+  /** Failed secret-room PIN attempts, scoped to a joining guest. */
+  pinFailures?: Record<string, { count: number; until: number }>;
   id: string;
   code: string;
   hostId: string;
   scenarioId: string;
   /** The story version chosen when the room was created; rooms saved before this field use the newest version. */
   scenarioVersion?: number;
+  /** Seats chosen at creation. Rooms saved before this field use the pinned story's player count. */
+  capacity?: number;
   memberIds: string[];
   sessionId: string | null;
   mode?: "solo" | "multiplayer";

@@ -18,13 +18,14 @@ export function createLobbyRoutes(deps: {
   store: Store;
   game: Game;
   notifyTemporal: (action: TemporalAction, payload: object) => void;
+  consentGrant?: (c: Context) => {key: string; expires: number} | null;
 }) {
   const app = new Hono<ApiEnv>();
   const { upgradeWebSocket, websocket } = createBunWebSocket();
-  const sockets = new Map<WSContext, { guest: Guest; expires: number; lobby: boolean }>();
+  const sockets = new Map<WSContext, { guest: Guest; expires: number; lobby: boolean; grant: {key: string; expires: number} | null }>();
   const broadcast = () => {
-    for (const [ws, { guest, expires }] of sockets) {
-      if (expires <= Date.now()) { ws.close(1008, "Expired"); continue; }
+    for (const [ws, { guest, expires, grant }] of sockets) {
+      if (expires <= Date.now() || (grant !== null && grant.expires <= Date.now())) { ws.close(1008, "Expired"); continue; }
       try {
         ws.send(JSON.stringify({ type: "snapshot", data: deps.game.snapshot(guest) }));
       } catch {
@@ -140,14 +141,16 @@ export function createLobbyRoutes(deps: {
       await next();
     },
     upgradeWebSocket((c) => {
+      const grant = deps.consentGrant?.(c) ?? null;
       const guest = c.get("guest");
       let connection: WSContext | undefined;
       let last = 0;
       let count = 0;
       return {
         onOpen(_event, ws) {
+          if (deps.consentGrant && !grant) { ws.close(1008,"Consent required"); return; }
           connection = ws;
-          sockets.set(ws, { guest, lobby: false, expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
+          sockets.set(ws, { guest, lobby: false, grant, expires: deps.store.sessionExpiry(getCookie(c, "festival_guest")) });
           presence.connect(guest.id);
           availabilityChanged(guest.id);
           broadcast();
@@ -155,7 +158,7 @@ export function createLobbyRoutes(deps: {
         onMessage(event, ws) {
           let requestId: string | undefined;
           try {
-            if (!authenticate(c)) {
+            if (!authenticate(c) || (sockets.get(connection ?? ws)?.expires ?? 0) <= Date.now() || (grant !== null && grant.expires <= Date.now())) {
               ws.close(1008, "Expired");
               return;
             }
@@ -230,5 +233,10 @@ export function createLobbyRoutes(deps: {
       ws.close(1008, "Signed out");
     }
   };
-  return { app, websocket, broadcast, disconnect, connectionCount: () => sockets.size };
+  const disconnectConsent = (key: string) => {
+    for (const [ws,entry] of sockets) {
+      if (entry.grant?.key === key) { entry.expires = 0; ws.close(1008,'Consent changed'); }
+    }
+  };
+  return { app, websocket, broadcast, disconnect, disconnectConsent, connectionCount: () => sockets.size };
 }

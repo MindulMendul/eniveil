@@ -77,6 +77,18 @@
       await load(); message = label('요청을 처리했어요.', 'Request updated.');
     });
   }
+  async function cancel(person: Person) {
+    await action(async () => {
+      await api(`/requests/${person.id}/cancel`, {});
+      await load(); message = label('친구 요청을 취소했어요.', 'Friend request cancelled.');
+    });
+  }
+  async function remove(person: Person) {
+    await action(async () => {
+      await api(`/friends/${person.id}/remove`, {});
+      await load(); message = label('친구를 삭제했어요.', 'Friend removed.');
+    });
+  }
 </script>
 
 <div class="friends-panel">
@@ -94,15 +106,15 @@
     <h3>{label('받은 요청', 'Incoming requests')} ({incoming.length})</h3>
     <ul>{#each incoming as person (person.id)}<li><span>{person.nickname}</span><div><Button disabled={busy} onclick={() => void respond(person,true)} aria-label={`${person.nickname} ${label('수락', 'Accept')}`}>{label('수락', 'Accept')}</Button><Button variant="secondary" disabled={busy} onclick={() => void respond(person,false)} aria-label={`${person.nickname} ${label('거절', 'Reject')}`}>{label('거절', 'Reject')}</Button></div></li>{/each}</ul>
     <h3>{label('보낸 요청', 'Sent requests')} ({outgoing.length})</h3>
-    <ul>{#each outgoing as person (person.id)}<li>{person.nickname}</li>{/each}</ul>
+    <ul>{#each outgoing as person (person.id)}<li><span>{person.nickname}</span><Button variant="secondary" disabled={busy} onclick={() => void cancel(person)}>{label('요청 취소', 'Cancel request')}</Button></li>{/each}</ul>
     {#if poll}
       <h3>{label('온라인', 'Online')} ({friends.filter(person => person.online).length})</h3>
-      <ul>{#each friends.filter(person => person.online) as person (person.id)}<li>{person.nickname}</li>{/each}</ul>
+      <ul>{#each friends.filter(person => person.online) as person (person.id)}<li><span>{person.nickname}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
       <h3>{label('오프라인', 'Offline')} ({friends.filter(person => !person.online).length})</h3>
-      <ul>{#each friends.filter(person => !person.online) as person (person.id)}<li>{person.nickname}</li>{/each}</ul>
+      <ul>{#each friends.filter(person => !person.online) as person (person.id)}<li><span>{person.nickname}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
     {:else}
       <h3>{label('친구', 'Friends')} ({friends.length})</h3>
-      <ul>{#each friends as person (person.id)}<li>{person.nickname}</li>{/each}</ul>
+      <ul>{#each friends as person (person.id)}<li><span>{person.nickname}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
     {/if}
     {#if !friends.length && !error && !listError}<p>{label('친구가 없어요.', 'No friends yet.')}</p>{/if}
     <Button variant="secondary" disabled={busy} onclick={() => void action(load)}>{label('새로고침', 'Refresh')}</Button>

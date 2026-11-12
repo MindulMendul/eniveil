@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { allowsService } from "../shared/analytics/consent";
   import { WORKSHOP_AUTHORING_ENABLED } from "@festival/shared/features";
   import PlayEnding from "../features/game/PlayEnding.svelte";
   import RoomSocial from "../features/friends/RoomSocial.svelte";
@@ -72,6 +73,11 @@
   let entryHome = $derived(currentPath === "/" && snapshot === null);
   let editorHasChanges = $state(false);
   let editorId = $state<string | undefined>(new URLSearchParams(location.search).get("id") ?? undefined);
+  let consentAccount: string | null | undefined = undefined;
+  $effect(() => {
+    const id = account.me?.id ?? null;
+    if (consentAccount !== id) { consentAccount = id; window.dispatchEvent(new Event('consent:account')); }
+  });
   $effect(() => { syncMetadata(localePath(locale, currentPath)); });
   const t = (key: string) => translate(locale, key as Parameters<typeof translate>[1]);
 
@@ -143,7 +149,8 @@
     const data = await response.json();
     if (!currentAuth(generation)) throw new DOMException("Cancelled account request", "AbortError");
     if (!response.ok) {
-      throw Object.assign(new Error(data.error ?? "요청에 실패했어."), { status: response.status });
+      if (data.code === 'FULL_CONSENT_REQUIRED') { window.dispatchEvent(new Event('consent:account')); window.dispatchEvent(new Event('consent:required')); }
+      throw Object.assign(new Error(data.code === 'FULL_CONSENT_REQUIRED' ? (locale === 'en' ? 'Full consent is required to use this service.' : '서비스 이용에는 전체 동의가 필요합니다.') : data.error ?? "요청에 실패했어."), { status: response.status, code: data.code });
     }
     return data;
   }
@@ -202,14 +209,15 @@
         error = "서버 응답을 확인할 수 없어.";
       }
     };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (!currentAuth(generation)) return;
+      if (event.code === 1008) window.dispatchEvent(new Event('consent:account'));
       connected = false;
       for (const timeout of pending.values()) clearTimeout(timeout);
       pending.clear();
       soloStartRequest = null;
       busy = false;
-      if (!disposed) {
+      if (!disposed && allowsService()) {
         reconnectTimer = setTimeout(async () => {
           try {
             const next = await api("/lobby/state");
@@ -327,7 +335,7 @@
     const nextAccount = await api("/platform/account");
     if (!currentAuth(generation)) return;
     account = nextAccount;
-    if (account.me && !account.needsNickname) {
+    if (account.me && !account.needsNickname && allowsService()) {
       const next = await api("/lobby/state");
       if (!currentAuth(generation)) return;
       snapshot = next;
@@ -389,6 +397,7 @@
     } catch { /* Ignore an invalid saved destination; never navigate to an arbitrary URL. */ }
   }
   async function googleLogin() {
+    if (!allowsService()) { window.dispatchEvent(new Event('consent:required')); return; }
     if (authConfig.google) { rememberGoogleAction(); location.assign(`/api/platform/auth/google?locale=${locale}`); return; }
     await action(async () => {
       if (!authConfig.demo) throw Error(locale === "en" ? "Google sign-in is not configured. Please use guest sign-in." : "구글 로그인 설정이 필요해요. 게스트 로그인을 이용해 주세요.");
@@ -422,6 +431,7 @@
     });
   }
   async function login() {
+    if (!allowsService()) { window.dispatchEvent(new Event('consent:required')); return; }
     const resume = loginDialog?.open ? pendingWorkshopAction : undefined;
     pendingWorkshopAction = undefined;
     await action(async () => {
@@ -490,6 +500,15 @@
   }
 
   onMount(() => {
+    const syncCollectionState = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if ((detail?.pending || detail?.error) && !detail?.restricting && !detail?.forceUnload) return;
+      if (allowsService()) { void action(loadAccount); return; }
+      if (socket) { socket.onclose = null; socket.close(); }
+      clearTimeout(reconnectTimer);
+      snapshot = null;
+    };
+    window.addEventListener('consent:changed', syncCollectionState);
     const rememberFocus = (event: FocusEvent) => {
       const target = event.target;
       lastFocusedControl = target instanceof HTMLElement && target.closest('main') ? target : null;
@@ -521,7 +540,7 @@
       } catch (cause) {
         if (!currentAuth(generation)) return;
         if ((cause as { status?: number }).status !== 401) {
-          error = "서버에 연결할 수 없어. 잠시 후 새로고침해 줘.";
+          error = (cause as {code?:string}).code === 'FULL_CONSENT_REQUIRED' ? (locale === 'en' ? 'Full consent is required to sign in and play.' : '로그인·플레이에는 전체 동의가 필요합니다.') : '서버에 연결할 수 없어. 잠시 후 새로고침해 줘.';
         }
       } finally {
         if (currentAuth(generation)) {
@@ -535,6 +554,7 @@
       focusObserver.disconnect();
       shell?.removeEventListener('focusin', rememberFocus);
       disposed = true;
+      window.removeEventListener('consent:changed', syncCollectionState);
       authGeneration++;
       authRequests.abort();
       window.removeEventListener("popstate", syncLocale);
@@ -581,10 +601,10 @@
         <NicknameSetup bind:nickname {locale} {busy} onRename={rename} onLogout={() => void logout()} />
       {/snippet}
     </LazyContent>
-  {:else if currentPath === "/mypage" && snapshot}
+  {:else if currentPath === "/mypage" && account.me}
     <LazyContent load={loadAccountPage} {locale}>
       {#snippet children({ default: MyPage })}
-        {#if snapshot}<MyPage onAuthLost={handleAuthLost} me={snapshot.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />{/if}
+        {#if account.me}<MyPage onAuthLost={handleAuthLost} me={account.me} accountType={account.accountType} {locale} {busy} onRename={rename} onLogout={() => logout()} onDeleteAccount={() => logout(true)} onEdit={openEditor} onWorkshop={openWorkshop} />{/if}
       {/snippet}
     </LazyContent>
   {:else if currentPath === "/workshop" && workshopPlayId && room}

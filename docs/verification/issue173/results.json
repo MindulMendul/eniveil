@@ -1,0 +1,54 @@
+[
+  {
+    "en": false,
+    "width": 320,
+    "firstVisitModal": true,
+    "axe": 0,
+    "basicBlocksService": true,
+    "googleSignInBlockedUntilFull": true,
+    "fullAllowsLogin": true,
+    "noSecondConsentOnLogin": true,
+    "crossTabDowngrade": true,
+    "withdrawal": true,
+    "accountSettingsAccessible": true
+  },
+  {
+    "en": false,
+    "width": 1440,
+    "firstVisitModal": true,
+    "axe": 0,
+    "basicBlocksService": true,
+    "googleSignInBlockedUntilFull": true,
+    "fullAllowsLogin": true,
+    "noSecondConsentOnLogin": true,
+    "crossTabDowngrade": true,
+    "withdrawal": true,
+    "accountSettingsAccessible": true
+  },
+  {
+    "en": true,
+    "width": 320,
+    "firstVisitModal": true,
+    "axe": 0,
+    "basicBlocksService": true,
+    "googleSignInBlockedUntilFull": true,
+    "fullAllowsLogin": true,
+    "noSecondConsentOnLogin": true,
+    "crossTabDowngrade": true,
+    "withdrawal": true,
+    "accountSettingsAccessible": true
+  },
+  {
+    "en": true,
+    "width": 1440,
+    "firstVisitModal": true,
+    "axe": 0,
+    "basicBlocksService": true,
+    "googleSignInBlockedUntilFull": true,
+    "fullAllowsLogin": true,
+    "noSecondConsentOnLogin": true,
+    "crossTabDowngrade": true,
+    "withdrawal": true,
+    "accountSettingsAccessible": true
+  }
+]

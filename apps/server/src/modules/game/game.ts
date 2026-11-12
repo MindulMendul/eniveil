@@ -21,9 +21,14 @@ export class Game {
   get state(): State {
     return this.store.state;
   }
+  /** Seats are fixed when the room is created, so a fallback version cannot change them. */
+  private roomCapacity(room: Room) {
+    return room.capacity ?? this.roomStory(room).scenario.players;
+  }
   /** A room keeps the version it was created with, so later publishes cannot change its seats or content. */
   private roomStory(room: Room) {
-    return this.storyCatalog.get(room.scenarioId, room.scenarioVersion)!;
+    // A pinned version can disappear after a rollback. Fall back to the current version so one stale room cannot break every lobby view.
+    return this.storyCatalog.get(room.scenarioId, room.scenarioVersion) ?? this.storyCatalog.get(room.scenarioId)!;
   }
   roomFor(id: string) {
     return Object.values(this.state.rooms).find((r) =>
@@ -79,7 +84,7 @@ export class Game {
       code: r.code,
       title: r.mode === "solo" ? supportedSoloStory.title : s.title,
       count: r.memberIds.length,
-      capacity: r.mode === "solo" ? 1 : s.players,
+      capacity: r.mode === "solo" ? 1 : this.roomCapacity(r),
       status: r.sessionId || r.soloStarted ? "playing" : "waiting",
     };
   }
@@ -327,6 +332,7 @@ export class Game {
       ...(access === "secret" ? { pinHash: this.hashPin(code, pin!) } : {}),
       scenarioId,
       scenarioVersion: scenario.version,
+      capacity: scenario.players,
       mode: scenarioId === supportedSoloStory.id ? "solo" : "multiplayer",
       memberIds: [me.id],
       sessionId: null,
@@ -347,31 +353,41 @@ export class Game {
     if (this.roomFor(me.id)) throw new Error("현재 방에서 먼저 나가 줘.");
     if (r.access === "friends" && !this.store.areFriends?.(r.hostId, me.id))
       throw new Error("방장의 친구만 입장할 수 있어.");
-    if (r.access === "secret") {
-      const now = Date.now();
-      if (r.pinFailures && r.pinFailures.until <= now) delete r.pinFailures;
-      if (r.pinFailures && r.pinFailures.count >= 10)
-        throw new Error("PIN 입력이 잠겼어. 10분 뒤 다시 시도해 줘.");
-      if (
-        !r.pinHash ||
-        !timingSafeEqual(
-          Buffer.from(r.pinHash),
-          Buffer.from(this.hashPin(r.code, pin ?? "")),
-        )
-      ) {
-        r.pinFailures = {
-          count: (r.pinFailures?.count ?? 0) + 1,
-          until: r.pinFailures?.until ?? now + 600000,
-        };
-        this.store.save();
-        throw new Error("PIN을 확인해 줘.");
-      }
-    }
+    if (r.access === "secret") this.verifyPin(me, r, pin);
     const error = this.joinError(r);
     if (error) throw new Error(error);
     r.memberIds.push(me.id);
     this.store.save();
     return r;
+  }
+  private verifyPin(me: Guest, room: Room, pin?: string) {
+    const now = Date.now();
+    // Old persisted rooms used one room-wide counter. It must not keep a
+    // legitimate guest locked out after the per-guest migration.
+    const legacy = room.pinFailures as unknown;
+    if (legacy && typeof legacy === "object" && "count" in legacy) delete room.pinFailures;
+    const attempts = room.pinFailures ?? {};
+    for (const [guestId, value] of Object.entries(attempts))
+      if (value.until <= now) delete attempts[guestId];
+    const correct = !!room.pinHash && timingSafeEqual(
+      Buffer.from(room.pinHash), Buffer.from(this.hashPin(room.code, pin ?? "")),
+    );
+    if (correct) {
+      delete attempts[me.id];
+      if (Object.keys(attempts).length) room.pinFailures = attempts;
+      else delete room.pinFailures;
+      return;
+    }
+    const previous = attempts[me.id];
+    if (previous && previous.count >= 10 && previous.until > now)
+      throw new Error("PIN 입력이 잠겼어. 10분 뒤 다시 시도해 줘.");
+    attempts[me.id] = { count: (previous?.count ?? 0) + 1, until: now + 600000 };
+    // Bound stored attacker identities even if accounts are rotated.
+    const oldest = Object.entries(attempts).sort(([, a], [, b]) => a.until - b.until);
+    while (oldest.length > 256) delete attempts[oldest.shift()![0]];
+    room.pinFailures = attempts;
+    this.store.save();
+    throw new Error("PIN을 확인해 줘.");
   }
   expireConnection(guestId: string, roomId: string) {
     const room = this.roomFor(guestId);
@@ -564,6 +580,12 @@ export class Game {
       case "start":
         this.startRoom(me, room, session);
         break;
+      case "transfer-host":
+        this.transferHost(me, room, session, command.targetId);
+        break;
+      case "remove-member":
+        this.removeMember(me, room, session, command.targetId);
+        break;
       case "advance":
         this.advanceRoom(me, room, session);
         break;
@@ -634,8 +656,10 @@ export class Game {
       return;
     }
     const scenario = this.roomStory(room).scenario;
+    if (room.capacity !== undefined && room.capacity !== scenario.players)
+      throw new Error("이 방의 작품 버전을 더 이상 시작할 수 없어. 방을 새로 만들어 줘.");
     if (
-      room.memberIds.length !== scenario.players ||
+      room.memberIds.length !== this.roomCapacity(room) ||
       room.memberIds.some((id) => !this.online.get(id))
     )
       throw new Error("모든 참가자가 접속해야 시작할 수 있어.");
@@ -692,6 +716,21 @@ export class Game {
     );
     this.state.sessions[session.id] = session;
     room.sessionId = session.id;
+  }
+  private requireWaitingRoom(session: Session | null, room: Room) {
+    if (session || room.soloStarted) throw new Error("대기방에서만 할 수 있어.");
+  }
+  private transferHost(me: Guest, room: Room, session: Session | null, targetId: string) {
+    this.requireHost(me, room);
+    this.requireWaitingRoom(session, room);
+    if (targetId === me.id || !room.memberIds.includes(targetId)) throw new Error("방장으로 넘길 참가자를 확인해 줘.");
+    room.hostId = targetId;
+  }
+  private removeMember(me: Guest, room: Room, session: Session | null, targetId: string) {
+    this.requireHost(me, room);
+    this.requireWaitingRoom(session, room);
+    if (targetId === me.id || !room.memberIds.includes(targetId)) throw new Error("내보낼 참가자를 확인해 줘.");
+    room.memberIds = room.memberIds.filter((id) => id !== targetId);
   }
   private advanceRoom(me: Guest, room: Room, session: Session | null) {
     this.requireHost(me, room);
