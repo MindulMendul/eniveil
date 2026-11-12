@@ -119,6 +119,9 @@ export class Game {
                 collectableItems: (story?.content.items ?? [])
                   .filter((item) => session.itemOwners?.[item.id] === null)
                   .map(({ id, name }) => ({ id, name })),
+                revealedItems: (story?.content.items ?? [])
+                  .filter((item) => (session.revealedItemIds ?? []).includes(item.id))
+                  .map(({ id, name, description }) => ({ id, name, description })),
                 clues: this.visibleClues(session, story?.content),
                 availableClueCount: this.availableClues(session, story?.content).length,
                 collectedClueCount: session.collectedClueIds?.length ?? 0,
@@ -550,6 +553,7 @@ export class Game {
         break;
       case "collect-item": this.collectItem(me, session, command.itemId); break;
       case "transfer-item": this.transferItem(me, session, command.itemId, command.targetId); break;
+      case "reveal-item": this.revealItem(me, session, command.itemId); break;
       case "vote":
         this.vote(me, room, session, command.targetId);
         break;
@@ -631,6 +635,7 @@ export class Game {
         Object.fromEntries((this.roomStory(room).content.resources ?? []).map((resource) => [resource.id, resource.initialValue])),
       ])),
       itemOwners: Object.fromEntries((this.roomStory(room).content.items ?? []).map((item) => [item.id, item.ownerRoleIndex === undefined ? null : ids.find((_, index) => index === item.ownerRoleIndex) ?? null])),
+      revealedItemIds: [],
       collectedClueIds: [],
       phaseEndsAt: null,
       endedAt: null,
@@ -738,6 +743,11 @@ export class Game {
     const target = session.participants.find((participant) => participant.id === targetId);
     if (!item || !target || item.transfer.mode === "never" || (item.transfer.mode === "owner_choice" && !item.transfer.targetRoleIndexes?.includes(target.roleIndex))) throw new Error("이 참가자에게 전달할 수 없어.");
     session.itemOwners[itemId] = targetId;
+  }
+  private revealItem(me: Guest, session: Session | null, itemId: string) {
+    if (!session || session.itemOwners?.[itemId] !== me.id) throw new Error("네가 가진 아이템만 공개할 수 있어.");
+    if ((session.revealedItemIds ?? []).includes(itemId)) throw new Error("이미 공개한 아이템이야.");
+    (session.revealedItemIds ??= []).push(itemId);
   }
   private vote(
     me: Guest,
