@@ -26,6 +26,14 @@ function setup(){
 }
 const evt=(sequence:number,stage:PlayEvent['stage']='explore',type:PlayEvent['type']='stage'):PlayEvent=>({id:crypto.randomUUID(),sequence,stage,type});
 
+test('only completed participants can save a story review',()=>{
+ const{analytics,users}=setup(),user=users[0].id;
+ analytics.start('review','story',1,'solo',null,[{id:user,role:'detective'}],{});
+ expect(()=>analytics.review('review',user,'좋았어요')).toThrow('결말');
+ analytics.finish('review','completed',{});analytics.ending('review',user,'completed');analytics.review('review',user,'좋았어요');
+ expect(analytics.reviews('story')).toEqual([{text:'좋았어요',created_at:100000}]);
+});
+
 test('duplicate and late events preserve visits, separate active/unknown time and keep internal MMR private',()=>{
  const{analytics,users,setTime}=setup();const user=users[0].id;
  analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{title:'Story'});

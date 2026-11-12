@@ -6,6 +6,7 @@ import {
   playEndingSchema,
   playRatingSchema,
   playChatSchema,
+  playReviewSchema,
 } from "@festival/shared";
 import type { Store } from "../../store";
 import type { PlayAnalytics } from "./play-analytics";
@@ -79,6 +80,12 @@ export function createPlayRoutes(deps: {
     deps.notify?.();
     return c.json({ saved: true });
   });
+  app.post("/sessions/:id/review", async (c) => {
+    const { text } = playReviewSchema.parse(await c.req.json());
+    deps.analytics.review(c.req.param("id"), c.get("owner"), text);
+    return c.json({ saved: true });
+  });
+  app.get("/stories/:id/reviews", (c) => c.json({ items: deps.analytics.reviews(c.req.param("id")) }));
   app.get("/sessions/:id/chat", (c) =>
     c.json({
       messages: deps.analytics.chats(c.req.param("id"), c.get("owner")),
