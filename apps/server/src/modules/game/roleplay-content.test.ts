@@ -5,6 +5,7 @@ import { storyPackageSchema, type Guest, type StoryPackage } from "@festival/sha
 import { Store } from "../../store";
 import { Game } from "./game";
 import { roleplayStoryVersion, withRoleplayPackages } from "./roleplay-content";
+import type { StoryCatalog } from "./story-catalog";
 import { storyCatalog } from "../platform/stories/catalog";
 
 const stores: Store[] = [];
@@ -213,35 +214,86 @@ test("a newer published version is offered, while an older session can still loa
   expect(catalog.get(older.story.id, 2)?.scenario.title).toBe("샘플 v2");
 });
 
-test("a room keeps its creation version after a newer version is published", () => {
+/** A live catalog the game reads from, so tests can publish or roll back versions between steps. */
+function liveGame(initial: StoryCatalog) {
+  const store = new Store(":memory:");
+  stores.push(store);
+  let current = initial;
+  const game = new Game(store, {
+    list: () => current.list(),
+    get: (id, version) => current.get(id, version),
+  });
+  const seat = (guest: Guest) => {
+    store.state.guests[guest.id] = guest;
+    game.online.set(guest.id, 1);
+    return guest;
+  };
+  return { game, seat, publish: (next: StoryCatalog) => { current = next; } };
+}
+const meta = (id: string, version: number) => ({ id, version, mode: "multiplayer" as const });
+function twoVersions(v1: StoryPackage, v2: StoryPackage) {
+  return withRoleplayPackages(storyCatalog, {
+    list: () => [meta(v1.story.id, 1), meta(v2.story.id, 2)],
+    get: (_id, version) => (version === 2 ? v2 : v1),
+  });
+}
+
+test("a room keeps its creation version and seats after a newer version is published", () => {
   const v1 = roleplayPackage();
   const v2 = roleplayPackage();
   v2.story.version = 2;
   v2.story.playerCount = { min: 3, max: 3 };
-  const id = v1.story.id;
-  const meta = (version: number) => ({ id, version, mode: "multiplayer" as const });
-  let current = withRoleplayPackages(storyCatalog, {
-    list: () => [meta(1)],
-    get: () => v1,
-  });
-  const store = new Store(":memory:");
-  stores.push(store);
-  const game = new Game(store, {
-    list: () => current.list(),
-    get: (storyId, version) => current.get(storyId, version),
-  });
-  const host: Guest = { id: "h", nickname: "방장" }, guest: Guest = { id: "g", nickname: "참가자" };
-  for (const member of [host, guest]) { store.state.guests[member.id] = member; game.online.set(member.id, 1); }
-  const room = game.create(host, id);
-  game.join(guest, room.code);
-
-  current = withRoleplayPackages(storyCatalog, {
-    list: () => [meta(1), meta(2)],
-    get: (_id, version) => (version === 2 ? v2 : v1),
-  });
-  const view = game.snapshot(host).room!;
+  const live = liveGame(withRoleplayPackages(storyCatalog, { list: () => [meta(v1.story.id, 1)], get: () => v1 }));
+  const host = live.seat({ id: "h", nickname: "방장" }), guest = live.seat({ id: "g", nickname: "참가자" });
+  const room = live.game.create(host, v1.story.id);
+  live.game.join(guest, room.code);
+  live.publish(twoVersions(v1, v2));
+  const view = live.game.snapshot(host).room!;
   expect(view.capacity).toBe(2);
   expect(view.scenario.version).toBe(1);
-  game.command(host, { type: "start", requestId: crypto.randomUUID() });
-  expect(game.snapshot(host).room?.session).not.toBeNull();
+  live.game.command(host, { type: "start", requestId: crypto.randomUUID() });
+  expect(live.game.snapshot(host).room?.session).not.toBeNull();
+});
+
+test("a room whose pinned version was removed still renders the lobby and keeps its seats", () => {
+  const v1 = roleplayPackage();
+  const v2 = roleplayPackage();
+  v2.story.version = 2;
+  v2.story.playerCount = { min: 4, max: 4 };
+  const live = liveGame(withRoleplayPackages(storyCatalog, { list: () => [meta(v1.story.id, 1)], get: () => v1 }));
+  const host = live.seat({ id: "h", nickname: "방장" }), outsider = live.seat({ id: "o", nickname: "구경꾼" });
+  live.game.create(host, v1.story.id);
+  // Rollback: version 1 is gone, only the four-seat version 2 remains.
+  live.publish(withRoleplayPackages(storyCatalog, { list: () => [meta(v2.story.id, 2)], get: () => v2 }));
+  expect(() => live.game.snapshot(outsider)).not.toThrow();
+  const view = live.game.snapshot(host).room!;
+  expect(view.scenario.version).toBe(2);
+  expect(view.capacity).toBe(2);
+});
+
+test("after a rollback, a two-seat room does not admit guests for the replacement's four seats", () => {
+  const v1 = roleplayPackage();
+  const v2 = roleplayPackage();
+  v2.story.version = 2;
+  v2.story.playerCount = { min: 4, max: 4 };
+  const live = liveGame(withRoleplayPackages(storyCatalog, { list: () => [meta(v1.story.id, 1)], get: () => v1 }));
+  const host = live.seat({ id: "h", nickname: "방장" });
+  const room = live.game.create(host, v1.story.id);
+  live.publish(withRoleplayPackages(storyCatalog, { list: () => [meta(v2.story.id, 2)], get: () => v2 }));
+  live.game.join(live.seat({ id: "g1", nickname: "참가1" }), room.code);
+  expect(() => live.game.join(live.seat({ id: "g2", nickname: "참가2" }), room.code)).toThrow("가득");
+});
+
+test("after a rollback to a different seat count, the old room cannot start on the replacement", () => {
+  const v1 = roleplayPackage();
+  const v2 = roleplayPackage();
+  v2.story.version = 2;
+  v2.story.playerCount = { min: 4, max: 4 };
+  const live = liveGame(withRoleplayPackages(storyCatalog, { list: () => [meta(v1.story.id, 1)], get: () => v1 }));
+  const host = live.seat({ id: "h", nickname: "방장" }), guest = live.seat({ id: "g", nickname: "참가자" });
+  const room = live.game.create(host, v1.story.id);
+  live.game.join(guest, room.code);
+  live.publish(withRoleplayPackages(storyCatalog, { list: () => [meta(v2.story.id, 2)], get: () => v2 }));
+  expect(() => live.game.command(host, { type: "start", requestId: crypto.randomUUID() })).toThrow("시작할 수 없어");
+  expect(live.game.snapshot(host).room?.session).toBeNull();
 });

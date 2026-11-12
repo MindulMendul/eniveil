@@ -21,9 +21,14 @@ export class Game {
   get state(): State {
     return this.store.state;
   }
+  /** Seats are fixed when the room is created, so a fallback version cannot change them. */
+  private roomCapacity(room: Room) {
+    return room.capacity ?? this.roomStory(room).scenario.players;
+  }
   /** A room keeps the version it was created with, so later publishes cannot change its seats or content. */
   private roomStory(room: Room) {
-    return this.storyCatalog.get(room.scenarioId, room.scenarioVersion)!;
+    // A pinned version can disappear after a rollback. Fall back to the current version so one stale room cannot break every lobby view.
+    return this.storyCatalog.get(room.scenarioId, room.scenarioVersion) ?? this.storyCatalog.get(room.scenarioId)!;
   }
   roomFor(id: string) {
     return Object.values(this.state.rooms).find((r) =>
@@ -79,7 +84,7 @@ export class Game {
       code: r.code,
       title: r.mode === "solo" ? supportedSoloStory.title : s.title,
       count: r.memberIds.length,
-      capacity: r.mode === "solo" ? 1 : s.players,
+      capacity: r.mode === "solo" ? 1 : this.roomCapacity(r),
       status: r.sessionId || r.soloStarted ? "playing" : "waiting",
     };
   }
@@ -327,6 +332,7 @@ export class Game {
       ...(access === "secret" ? { pinHash: this.hashPin(code, pin!) } : {}),
       scenarioId,
       scenarioVersion: scenario.version,
+      capacity: scenario.players,
       mode: scenarioId === supportedSoloStory.id ? "solo" : "multiplayer",
       memberIds: [me.id],
       sessionId: null,
@@ -634,8 +640,10 @@ export class Game {
       return;
     }
     const scenario = this.roomStory(room).scenario;
+    if (room.capacity !== undefined && room.capacity !== scenario.players)
+      throw new Error("이 방의 작품 버전을 더 이상 시작할 수 없어. 방을 새로 만들어 줘.");
     if (
-      room.memberIds.length !== scenario.players ||
+      room.memberIds.length !== this.roomCapacity(room) ||
       room.memberIds.some((id) => !this.online.get(id))
     )
       throw new Error("모든 참가자가 접속해야 시작할 수 있어.");
