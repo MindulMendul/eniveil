@@ -3,7 +3,8 @@ import type { Guest } from "@festival/shared";
 export type Room = {
   access?: import("@festival/shared").RoomAccess;
   pinHash?: string;
-  pinFailures?: { count: number; until: number };
+  /** Failed secret-room PIN attempts, scoped to a joining guest. */
+  pinFailures?: Record<string, { count: number; until: number }>;
   id: string;
   code: string;
   hostId: string;
