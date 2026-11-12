@@ -26,7 +26,7 @@
   {#if !view}<p role="status">{locale==='en'?'Loading…':'불러오는 중…'}</p>
   {:else if view.endingComplete}
     <h1 class="heading-one">{locale==='en'?'Rate this story':'스토리 평가'}</h1>
-    <StoryRating runId={id} {locale} beforeSubmit={async()=>{if(tracker&&!await tracker.flush())throw Error(locale==='en'?'Could not save play records. Please retry.':'플레이 기록을 저장하지 못했어. 다시 시도해 줘.');}} onDone={()=>{if(view)sessionStorage.removeItem(`active-play:${view.storyId}`);sessionStorage.removeItem(`solo-ui:${id}`);onExit();}} />
+    <StoryRating runId={id} storyId={view.storyId} {locale} beforeSubmit={async()=>{if(tracker&&!await tracker.flush())throw Error(locale==='en'?'Could not save play records. Please retry.':'플레이 기록을 저장하지 못했어. 다시 시도해 줘.');}} onDone={()=>{if(view)sessionStorage.removeItem(`active-play:${view.storyId}`);sessionStorage.removeItem(`solo-ui:${id}`);onExit();}} />
   {:else if view.result.cues?.length}
     <StoryCuePlayer cues={view.result.cues} initialIndex={view.cueIndex} onAction={(type,index)=>{if(type==='skip')endingAction='skipped';tracker?.record(type==='next'?'cue_next':'cue_skip',String(index));}} onComplete={async()=>{if(endingAction==='completed')tracker?.record('cue_complete',String((view?.result.cues?.length??0)-1));await ending();}} />
     {#if error}<Button disabled={busy} onclick={ending}>{locale==='en'?'Continue':'계속'}</Button>{/if}

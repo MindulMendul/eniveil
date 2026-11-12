@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { Button } from '../../shared/ui';
-  let {runId,onDone=()=>{},beforeSubmit=async()=>{},locale='ko'}:{runId:string;onDone?:()=>void;beforeSubmit?:()=>Promise<void>;locale?:'ko'|'en'}=$props();
+  let {runId,storyId,onDone=()=>{},beforeSubmit=async()=>{},locale='ko'}:{runId:string;storyId?:string;onDone?:()=>void;beforeSubmit?:()=>Promise<void>;locale?:'ko'|'en'}=$props();
   let busy=$state(false),error=$state('');
   let review=$state('');
+  let reviews=$state<{text:string}[]>([]);
+  onMount(()=>{if(storyId)void fetch(`/api/play/stories/${storyId}/reviews`).then(response=>response.json()).then(data=>reviews=data.items??[]).catch(()=>{});});
   async function submit(rating:number|null){
     if(busy)return;busy=true;error='';
     try{await beforeSubmit();const response=await fetch(`/api/play/sessions/${runId}/rating`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rating})});const data=await response.json();if(!response.ok)throw Error(data.error);if(review.trim()){const reviewed=await fetch(`/api/play/sessions/${runId}/review`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:review})});const result=await reviewed.json();if(!reviewed.ok)throw Error(result.error);}onDone();}
@@ -16,4 +19,5 @@
   </div>
   <Button variant="secondary" disabled={busy} onclick={()=>submit(null)}>{locale==='en'?'Skip and return to lobby':'건너뛰고 로비로'}</Button>
   {#if error}<p role="alert">{error}</p>{/if}
+  {#if reviews.length}<section class="mt-6 text-left" aria-label={locale==='en'?'Recent reviews':'최근 후기'}><h2 class="heading-three">{locale==='en'?'Recent reviews':'최근 후기'}</h2>{#each reviews as item}<p class="muted">{item.text}</p>{/each}</section>{/if}
 </section>
