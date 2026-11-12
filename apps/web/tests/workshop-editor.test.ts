@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { createStoryDraft, editorErrors, serializeDraft, renameScene, hasPreservedSceneReference } from '../src/pages/workshop/model/_editor';
+import { createRoleplayDraft, createStoryDraft, editorErrors, serializeDraft, renameScene, hasPreservedSceneReference } from '../src/pages/workshop/model/_editor';
 import { storyPackageSchema } from '@festival/shared';
 
 test('localized starter is valid and preserves non-editor content across export/import', () => {
@@ -16,6 +16,19 @@ test('localized starter is valid and preserves non-editor content across export/
     const imported = JSON.parse(serializeDraft(source));
     expect(imported).toEqual(source);
     expect(imported.content.mechanics).toEqual(preserved);
+  }
+});
+
+test('roleplay starter is a valid two-player package with private memories and staged clues', () => {
+  for (const locale of ['ko', 'en'] as const) {
+    const source = createRoleplayDraft(locale);
+    expect(storyPackageSchema.safeParse(source).success).toBe(true);
+    expect(source.story.mode).toBe('multiplayer');
+    if (source.content.mechanics.type !== 'roleplay') throw new Error('roleplay starter expected');
+    expect(source.content.roles).toHaveLength(2);
+    expect(source.content.mechanics.memories.map(memory => memory.roleId)).toEqual(source.content.roles.map(role => role.id));
+    expect(source.content.mechanics.firstClues).toHaveLength(1);
+    expect(source.content.mechanics.answerRoleId).toBe(source.content.roles[0]!.id);
   }
 });
 

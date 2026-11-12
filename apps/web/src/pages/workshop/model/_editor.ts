@@ -27,6 +27,43 @@ export function createStoryDraft(locale: 'ko' | 'en'): StoryPackage {
   });
 }
 
+/** A minimal, playable multiplayer package.  Keep this in the editor rather
+ * than shipping it as public story content: it is only a creator starting point. */
+export function createRoleplayDraft(locale: 'ko' | 'en'): StoryPackage {
+  const text = (ko: string, en: string) => locale === 'en' ? en : ko;
+  return storyPackageSchema.parse({
+    format: 'murder-parker-story', formatVersion: 1,
+    story: { id: `roleplay-${crypto.randomUUID()}`, version: 1, mode: 'multiplayer', locale,
+      title: text('새 역할극', 'New roleplay'), subtitle: text('참가자와 함께 진상을 밝혀 보세요.', 'Uncover the truth together.'),
+      playerCount: { min: 2, max: 2 }, estimatedMinutes: 20, startSceneId: 'intro' },
+    content: {
+      characters: [], assets: [], information: [],
+      scenes: [{ id: 'intro', cues: [{ type: 'dialogue.show', text: text('역할과 비공개 기억을 확인하세요.', 'Check your role and private memory.') }], choices: [] }],
+      roles: [
+        { id: 'role-one', name: text('참가자 1', 'Player one') },
+        { id: 'role-two', name: text('참가자 2', 'Player two') },
+      ],
+      items: [],
+      mechanics: {
+        type: 'roleplay',
+        memories: [
+          { roleId: 'role-one', text: text('당신만 아는 기억을 작성하세요.', 'Write a memory only you know.') },
+          { roleId: 'role-two', text: text('당신만 아는 다른 기억을 작성하세요.', 'Write another private memory.') },
+        ],
+        firstClues: [{ id: 'first-clue', text: text('1차 조사 단서', 'First investigation clue') }], secondClues: [],
+        stageDurations: { firstInvestigationSeconds: 300, meetingSeconds: 180, secondInvestigationSeconds: 300 },
+        meetingPrompt: text('각자 확인한 단서를 공유하고 토론하세요.', 'Share your clues and discuss them.'),
+        finalChoices: [
+          { id: 'choose-role-one', label: text('참가자 1', 'Player one'), outcome: text('진상을 확인했습니다.', 'You found the truth.') },
+          { id: 'choose-role-two', label: text('참가자 2', 'Player two'), outcome: text('다른 가능성도 살펴보세요.', 'Consider another possibility.') },
+        ],
+        rooms: [], resources: [], itemRecipes: [],
+        answer: text('진상과 결말을 작성하세요.', 'Write the truth and ending.'), answerRoleId: 'role-one',
+      },
+    },
+  });
+}
+
 export function editorErrors(source: unknown, locale: 'ko' | 'en'): string[] {
   const result = storyPackageSchema.safeParse(source);
   if (result.success) return [];
