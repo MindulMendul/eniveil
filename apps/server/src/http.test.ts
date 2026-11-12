@@ -69,10 +69,13 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, independ
         .status,
     ).toBe(403);
     const guest = async (nickname: string) => {
-      const r = await req("/api/platform/guest", "", { nickname });
+      const preference = await req('/api/platform/consent', '', {version:2,scope:'full'});
+      expect(preference.status).toBe(200);
+      const consentCookie = preference.headers.get('set-cookie')!.split(';')[0]!;
+      const r = await req("/api/platform/guest", consentCookie, { nickname });
       expect(r.status).toBe(201);
       return {
-        cookie: r.headers.get("set-cookie")!.split(";")[0],
+        cookie: consentCookie + "; " + r.headers.get("set-cookie")!.split(";")[0],
         me: ((await r.json()) as { me: { id: string; nickname: string } }).me,
       };
     };
@@ -189,8 +192,19 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, independ
     expect((await req(exitPath,a.cookie,{roomId:nextRoomId,soloPlayId:newAttempt})).status).toBe(200);
     await wait(()=>!aa.latest.room);
     expect(((await (await req('/api/lobby/state',b.cookie)).json()) as Snapshot).rooms.map(r=>r.id)).not.toContain(roomId);
+    const authOnly = a.cookie.split('; ').filter(value => value.startsWith('festival_guest=')).join('; ');
+    const deviceGrant = await req('/api/platform/consent',authOnly,{version:2,scope:'full'});
+    expect(deviceGrant.status).toBe(200);
+    const otherCookie = authOnly + '; ' + deviceGrant.headers.getSetCookie().find(value => value.startsWith('eniveil_collection='))!.split(';')[0];
+    const otherDevice = await connect(otherCookie);
+    let revoked = false;
+    aa.ws.addEventListener('close',()=>{revoked=true});
+    expect((await req('/api/platform/consent',a.cookie,{version:2,scope:'basic'})).status).toBe(200);
+    await wait(()=>revoked);
+    expect(otherDevice.ws.readyState).toBe(WebSocket.OPEN);
+    expect((await req('/api/lobby/state',otherCookie)).status).toBe(200);
     let closed = false;
-    aa.ws.addEventListener("close", () => { closed = true; });
+    otherDevice.ws.addEventListener("close", () => { closed = true; });
     expect((await req("/api/platform/account/logout", a.cookie, {})).status).toBe(200);
     await wait(() => closed);
     expect((await req("/api/lobby/state", a.cookie)).status).toBe(401);

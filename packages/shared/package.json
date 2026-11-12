@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./images": "./src/images.ts",
-    "./features": "./src/features.ts"
+    "./features": "./src/features.ts",
+    "./consent": "./src/consent.ts"
   },
   "dependencies": {
     "zod": "^4.1.0"

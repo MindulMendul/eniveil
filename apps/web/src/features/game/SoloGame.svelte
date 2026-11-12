@@ -3,6 +3,7 @@
   import { supportedSoloStory } from '@festival/shared';
   import { onMount } from 'svelte';
   import { translate } from '../../shared/lib/i18n.js';
+  import { allowsPlayAnalytics } from '../../shared/analytics/consent';
   import { trackEvent } from '../../analytics.js';
   import StoryCuePlayer from './StoryCuePlayer.svelte';
   import PlayEnding from './PlayEnding.svelte';
@@ -99,7 +100,7 @@
     const pageLoadMs = navigation instanceof PerformanceNavigationTiming && navigation.loadEventEnd > 0
       ? navigation.loadEventEnd - navigation.startTime
       : performance.now();
-    void fetch('/api/platform/analytics/vitals', {
+    if (allowsPlayAnalytics()) void fetch('/api/platform/analytics/vitals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       keepalive: true,
