@@ -33,7 +33,7 @@ export class StorySessionService {
   current(runId: string) {
     const run = this.needActiveRun(runId);
     const story = run.storyPackage ?? this.needSoloStory(run.storyId, run.storyVersion);
-    return { runId: run.id, ...this.sceneView(run, story) };
+    return { runId: run.id, package:soloStoryView(story), ...this.sceneView(run, story) };
   }
 
   advance(runId: string) {
@@ -52,7 +52,7 @@ export class StorySessionService {
     run.lastActiveAt = new Date().toISOString();
     this.runs.save(run);
     this.record(run, "scene_entered", { sceneId: run.currentSceneId });
-    return { runId: run.id, ...this.sceneView(run, story) };
+    return { runId: run.id, package:soloStoryView(story), ...this.sceneView(run, story) };
   }
 
   inspectEvidence(runId: string, evidenceId: string) {

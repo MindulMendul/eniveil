@@ -4,14 +4,19 @@ import { serveStatic } from "hono/bun";
 import { bodyLimit } from "hono/body-limit";
 import { resolve } from "node:path";
 import { Store } from "./store";
+import { PlayAnalytics } from "./modules/game/play-analytics";
+import { sweepPlays } from "./modules/game/play-cleanup";
+import { createPlayRoutes, playOwner } from "./modules/game/play-routes";
 import { Game } from "./game";
 import { metrics, observeHTTP } from "./observability";
 import { storyCatalog } from "./modules/platform/stories/catalog";
+import { withRoleplayPackages } from "./modules/game/roleplay-content";
 import { fileStoryCatalog } from "./modules/platform/stories/file-catalog";
 import { SQLiteStoryRunStore } from "./infrastructure/sqlite/story-run-store";
 import { SQLiteWorkshopStore } from "./infrastructure/sqlite/workshop-store";
 import { PlayStoryCatalog } from "./modules/platform/stories/play-catalog";
 import { StorySessionService } from "./modules/game/story-session-service";
+import { ConsentService } from "./modules/platform/consent";
 import { createAccountRoutes } from "./modules/platform/account-routes";
 import { createFriendRoutes } from "./modules/platform/friend-routes";
 import { createPlatformRoutes } from "./modules/platform/routes";
@@ -26,11 +31,17 @@ if (production && !process.env.APP_ORIGIN)
 export const store = new Store(
   process.env.DATABASE_PATH ?? "./data/festival.sqlite",
 );
-export const game = new Game(store, storyCatalog);
-const storyRunStore = new SQLiteStoryRunStore(store.db);
+const analytics = new PlayAnalytics(store.db);
+export const game = new Game(store, withRoleplayPackages(storyCatalog, fileStoryCatalog), analytics);
+const collectionConsent = new ConsentService(store, token => lobby.disconnectConsent(token), production);
+const storyRunStore = new SQLiteStoryRunStore(store.db, { collection: { allows: collectionConsent.acceptsRecord, recorded: collectionConsent.recorded } });
 const workshopStore = new SQLiteWorkshopStore(store.db);
 const playCatalog = new PlayStoryCatalog(fileStoryCatalog, workshopStore);
 const storySessions = new StorySessionService(playCatalog, storyRunStore);
+analytics.pruneRetention();
+analytics.cleanupLegacy();
+game.recoverLegacySessions();
+setInterval(() => sweepPlays({analytics,game,store,storySessions}),60000).unref();
 
 const notifyTemporal = (action: "start" | "event" | "end", payload: object) => {
   const baseUrl = process.env.TEMPORAL_GATEWAY_URL;
@@ -78,10 +89,12 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-const lobby = createLobbyRoutes({ store, game, notifyTemporal });
+const lobby = createLobbyRoutes({ store, game, notifyTemporal, consentGrant: collectionConsent.connectionGrant });
 const google = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.APP_ORIGIN
   ? { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, origin: new URL(process.env.APP_ORIGIN).origin }
   : undefined;
+app.use("/api/*", collectionConsent.middleware);
+app.route("/api/platform", collectionConsent.routes());
 app.route("/api/platform", createAccountRoutes({ store, production, google, onLogout: lobby.disconnect, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
 app.route('/api/friends', createFriendRoutes(store, { isOnline: id => (game.online.get(id) ?? 0) > 0 }));
 app.route("/api/platform", createPlatformRoutes({
@@ -101,8 +114,13 @@ app.route("/api/game", createGameRoutes({
   stories: playCatalog,
   runs: storyRunStore,
   sessions: storySessions,
+  analytics,
+  owner: c => playOwner(c,store,production),
+  rate: (owner,id,rating)=>game.completeRating(owner,id,rating),
+  roomId: (owner,story) => game.soloRoomForStory(owner,story),
 }));
 app.route("/api/lobby", lobby.app);
+app.route("/api/play", createPlayRoutes({analytics,store,game,production,notify:lobby.broadcast,adminToken:process.env.STORY_ADMIN_TOKEN}));
 
 app.get("/metrics", (c) => {
   const token = process.env.METRICS_BEARER_TOKEN;

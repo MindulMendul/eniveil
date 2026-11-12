@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import type { Snapshot, ServerEvent } from "@festival/shared";
-test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return", async () => {
+test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, independent ratings and room destruction", async () => {
   const port = 19000 + Math.floor(Math.random() * 10000),
     origin = `http://127.0.0.1:${port}`;
   const process = Bun.spawn([Bun.which("bun")!, "apps/server/src/index.ts"], {
@@ -69,10 +69,13 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
         .status,
     ).toBe(403);
     const guest = async (nickname: string) => {
-      const r = await req("/api/platform/guest", "", { nickname });
+      const preference = await req('/api/platform/consent', '', {version:2,scope:'full'});
+      expect(preference.status).toBe(200);
+      const consentCookie = preference.headers.get('set-cookie')!.split(';')[0]!;
+      const r = await req("/api/platform/guest", consentCookie, { nickname });
       expect(r.status).toBe(201);
       return {
-        cookie: r.headers.get("set-cookie")!.split(";")[0],
+        cookie: consentCookie + "; " + r.headers.get("set-cookie")!.split(";")[0],
         me: ((await r.json()) as { me: { id: string; nickname: string } }).me,
       };
     };
@@ -146,15 +149,27 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     expect(reconnected.latest.room!.session!.id).toBe(id);
     await send(aa, "advance");
     await send(aa, "advance");
+    await send(aa, "advance");
+    await send(aa, "advance");
     await send(aa, "vote", b.me.id);
     expect(aa.latest.room!.session!.result).toBeNull();
     await send(reconnected, "vote", a.me.id);
     await wait(() => aa.latest.room?.session?.phase === "reveal");
-    await send(aa, "return");
-    expect(aa.latest.room!.session).toBeNull();
-    expect(aa.latest.room!.count).toBe(2);
     expect((await req("/api/platform/account/logout", a.cookie, {})).status).toBe(409);
-    await send(reconnected, "leave");
+    const blockedReturn=crypto.randomUUID();aa.ws.send(JSON.stringify({type:'return',requestId:blockedReturn}));
+    await wait(()=>aa.events.some(e=>e.type==='error'&&e.requestId===blockedReturn));
+    expect((await req(`/api/play/sessions/${id}/rating`,a.cookie,{rating:5})).status).toBe(400);
+    expect((await req(`/api/play/sessions/${id}/ending`,a.cookie,{action:'completed'})).status).toBe(200);
+    expect((await req(`/api/play/sessions/${id}/rating`,a.cookie,{rating:5})).status).toBe(200);
+    await wait(()=>!aa.latest.room);
+    expect(reconnected.latest.room!.session!.phase).toBe('reveal');
+    expect((await req(`/api/play/sessions/${id}/ending`,b.cookie,{action:'completed'})).status).toBe(200);
+    expect((await req(`/api/play/sessions/${id}/rating`,b.cookie,{rating:null})).status).toBe(200);
+    await wait(()=>!reconnected.latest.room);
+    expect((await req(`/api/play/sessions/${id}`,a.cookie)).status).toBe(200);
+    expect((await req('/api/lobby/rooms',a.cookie,{scenarioId:'rehearsal'})).status).toBe(201);
+    await wait(()=>!!aa.latest.room);
+    const soloRoomId=aa.latest.room!.id;
     await send(aa, "mode", undefined, "solo");
     await send(aa, "start");
     const firstAttempt = aa.latest.room!.soloPlayId;
@@ -163,21 +178,33 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     expect(sameHostTab.latest.room!.soloPlayId).toBe(firstAttempt);
     sameHostTab.ws.close();
     expect(((await (await req("/api/lobby/state", a.cookie)).json()) as Snapshot).room!.soloStarted).toBe(true);
-    expect((await req(exitPath, a.cookie, { roomId: crypto.randomUUID(), soloPlayId: firstAttempt })).status).toBe(400);
-    expect((await req(exitPath, a.cookie, { roomId, soloPlayId: firstAttempt })).status).toBe(200);
-    await wait(() => aa.latest.room?.status === "waiting");
-    await send(aa, "start");
-    const newAttempt = aa.latest.room!.soloPlayId;
+    expect((await req(exitPath,a.cookie,{roomId:crypto.randomUUID(),soloPlayId:firstAttempt})).status).toBe(400);
+    expect((await req(exitPath,a.cookie,{roomId:soloRoomId,soloPlayId:firstAttempt})).status).toBe(200);
+    await wait(()=>!aa.latest.room);
+    expect((await req('/api/lobby/rooms',a.cookie,{scenarioId:'rehearsal'})).status).toBe(201);
+    await wait(()=>!!aa.latest.room);
+    const nextRoomId=aa.latest.room!.id;
+    await send(aa,'mode',undefined,'solo');await send(aa,'start');
+    const newAttempt=aa.latest.room!.soloPlayId;
     expect(newAttempt).not.toBe(firstAttempt);
-    expect((await req(exitPath, a.cookie, { roomId, soloPlayId: firstAttempt })).status).toBe(200);
-    expect(((await (await req("/api/lobby/state", a.cookie)).json()) as Snapshot).room!.soloStarted).toBe(true);
-    expect((await req(exitPath, a.cookie, { roomId, soloPlayId: newAttempt })).status).toBe(200);
-    await wait(() => aa.latest.room?.status === "waiting");
-    await send(aa, "leave");
-    await wait(() => !reconnected.latest.rooms.some((room) => room.id === roomId));
-    expect(((await (await req("/api/lobby/state", b.cookie)).json()) as Snapshot).rooms.map((room) => room.id)).not.toContain(roomId);
+    expect((await req(exitPath,a.cookie,{roomId:soloRoomId,soloPlayId:firstAttempt})).status).toBe(400);
+    expect(((await (await req('/api/lobby/state',a.cookie)).json()) as Snapshot).room!.soloStarted).toBe(true);
+    expect((await req(exitPath,a.cookie,{roomId:nextRoomId,soloPlayId:newAttempt})).status).toBe(200);
+    await wait(()=>!aa.latest.room);
+    expect(((await (await req('/api/lobby/state',b.cookie)).json()) as Snapshot).rooms.map(r=>r.id)).not.toContain(roomId);
+    const authOnly = a.cookie.split('; ').filter(value => value.startsWith('festival_guest=')).join('; ');
+    const deviceGrant = await req('/api/platform/consent',authOnly,{version:2,scope:'full'});
+    expect(deviceGrant.status).toBe(200);
+    const otherCookie = authOnly + '; ' + deviceGrant.headers.getSetCookie().find(value => value.startsWith('eniveil_collection='))!.split(';')[0];
+    const otherDevice = await connect(otherCookie);
+    let revoked = false;
+    aa.ws.addEventListener('close',()=>{revoked=true});
+    expect((await req('/api/platform/consent',a.cookie,{version:2,scope:'basic'})).status).toBe(200);
+    await wait(()=>revoked);
+    expect(otherDevice.ws.readyState).toBe(WebSocket.OPEN);
+    expect((await req('/api/lobby/state',otherCookie)).status).toBe(200);
     let closed = false;
-    aa.ws.addEventListener("close", () => { closed = true; });
+    otherDevice.ws.addEventListener("close", () => { closed = true; });
     expect((await req("/api/platform/account/logout", a.cookie, {})).status).toBe(200);
     await wait(() => closed);
     expect((await req("/api/lobby/state", a.cookie)).status).toBe(401);
@@ -188,9 +215,9 @@ test("HTTP + real WebSocket: guests, room, session, ballots, reconnect, return",
     process.kill();
     await process.exited;
   }
-}, 15000);
+}, 25000);
 async function wait(predicate: () => boolean) {
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 500; i++) {
     if (predicate()) return;
     await Bun.sleep(20);
   }

@@ -18,7 +18,7 @@ export class StoryRunQuotaError extends Error {}
 
 export class SQLiteStoryRunStore implements StoryRunStore {
   private readonly pinnedBytes: number;
-  constructor(private readonly db: Database, limits: { pinnedBytes?: number } = {}) {
+  constructor(private readonly db: Database, private readonly limits: { pinnedBytes?: number; collection?: { allows: () => boolean; recorded: (id: string, kind: 'event' | 'vital') => void } } = {}) {
     this.pinnedBytes = limits.pinnedBytes ?? 64 * 1024 * 1024;
     if (!Number.isSafeInteger(this.pinnedBytes) || this.pinnedBytes < 0) throw new Error("Invalid pinned play storage budget");
     db.exec(`
@@ -130,6 +130,8 @@ export class SQLiteStoryRunStore implements StoryRunStore {
   }
 
   record(event: StoryRunEvent) {
+    if (this.limits.collection && !this.limits.collection.allows()) return;
+    this.db.transaction(() => {
     this.db.query(`
       INSERT INTO story_run_events
         (id, run_id, story_id, event_type, occurred_at, value, metadata_json)
@@ -143,6 +145,8 @@ export class SQLiteStoryRunStore implements StoryRunStore {
       event.value,
       JSON.stringify(event.metadata),
     );
+    this.limits.collection?.recorded(event.id, 'event');
+    })();
   }
 
   rate(runId: string, storyId: string, rating: number, createdAt: string) {
@@ -154,6 +158,8 @@ export class SQLiteStoryRunStore implements StoryRunStore {
   }
 
   recordVital(vital: StoryVital) {
+    if (this.limits.collection && !this.limits.collection.allows()) return;
+    this.db.transaction(() => {
     this.db.query(`
       INSERT INTO story_rum_vitals
         (id, story_id, metric_name, value, navigation_id, route, occurred_at)
@@ -167,6 +173,8 @@ export class SQLiteStoryRunStore implements StoryRunStore {
       vital.route,
       vital.occurredAt,
     );
+    this.limits.collection?.recorded(vital.id, 'vital');
+    })();
   }
 
   catalogMetrics(storyIds: readonly string[]) {

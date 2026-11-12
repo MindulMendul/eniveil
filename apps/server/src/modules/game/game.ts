@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type {
   Command,
   Guest,
@@ -8,49 +9,96 @@ import type {
 import { supportedSoloStory } from "@festival/shared";
 import type { Room, Session, State } from "./model";
 import type { GameStateStore } from "./ports/state-store";
-import type { StoryCatalog } from "./story-catalog";
+import type { StoryCatalog, StoryContent } from "./story-catalog";
+import type { PlayAnalytics } from "./play-analytics";
 export class Game {
   online = new Map<string, number>();
   constructor(
     public store: GameStateStore,
     private readonly storyCatalog: StoryCatalog,
+    readonly analytics?: PlayAnalytics,
   ) {}
   get state(): State {
     return this.store.state;
+  }
+  /** Seats are fixed when the room is created, so a fallback version cannot change them. */
+  private roomCapacity(room: Room) {
+    return room.capacity ?? this.roomStory(room).scenario.players;
+  }
+  /** A room keeps the version it was created with, so later publishes cannot change its seats or content. */
+  private roomStory(room: Room) {
+    // A pinned version can disappear after a rollback. Fall back to the current version so one stale room cannot break every lobby view.
+    return this.storyCatalog.get(room.scenarioId, room.scenarioVersion) ?? this.storyCatalog.get(room.scenarioId)!;
   }
   roomFor(id: string) {
     return Object.values(this.state.rooms).find((r) =>
       r.memberIds.includes(id),
     );
   }
+  /** Chat is available only while participants are collecting clues or meeting. */
+  canChat(id: string, sessionId: string) {
+    const room = this.roomFor(id);
+    if (room?.sessionId !== sessionId) return false;
+    const phase = this.state.sessions[sessionId]?.phase;
+    return (
+      phase === "first_investigation" ||
+      phase === "meeting" ||
+      phase === "second_investigation"
+    );
+  }
+  private availableClues(session: Session, story?: StoryContent) {
+    if (!story || session.phase === "briefing") return [];
+    if (session.phase === "first_investigation" || session.phase === "meeting")
+      return story.firstClues;
+    return [...story.firstClues, ...story.secondClues];
+  }
+  private visibleClues(session: Session, story?: StoryContent) {
+    const collected = new Set(session.collectedClueIds ?? []);
+    return this.availableClues(session, story)
+      .filter((clue) => collected.has(clue.id))
+      .map((clue) => clue.text);
+  }
+  private resourceValue(session: Session, userId: string, resourceId: string, scope: "personal" | "shared") {
+    return scope === "shared" ? session.sharedResources?.[resourceId] ?? 0 : session.resources?.[userId]?.[resourceId] ?? 0;
+  }
+  private canPay(session: Session, userId: string, changes: { resourceId: string; amount: number }[], story?: StoryContent) {
+    return changes.every((change) => {
+      const scope = story?.resources?.find((resource) => resource.id === change.resourceId)?.scope ?? "personal";
+      return this.resourceValue(session, userId, change.resourceId, scope) >= change.amount;
+    });
+  }
+  soloRoomForStory(owner: string, story: string) {
+    const room=this.roomFor(owner);
+    return room?.soloStarted && room.mode === 'solo' && story === supportedSoloStory.id ? room.id : null;
+  }
   needRoom(id: string) {
     const r = this.roomFor(id);
-    if (!r) throw Error("참여 중인 방이 없어.");
+    if (!r) throw new Error("참여 중인 방이 없어.");
     return r;
   }
   summary(r: Room): RoomSummary {
-    const s = this.storyCatalog.get(r.scenarioId)!.scenario;
+    const s = this.roomStory(r).scenario;
     return {
+      access: r.access ?? "public",
       id: r.id,
       code: r.code,
       title: r.mode === "solo" ? supportedSoloStory.title : s.title,
       count: r.memberIds.length,
-      capacity: r.mode === "solo" ? 1 : s.players,
+      capacity: r.mode === "solo" ? 1 : this.roomCapacity(r),
       status: r.sessionId || r.soloStarted ? "playing" : "waiting",
     };
   }
   private joinError(room: Room): string | null {
     const summary = this.summary(room);
     if (summary.status !== "waiting") return "이미 게임이 진행 중이야.";
-    if (summary.count >= summary.capacity)
-      return "방이 가득 찼어.";
+    if (summary.count >= summary.capacity) return "방이 가득 찼어.";
     return null;
   }
   snapshot(me: Guest): Snapshot {
     const r = this.roomFor(me.id);
     let room: RoomView | null = null;
     if (r) {
-      const scenario = this.storyCatalog.get(r.scenarioId)!.scenario;
+      const scenario = this.roomStory(r).scenario;
       const session = r.sessionId ? this.state.sessions[r.sessionId] : null;
       const participant = session?.participants.find((p) => p.id === me.id);
       const story = session
@@ -74,18 +122,63 @@ export class Game {
                 id: session.id,
                 scenarioVersion: session.scenarioVersion,
                 phase: session.phase,
+                phaseEndsAt: session.phaseEndsAt ?? null,
                 role: story?.content.roles[participant.roleIndex] ?? {
                   name: "역할 정보 없음",
                   secret: "이 작품의 역할 정보를 불러오지 못했어.",
                 },
-                clues:
-                  session.phase === "briefing" ? [] : (story?.content.clues ?? []),
-                voteCount: r.memberIds.filter((id) => !!session.votes[id]).length,
+                items: (story?.content.items ?? [])
+                  .filter((item) => session.itemOwners?.[item.id] === me.id || (!session.itemOwners && item.ownerRoleIndex === participant.roleIndex))
+                  .map(({ id, name, description, use }) => ({ id, name, description, useLabel: use && !(session.usedItemIds ?? []).includes(id) ? use.label : null })),
+                itemRecipes: (story?.content.itemRecipes ?? [])
+                  .filter((recipe) => recipe.itemIds.every((id) => session.itemOwners?.[id] === me.id))
+                  .map((recipe) => ({
+                    ...recipe,
+                    resultName: story?.content.items?.find((item) => item.id === recipe.resultItemId)?.name ?? recipe.resultItemId,
+                  })),
+                transferTargets: session.participants
+                  .filter((participant) => participant.id !== me.id)
+                  .map(({ id, nickname }) => ({ id, nickname })),
+                collectableItems: (story?.content.items ?? [])
+                  .filter((item) => session.itemOwners?.[item.id] === null && !(session.consumedItemIds ?? []).includes(item.id) && (() => { const roomId = (story?.content.rooms ?? []).find((room) => room.itemIds.includes(item.id))?.id; return !roomId || session.currentRoomIds?.[me.id] === roomId; })())
+                  .map(({ id, name }) => ({ id, name, roomId: (story?.content.rooms ?? []).find((room) => room.itemIds.includes(id))?.id ?? null })),
+                revealedItems: (story?.content.items ?? [])
+                  .filter((item) => (session.revealedItemIds ?? []).includes(item.id))
+                  .map(({ id, name, description }) => ({ id, name, description })),
+                itemUseResults: session.itemUseResults ?? [],
+                clues: this.visibleClues(session, story?.content),
+                availableClueCount: this.availableClues(session, story?.content).length,
+                collectedClueCount: session.collectedClueIds?.length ?? 0,
+                meetingPrompt: story?.content.meetingPrompt ?? null,
+                finalChoices: (story?.content.finalChoices ?? []).map(({ id, label }) => ({ id, label })),
+                selectedFinalChoiceId: session.finalChoices?.[me.id] ?? null,
+                rooms: (story?.content.rooms ?? []).map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  description: item.description ?? null,
+                  available: item.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)) && this.canPay(session, me.id, [...item.entryCost, ...item.entryPenalty], story?.content),
+                  resourceChanges: [
+                    ...item.entryCost.map((change) => ({ name: story?.content.resources?.find((resource) => resource.id === change.resourceId)?.name ?? change.resourceId, amount: change.amount, kind: "cost" as const })),
+                    ...item.entryReward.map((change) => ({ name: story?.content.resources?.find((resource) => resource.id === change.resourceId)?.name ?? change.resourceId, amount: change.amount, kind: "reward" as const })),
+                    ...item.entryPenalty.map((change) => ({ name: story?.content.resources?.find((resource) => resource.id === change.resourceId)?.name ?? change.resourceId, amount: change.amount, kind: "penalty" as const })),
+                  ],
+                })),
+                currentRoomId: session.currentRoomIds?.[me.id] ?? null,
+                resources: (story?.content.resources ?? []).map((resource) => ({
+                  id: resource.id,
+                  name: resource.name,
+                  value: this.resourceValue(session, me.id, resource.id, resource.scope),
+                  scope: resource.scope,
+                })),
+                voteCount: r.memberIds.filter((id) => !!session.votes[id])
+                  .length,
                 hasVoted: !!session.votes[me.id],
                 result:
                   session.phase === "reveal"
                     ? {
-                        answer: story?.content.answer ?? "결말 정보를 불러오지 못했어.",
+                        answer:
+                          story?.content.answer ??
+                          "결말 정보를 불러오지 못했어.",
                         votes: session.participants.map((p) => ({
                           voter: p.nickname,
                           target:
@@ -93,17 +186,32 @@ export class Game {
                               (t) => t.id === session.votes[p.id],
                             )?.nickname ?? "미투표",
                         })),
+                        choices: session.participants.flatMap((p) => {
+                          const choice = (story?.content.finalChoices ?? []).find((item) => item.id === session.finalChoices?.[p.id]);
+                          return choice ? [{ player: p.nickname, outcome: choice.outcome }] : [];
+                        }),
                       }
                     : null,
               }
             : null,
       };
     }
+    const friendIds = this.store.friendIds
+      ? new Set(this.store.friendIds(me.id))
+      : null;
     return {
       me,
+      endingSessionId: this.analytics?.pending(me.id) ?? null,
       scenarios: this.storyCatalog.list(),
       rooms: Object.values(this.state.rooms)
-        .filter((room) => this.joinError(room) === null)
+        .filter(
+          (room) =>
+            this.joinError(room) === null &&
+            (room.access !== "friends" ||
+              (friendIds
+                ? friendIds.has(room.hostId)
+                : !!this.store.areFriends?.(room.hostId, me.id))),
+        )
         .map((room) => this.summary(room)),
       room,
     };
@@ -138,41 +246,54 @@ export class Game {
       playsByStoryVersion.set(key, plays);
     }
 
-    const items = this.storyCatalog.list().map((story) => {
-      const plays = playsByStoryVersion.get(JSON.stringify([story.id, story.version]));
-      return {
-        ...story,
-        origin: story.kind,
-        difficulty: story.difficulty ?? null,
-        averageRating: null,
-        ratingCount: 0,
-        startedPlays: plays?.started ?? 0,
-        completedPlays: plays?.completed ?? 0,
-        uniquePlayers: plays?.players.size ?? 0,
-      };
-    }).filter((story) => {
-      if (query.origin && story.origin !== query.origin) return false;
-      if (query.difficulty && (
-        query.difficulty === "unset"
-          ? story.difficulty !== null
-          : story.difficulty !== query.difficulty
-      )) return false;
-      if (query.players && story.players !== query.players) return false;
-      const keyword = query.q?.trim().toLocaleLowerCase();
-      return !keyword ||
-        story.title.toLocaleLowerCase().includes(keyword) ||
-        story.subtitle.toLocaleLowerCase().includes(keyword);
-    });
+    const items = this.storyCatalog
+      .list()
+      .map((story) => {
+        const plays = playsByStoryVersion.get(
+          JSON.stringify([story.id, story.version]),
+        );
+        return {
+          ...story,
+          origin: story.kind,
+          difficulty: story.difficulty ?? null,
+          averageRating: null,
+          ratingCount: 0,
+          startedPlays: plays?.started ?? 0,
+          completedPlays: plays?.completed ?? 0,
+          uniquePlayers: plays?.players.size ?? 0,
+        };
+      })
+      .filter((story) => {
+        if (query.origin && story.origin !== query.origin) return false;
+        if (
+          query.difficulty &&
+          (query.difficulty === "unset"
+            ? story.difficulty !== null
+            : story.difficulty !== query.difficulty)
+        )
+          return false;
+        if (query.players && story.players !== query.players) return false;
+        const keyword = query.q?.trim().toLocaleLowerCase();
+        return (
+          !keyword ||
+          story.title.toLocaleLowerCase().includes(keyword) ||
+          story.subtitle.toLocaleLowerCase().includes(keyword)
+        );
+      });
 
     items.sort((a, b) => {
       if (query.sort === "rating") {
-        return (b.averageRating ?? -1) - (a.averageRating ?? -1) ||
-          b.version - a.version;
+        return (
+          (b.averageRating ?? -1) - (a.averageRating ?? -1) ||
+          b.version - a.version
+        );
       }
       if (query.sort === "popular") {
-        return b.uniquePlayers - a.uniquePlayers ||
+        return (
+          b.uniquePlayers - a.uniquePlayers ||
           b.startedPlays - a.startedPlays ||
-          b.version - a.version;
+          b.version - a.version
+        );
       }
       return b.version - a.version || a.title.localeCompare(b.title);
     });
@@ -184,12 +305,21 @@ export class Game {
       offset: query.offset,
     };
   }
-  create(me: Guest, scenarioId: string) {
-    if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
+  create(
+    me: Guest,
+    scenarioId: string,
+    access: import("@festival/shared").RoomAccess = "public",
+    pin?: string,
+  ) {
+    if (!["public", "friends", "secret"].includes(access))
+      throw new Error("방 종류를 확인해 줘.");
+    if (access === "secret" && !/^\d{4}$/.test(pin ?? ""))
+      throw new Error("숫자 4자리 PIN을 입력해 줘.");
+    if (this.roomFor(me.id)) throw new Error("현재 방에서 먼저 나가 줘.");
     const scenario = this.storyCatalog
       .list()
       .find((s) => s.id === scenarioId && s.available);
-    if (!scenario) throw Error("아직 플레이할 수 없는 작품이야.");
+    if (!scenario) throw new Error("아직 플레이할 수 없는 작품이야.");
     let code: string;
     do {
       code = crypto.randomUUID().replaceAll("-", "").slice(0, 6).toUpperCase();
@@ -198,8 +328,12 @@ export class Game {
       id: crypto.randomUUID(),
       code,
       hostId: me.id,
+      access,
+      ...(access === "secret" ? { pinHash: this.hashPin(code, pin!) } : {}),
       scenarioId,
-      mode: scenarioId === supportedSoloStory.id ? 'solo' : 'multiplayer',
+      scenarioVersion: scenario.version,
+      capacity: scenario.players,
+      mode: scenarioId === supportedSoloStory.id ? "solo" : "multiplayer",
       memberIds: [me.id],
       sessionId: null,
     };
@@ -207,133 +341,637 @@ export class Game {
     this.store.save();
     return r;
   }
-  join(me: Guest, code: string) {
+  private hashPin(code: string, pin: string) {
+    return createHash("sha256")
+      .update(code + ":" + pin)
+      .digest("hex");
+  }
+  join(me: Guest, code: string, pin?: string) {
     const r = Object.values(this.state.rooms).find((r) => r.code === code);
-    if (!r) throw Error("초대 코드에 해당하는 방이 없어.");
+    if (!r) throw new Error("초대 코드에 해당하는 방이 없어.");
     if (r.memberIds.includes(me.id)) return r;
-    if (this.roomFor(me.id)) throw Error("현재 방에서 먼저 나가 줘.");
+    if (this.roomFor(me.id)) throw new Error("현재 방에서 먼저 나가 줘.");
+    if (r.access === "friends" && !this.store.areFriends?.(r.hostId, me.id))
+      throw new Error("방장의 친구만 입장할 수 있어.");
+    if (r.access === "secret") this.verifyPin(me, r, pin);
     const error = this.joinError(r);
     if (error) throw new Error(error);
     r.memberIds.push(me.id);
     this.store.save();
     return r;
   }
+  private verifyPin(me: Guest, room: Room, pin?: string) {
+    const now = Date.now();
+    // Old persisted rooms used one room-wide counter. It must not keep a
+    // legitimate guest locked out after the per-guest migration.
+    const legacy = room.pinFailures as unknown;
+    if (legacy && typeof legacy === "object" && "count" in legacy) delete room.pinFailures;
+    const attempts = room.pinFailures ?? {};
+    for (const [guestId, value] of Object.entries(attempts))
+      if (value.until <= now) delete attempts[guestId];
+    const correct = !!room.pinHash && timingSafeEqual(
+      Buffer.from(room.pinHash), Buffer.from(this.hashPin(room.code, pin ?? "")),
+    );
+    if (correct) {
+      delete attempts[me.id];
+      if (Object.keys(attempts).length) room.pinFailures = attempts;
+      else delete room.pinFailures;
+      return;
+    }
+    const previous = attempts[me.id];
+    if (previous && previous.count >= 10 && previous.until > now)
+      throw new Error("PIN 입력이 잠겼어. 10분 뒤 다시 시도해 줘.");
+    attempts[me.id] = { count: (previous?.count ?? 0) + 1, until: now + 600000 };
+    // Bound stored attacker identities even if accounts are rotated.
+    const oldest = Object.entries(attempts).sort(([, a], [, b]) => a.until - b.until);
+    while (oldest.length > 256) delete attempts[oldest.shift()![0]];
+    room.pinFailures = attempts;
+    this.store.save();
+    throw new Error("PIN을 확인해 줘.");
+  }
   expireConnection(guestId: string, roomId: string) {
     const room = this.roomFor(guestId);
-    if (!room || room.id !== roomId || (this.online.get(guestId) ?? 0) > 0) return;
+    if (!room || room.id !== roomId || (this.online.get(guestId) ?? 0) > 0)
+      return;
     // End access to the room without rewriting the game's participant history.
     room.memberIds = room.memberIds.filter((id) => id !== guestId);
-    const session = room.sessionId ? this.state.sessions[room.sessionId] : undefined;
-    const previousPhase = session?.phase, previouslyEnded = !!session?.endedAt;
+    const session = room.sessionId
+      ? this.state.sessions[room.sessionId]
+      : undefined;
+    const previousPhase = session?.phase,
+      previouslyEnded = !!session?.endedAt;
     if (!room.memberIds.length) {
-      if (session && !session.endedAt) session.endedAt = new Date().toISOString();
+      if (session && !session.endedAt) {
+        session.endedAt = new Date().toISOString();
+        this.analytics?.finish(session.id, "abandoned", null);
+      }
+      const active = this.analytics?.activeForRoom(room.id);
+      if (active) this.analytics?.finish(active.id, "abandoned", null);
       delete this.state.rooms[room.id];
     } else {
       if (room.hostId === guestId) room.hostId = room.memberIds[0];
       if (session) this.revealWhenAllActiveVoted(room, session);
     }
     this.store.save();
-    if (session && (session.phase !== previousPhase || !!session.endedAt !== previouslyEnded)) {
-      return { sessionId: session.id, phase: session.phase, ended: !!session.endedAt };
+    if (
+      session &&
+      (session.phase !== previousPhase || !!session.endedAt !== previouslyEnded)
+    ) {
+      return {
+        sessionId: session.id,
+        phase: session.phase,
+        ended: !!session.endedAt,
+      };
     }
   }
+  recoverLegacySessions() {
+    if (!this.analytics) return;
+    const before = structuredClone(this.state);
+    try {
+      this.analytics.atomic(() => {
+        let changed = false;
+        for (const room of Object.values(this.state.rooms)) {
+          const session = room.sessionId
+            ? this.state.sessions[room.sessionId]
+            : null;
+          if (!session || this.analytics!.play(session.id)) continue;
+          const story = this.storyCatalog.get(
+            session.scenarioId,
+            session.scenarioVersion,
+          );
+          if (!story) continue;
+          this.analytics!.start(
+            session.id,
+            session.scenarioId,
+            session.scenarioVersion,
+            "multiplayer",
+            room.id,
+            session.participants.map((p) => ({
+              id: p.id,
+              role: String(p.roleIndex),
+            })),
+            {
+              title: story.scenario.title,
+              participants: session.participants.map((p) => ({
+                id: p.id,
+                nickname: p.nickname,
+              })),
+            },
+          );
+          this.analytics!.markLegacy(
+            session.id,
+            this.analytics!.play(session.id)!.started,
+            null,
+          );
+          for (const participant of session.participants)
+            this.analytics!.stage(session.id, participant.id, session.phase);
+          if (session.phase === "reveal")
+            this.finishRecoveredSession(
+              session,
+              story.content.answer,
+              story.content.answerRoleIndex,
+            );
+          changed = true;
+        }
+        if (changed) this.store.save();
+      });
+    } catch (error) {
+      this.store.state = before;
+      throw error;
+    }
+  }
+  private finishRecoveredSession(
+    session: Session,
+    answer: string,
+    answerRoleIndex: number | undefined,
+  ) {
+    const result = {
+      answer,
+      votes: session.participants.map((p) => ({
+        voter: p.nickname,
+        target:
+          session.participants.find((other) => other.id === session.votes[p.id])
+            ?.nickname ?? "미투표",
+      })),
+    };
+    this.analytics!.finish(
+      session.id,
+      "completed",
+      result,
+      this.groupCorrectness(session, answerRoleIndex),
+    );
+    session.endedAt ??= new Date().toISOString();
+  }
+  private groupCorrectness(
+    session: Session,
+    answerRoleIndex: number | undefined,
+  ): boolean | null {
+    if (answerRoleIndex === undefined) return null;
+    const counts = new Map<string, number>();
+    for (const target of Object.values(session.votes))
+      counts.set(target, (counts.get(target) ?? 0) + 1);
+    const highest = Math.max(0, ...counts.values());
+    const winners = [...counts].filter(([, count]) => count === highest);
+    if (winners.length !== 1) return null;
+    return (
+      session.participants.find((p) => p.id === winners[0][0])?.roleIndex ===
+      answerRoleIndex
+    );
+  }
   private revealWhenAllActiveVoted(room: Room, session: Session) {
-    if (session.phase === "voting" && room.memberIds.every((id) => !!session.votes[id])) {
+    if (
+      session.phase === "final_choice" &&
+      room.memberIds.every((id) => !!session.votes[id])
+    ) {
       session.phase = "reveal";
+      if (this.analytics) {
+        session.endedAt = new Date().toISOString();
+        const story = this.storyCatalog.get(
+          session.scenarioId,
+          session.scenarioVersion,
+        );
+        this.analytics.finish(
+          session.id,
+          "completed",
+          {
+            answer: story?.content.answer ?? "",
+            votes: session.participants.map((p) => ({
+              voter: p.nickname,
+              target:
+                session.participants.find((t) => t.id === session.votes[p.id])
+                  ?.nickname ?? "미투표",
+            })),
+          },
+          this.groupCorrectness(session, story?.content.answerRoleIndex),
+        );
+      }
     }
   }
   command(me: Guest, command: Command) {
-    const r = this.needRoom(me.id);
-    const s = r.sessionId ? this.state.sessions[r.sessionId] : null;
-    const host = () => {
-      if (r.hostId !== me.id) throw Error("방장만 진행할 수 있어.");
-    };
+    if (!this.analytics) return this.applyCommand(me, command);
+    const room = this.needRoom(me.id),
+      beforeRoom = structuredClone(room);
+    const beforeSession = room.sessionId
+      ? structuredClone(this.state.sessions[room.sessionId])
+      : null;
+    try {
+      this.analytics.atomic(() => this.applyCommand(me, command));
+    } catch (error) {
+      if (room.sessionId && room.sessionId !== beforeRoom.sessionId)
+        delete this.state.sessions[room.sessionId];
+      this.state.rooms[beforeRoom.id] = beforeRoom;
+      if (beforeSession) this.state.sessions[beforeSession.id] = beforeSession;
+      throw error;
+    }
+  }
+  private requireHost(me: Guest, room: Room) {
+    if (room.hostId !== me.id) throw new Error("방장만 진행할 수 있어.");
+  }
+  private applyCommand(me: Guest, command: Command) {
+    const room = this.needRoom(me.id);
+    const session = room.sessionId ? this.state.sessions[room.sessionId] : null;
     switch (command.type) {
       case "mode":
-        host();
-        if (r.scenarioId === supportedSoloStory.id && command.mode !== 'solo') throw Error('선택한 작품은 1인 플레이만 지원해.');
-        if (s || r.soloStarted) throw Error("게임 시작 전에만 모드를 바꿀 수 있어.");
-        if (command.mode === "solo" && r.memberIds.length !== 1) throw Error("혼자 있는 방에서만 1인 모드를 열 수 있어.");
-        r.mode = command.mode;
+        this.setMode(me, room, session, command.mode);
         break;
       case "solo-return":
-        host();
-        if (r.mode !== "solo" || !r.soloStarted) throw Error("진행 중인 1인 게임이 없어.");
-        r.soloStarted = false;
-        r.soloPlayId = null;
+        this.closeSolo(me, room);
         break;
-      case "start": {
-        host();
-        if (s || r.soloStarted) throw Error("이미 시작한 게임이야.");
-        if (r.mode === "solo") {
-          if (r.memberIds.length !== 1 || !this.online.get(me.id)) throw Error("참가자가 접속해야 시작할 수 있어.");
-          r.soloStarted = true;
-          r.soloPlayId = crypto.randomUUID();
-          break;
-        }
-        const scenario = this.storyCatalog.get(r.scenarioId)!.scenario;
-        if (
-          r.memberIds.length !== scenario.players ||
-          r.memberIds.some((id) => !this.online.get(id))
-        )
-          throw Error("모든 참가자가 접속해야 시작할 수 있어.");
-        const ids = [...r.memberIds];
-        for (let i = ids.length - 1; i > 0; i--) {
-          const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
-          [ids[i], ids[j]] = [ids[j], ids[i]];
-        }
-        const session: Session = {
-          id: crypto.randomUUID(),
-          roomId: r.id,
-          scenarioId: scenario.id,
-          scenarioVersion: scenario.version,
-          participants: ids.map((id, roleIndex) => ({
-            ...this.state.guests[id],
-            roleIndex,
-          })),
-          phase: "briefing",
-          votes: {},
-          endedAt: null,
-        };
-        this.state.sessions[session.id] = session;
-        r.sessionId = session.id;
+      case "start":
+        this.startRoom(me, room, session);
         break;
-      }
+      case "transfer-host":
+        this.transferHost(me, room, session, command.targetId);
+        break;
+      case "remove-member":
+        this.removeMember(me, room, session, command.targetId);
+        break;
       case "advance":
-        host();
-        if (!s) throw Error("진행 중인 게임이 없어.");
-        if (s.phase === "briefing") s.phase = "discussion";
-        else if (s.phase === "discussion") s.phase = "voting";
-        else throw Error("참가자들의 투표를 기다려 줘.");
+        this.advanceRoom(me, room, session);
         break;
+      case "collect-clue":
+        this.collectClue(me, room, session);
+        break;
+      case "choose-final":
+        this.chooseFinal(me, room, session, command.choiceId);
+        break;
+      case "move-room":
+        this.moveRoom(me, session, command.roomId);
+        break;
+      case "collect-item": this.collectItem(me, session, command.itemId); break;
+      case "transfer-item": this.transferItem(me, session, command.itemId, command.targetId); break;
+      case "reveal-item": this.revealItem(me, session, command.itemId); break;
+      case "combine-items": this.combineItems(me, session, command.recipeId); break;
+      case "use-item": this.useItem(me, session, command.itemId); break;
       case "vote":
-        if (!s || s.phase !== "voting") throw Error("투표 단계가 아니야.");
-        if (s.votes[me.id]) throw Error("이미 투표했어.");
-        if (!s.participants.some((p) => p.id === command.targetId))
-          throw Error("투표 대상을 확인해 줘.");
-        s.votes[me.id] = command.targetId;
-        this.revealWhenAllActiveVoted(r, s);
+        this.vote(me, room, session, command.targetId);
         break;
       case "return":
-        host();
-        if (!s || s.phase !== "reveal")
-          throw Error("결말 공개 후 돌아갈 수 있어.");
-        s.endedAt = new Date().toISOString();
-        r.sessionId = null;
+        this.returnRoom(me, room, session);
         break;
       case "leave":
-        if (s || r.soloStarted) throw Error("게임 중에는 퇴장할 수 없어. 재접속할 수 있어.");
-        r.memberIds = r.memberIds.filter((id) => id !== me.id);
-        if (!r.memberIds.length) delete this.state.rooms[r.id];
-        else if (r.hostId === me.id) r.hostId = r.memberIds[0];
+        this.leaveRoom(me, room, session);
         break;
+      case "presence":
+        throw new Error("접속 상태는 로비 연결에서 처리해 줘.");
     }
     this.store.save();
   }
+  private setMode(
+    me: Guest,
+    room: Room,
+    session: Session | null,
+    mode: "solo" | "multiplayer",
+  ) {
+    this.requireHost(me, room);
+    if (room.scenarioId === supportedSoloStory.id && mode !== "solo")
+      throw new Error("선택한 작품은 1인 플레이만 지원해.");
+    if (session || room.soloStarted)
+      throw new Error("게임 시작 전에만 모드를 바꿀 수 있어.");
+    if (mode === "solo" && room.memberIds.length !== 1)
+      throw new Error("혼자 있는 방에서만 1인 모드를 열 수 있어.");
+    room.mode = mode;
+  }
+  private closeSolo(me: Guest, room: Room) {
+    this.requireHost(me, room);
+    if (room.mode !== "solo" || !room.soloStarted)
+      throw new Error("진행 중인 1인 게임이 없어.");
+    if (this.analytics) {
+      const active = this.analytics.activeForRoom(room.id);
+      if (active) this.analytics.finish(active.id, "abandoned", null);
+      delete this.state.rooms[room.id];
+      return;
+    }
+    room.soloStarted = false;
+    room.soloPlayId = null;
+  }
+  private startRoom(me: Guest, room: Room, previous: Session | null) {
+    this.requireHost(me, room);
+    if (previous || room.soloStarted) throw new Error("이미 시작한 게임이야.");
+    if (room.mode === "solo") {
+      if (room.memberIds.length !== 1 || !this.online.get(me.id))
+        throw new Error("참가자가 접속해야 시작할 수 있어.");
+      room.soloStarted = true;
+      room.soloPlayId = crypto.randomUUID();
+      return;
+    }
+    const scenario = this.roomStory(room).scenario;
+    if (room.capacity !== undefined && room.capacity !== scenario.players)
+      throw new Error("이 방의 작품 버전을 더 이상 시작할 수 없어. 방을 새로 만들어 줘.");
+    if (
+      room.memberIds.length !== this.roomCapacity(room) ||
+      room.memberIds.some((id) => !this.online.get(id))
+    )
+      throw new Error("모든 참가자가 접속해야 시작할 수 있어.");
+    const ids = [...room.memberIds];
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    const session: Session = {
+      id: crypto.randomUUID(),
+      roomId: room.id,
+      scenarioId: scenario.id,
+      scenarioVersion: scenario.version,
+      participants: ids.map((id, roleIndex) => ({
+        ...this.state.guests[id],
+        roleIndex,
+      })),
+      phase: "briefing",
+      votes: {},
+      finalChoices: {},
+      currentRoomIds: {},
+      resources: Object.fromEntries(ids.map((id) => [
+        id,
+        Object.fromEntries((this.roomStory(room).content.resources ?? []).filter((resource) => resource.scope === "personal").map((resource) => [resource.id, resource.initialValue])),
+      ])),
+      sharedResources: Object.fromEntries((this.roomStory(room).content.resources ?? []).filter((resource) => resource.scope === "shared").map((resource) => [resource.id, resource.initialValue])),
+      visitedRoomIds: {},
+      itemOwners: Object.fromEntries((this.roomStory(room).content.items ?? []).map((item) => [item.id, item.ownerRoleIndex === undefined ? null : ids.find((_, index) => index === item.ownerRoleIndex) ?? null])),
+      consumedItemIds: [],
+      usedItemIds: [],
+      itemUseResults: [],
+      revealedItemIds: [],
+      collectedClueIds: [],
+      phaseEndsAt: null,
+      endedAt: null,
+    };
+    this.analytics?.start(
+      session.id,
+      session.scenarioId,
+      session.scenarioVersion,
+      "multiplayer",
+      room.id,
+      session.participants.map((p) => ({
+        id: p.id,
+        role: String(p.roleIndex),
+      })),
+      {
+        title: scenario.title,
+        participants: session.participants.map((p) => ({
+          id: p.id,
+          nickname: p.nickname,
+        })),
+      },
+    );
+    this.state.sessions[session.id] = session;
+    room.sessionId = session.id;
+  }
+  private requireWaitingRoom(session: Session | null, room: Room) {
+    if (session || room.soloStarted) throw new Error("대기방에서만 할 수 있어.");
+  }
+  private transferHost(me: Guest, room: Room, session: Session | null, targetId: string) {
+    this.requireHost(me, room);
+    this.requireWaitingRoom(session, room);
+    if (targetId === me.id || !room.memberIds.includes(targetId)) throw new Error("방장으로 넘길 참가자를 확인해 줘.");
+    room.hostId = targetId;
+  }
+  private removeMember(me: Guest, room: Room, session: Session | null, targetId: string) {
+    this.requireHost(me, room);
+    this.requireWaitingRoom(session, room);
+    if (targetId === me.id || !room.memberIds.includes(targetId)) throw new Error("내보낼 참가자를 확인해 줘.");
+    room.memberIds = room.memberIds.filter((id) => id !== targetId);
+  }
+  private advanceRoom(me: Guest, room: Room, session: Session | null) {
+    this.requireHost(me, room);
+    if (!session) throw new Error("진행 중인 게임이 없어.");
+    if (session.phase === "briefing") this.advancePhase(session);
+    else if (session.phase === "first_investigation") this.advancePhase(session);
+    else if (session.phase === "meeting") this.advancePhase(session);
+    else if (session.phase === "second_investigation") this.advancePhase(session);
+    else throw new Error("참가자들의 최종 선택을 기다려 줘.");
+    if (this.analytics)
+      for (const participant of session.participants)
+        this.analytics.stage(session.id, participant.id, session.phase);
+  }
+  private advancePhase(session: Session, now = Date.now()) {
+    session.phase = session.phase === "briefing" ? "first_investigation"
+      : session.phase === "first_investigation" ? "meeting"
+      : session.phase === "meeting" ? "second_investigation"
+      : "final_choice";
+    const story = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content;
+    const seconds = session.phase === "first_investigation"
+      ? story?.stageDurations?.firstInvestigationSeconds
+      : session.phase === "meeting"
+        ? story?.stageDurations?.meetingSeconds
+        : session.phase === "second_investigation"
+          ? story?.stageDurations?.secondInvestigationSeconds
+          : undefined;
+    session.phaseEndsAt = seconds ? now + seconds * 1000 : null;
+  }
+  /** Advances expired configured stages. The lobby broadcasts returned sessions. */
+  expireTimedStages(now = Date.now()) {
+    const changed: Session[] = [];
+    for (const session of Object.values(this.state.sessions)) {
+      if (!session.phaseEndsAt || session.phaseEndsAt > now) continue;
+      if (!["first_investigation", "meeting", "second_investigation"].includes(session.phase)) continue;
+      this.advancePhase(session, now);
+      for (const participant of session.participants)
+        this.analytics?.stage(session.id, participant.id, session.phase);
+      changed.push(session);
+    }
+    if (changed.length) this.store.save();
+    return changed;
+  }
+  private chooseFinal(me: Guest, room: Room, session: Session | null, choiceId: string) {
+    if (!session || session.phase !== "final_choice") throw new Error("최종 선택 단계가 아니야.");
+    const choices = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.finalChoices ?? [];
+    if (!choices.some((choice) => choice.id === choiceId)) throw new Error("선택지를 확인해 줘.");
+    if ((session.finalChoices ?? {})[me.id]) throw new Error("이미 선택했어.");
+    (session.finalChoices ??= {})[me.id] = choiceId;
+    if (room.memberIds.every((id) => !!session.finalChoices[id])) {
+      session.phase = "reveal";
+      session.phaseEndsAt = null;
+      session.endedAt = new Date().toISOString();
+      const story = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content;
+      this.analytics?.finish(session.id, "completed", {
+        answer: story?.answer ?? "",
+        choices: session.participants.map((participant) => ({
+          player: participant.nickname,
+          choiceId: session.finalChoices[participant.id],
+        })),
+      });
+    }
+  }
+  private moveRoom(me: Guest, session: Session | null, roomId: string) {
+    if (!session || (session.phase !== "first_investigation" && session.phase !== "second_investigation"))
+      throw new Error("조사 단계에서만 방을 이동할 수 있어.");
+    const target = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.rooms?.find((item) => item.id === roomId);
+    if (!target) throw new Error("방을 찾을 수 없어.");
+    if (!target.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)))
+      throw new Error("아직 이 방을 열 조건을 충족하지 못했어.");
+    const story = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content;
+    const charge = [...target.entryCost, ...target.entryPenalty];
+    if (!this.canPay(session, me.id, charge, story)) throw new Error("자원이 부족해서 이 방에 들어갈 수 없어.");
+    for (const change of charge) this.changeResource(session, me.id, change.resourceId, -change.amount, story);
+    const visited = (session.visitedRoomIds ??= {})[me.id] ??= [];
+    if (!visited.includes(roomId)) {
+      for (const change of target.entryReward) this.changeResource(session, me.id, change.resourceId, change.amount, story);
+      visited.push(roomId);
+    }
+    (session.currentRoomIds ??= {})[me.id] = roomId;
+  }
+  private changeResource(session: Session, userId: string, resourceId: string, amount: number, story?: StoryContent) {
+    const scope = story?.resources?.find((resource) => resource.id === resourceId)?.scope ?? "personal";
+    if (scope === "shared") session.sharedResources[resourceId] = (session.sharedResources[resourceId] ?? 0) + amount;
+    else {
+      const resources = (session.resources ??= {})[userId] ??= {};
+      resources[resourceId] = (resources[resourceId] ?? 0) + amount;
+    }
+  }
+  private collectItem(me: Guest, session: Session | null, itemId: string) {
+    if (!session || (session.phase !== "first_investigation" && session.phase !== "second_investigation")) throw new Error("조사 단계에서만 아이템을 수집할 수 있어.");
+    const item = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.find((item) => item.id === itemId);
+    if (!item || session.itemOwners?.[itemId] !== null) throw new Error("수집할 수 없는 아이템이야.");
+    const room = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.rooms?.find((entry) => entry.itemIds.includes(itemId));
+    if (room && session.currentRoomIds?.[me.id] !== room.id) throw new Error("이 아이템이 있는 방으로 이동해 줘.");
+    session.itemOwners[itemId] = me.id;
+  }
+  private transferItem(me: Guest, session: Session | null, itemId: string, targetId: string) {
+    if (!session || session.itemOwners?.[itemId] !== me.id) throw new Error("네가 가진 아이템만 전달할 수 있어.");
+    const item = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.find((item) => item.id === itemId);
+    const target = session.participants.find((participant) => participant.id === targetId);
+    if (!item || !target || item.transfer.mode === "never" || (item.transfer.mode === "owner_choice" && !item.transfer.targetRoleIndexes?.includes(target.roleIndex))) throw new Error("이 참가자에게 전달할 수 없어.");
+    session.itemOwners[itemId] = targetId;
+  }
+  private revealItem(me: Guest, session: Session | null, itemId: string) {
+    if (!session || session.itemOwners?.[itemId] !== me.id) throw new Error("네가 가진 아이템만 공개할 수 있어.");
+    if ((session.revealedItemIds ?? []).includes(itemId)) throw new Error("이미 공개한 아이템이야.");
+    (session.revealedItemIds ??= []).push(itemId);
+  }
+  private combineItems(me: Guest, session: Session | null, recipeId: string) {
+    if (!session || (session.phase !== "first_investigation" && session.phase !== "meeting" && session.phase !== "second_investigation")) throw new Error("조사 중에만 아이템을 조합할 수 있어.");
+    const recipe = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.itemRecipes?.find((item) => item.id === recipeId);
+    if (!recipe || recipe.itemIds.length < 2 || new Set(recipe.itemIds).size !== recipe.itemIds.length || recipe.itemIds.some((id) => session.itemOwners?.[id] !== me.id)) throw new Error("조합 재료를 모두 가지고 있지 않아.");
+    if (!this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.some((item) => item.id === recipe.resultItemId)) throw new Error("조합 결과 아이템을 확인해 줘.");
+    for (const itemId of recipe.itemIds) { session.itemOwners[itemId] = null; (session.consumedItemIds ??= []).push(itemId); }
+    session.itemOwners[recipe.resultItemId] = me.id;
+  }
+  private useItem(me: Guest, session: Session | null, itemId: string) {
+    if (!session || !["first_investigation", "meeting", "second_investigation"].includes(session.phase)) throw new Error("진행 중에만 아이템을 사용할 수 있어.");
+    if (session.itemOwners?.[itemId] !== me.id) throw new Error("네가 가진 아이템만 사용할 수 있어.");
+    if ((session.usedItemIds ?? []).includes(itemId)) throw new Error("이미 사용한 아이템이야.");
+    const item = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.find((entry) => entry.id === itemId);
+    if (!item?.use) throw new Error("사용할 수 없는 아이템이야.");
+    (session.usedItemIds ??= []).push(itemId);
+    (session.itemUseResults ??= []).push({ itemId, text: item.use.result });
+    if (item.use.consumes) {
+      session.itemOwners[itemId] = null;
+      (session.consumedItemIds ??= []).push(itemId);
+    }
+    this.analytics?.record(session.id, me.id, "use_item", session.phase, itemId);
+  }
+  private vote(
+    me: Guest,
+    room: Room,
+    session: Session | null,
+    targetId: string,
+  ) {
+    if (!session || session.phase !== "final_choice")
+      throw new Error("최종 선택 단계가 아니야.");
+    if (session.votes[me.id]) throw new Error("이미 투표했어.");
+    if (!session.participants.some((p) => p.id === targetId))
+      throw new Error("투표 대상을 확인해 줘.");
+    session.votes[me.id] = targetId;
+    this.analytics?.record(session.id, me.id, "vote", "final_choice", targetId);
+    this.revealWhenAllActiveVoted(room, session);
+  }
+  private collectClue(me: Guest, room: Room, session: Session | null) {
+    if (!session || (session.phase !== "first_investigation" && session.phase !== "second_investigation"))
+      throw new Error("조사 단계에서만 단서를 확인할 수 있어.");
+    const story = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content;
+    const clue = this.availableClues(session, story).find(
+      (item) => !(session.collectedClueIds ?? []).includes(item.id),
+    );
+    if (!clue) throw new Error("이 단계에서 확인할 단서를 모두 찾았어.");
+    if (clue.resourceCost) {
+      const resource = story?.resources?.find((item) => item.id === clue.resourceCost!.resourceId);
+      const remaining = this.resourceValue(session, me.id, clue.resourceCost.resourceId, resource?.scope ?? "personal");
+      if (remaining < clue.resourceCost.amount) throw new Error("자원이 부족해서 이 단서를 조사할 수 없어.");
+      this.changeResource(session, me.id, clue.resourceCost.resourceId, -clue.resourceCost.amount, story);
+    }
+    if (clue.resourceReward)
+      this.changeResource(session, me.id, clue.resourceReward.resourceId, clue.resourceReward.amount, story);
+    (session.collectedClueIds ??= []).push(clue.id);
+    this.analytics?.record(session.id, me.id, "inspect", session.phase, clue.id);
+  }
+  private returnRoom(me: Guest, room: Room, session: Session | null) {
+    if (this.analytics) throw new Error("평가 후 로비로 돌아가 줘.");
+    this.requireHost(me, room);
+    if (!session || session.phase !== "reveal")
+      throw new Error("결말 공개 후 돌아갈 수 있어.");
+    session.endedAt = new Date().toISOString();
+    room.sessionId = null;
+  }
+  private leaveRoom(me: Guest, room: Room, session: Session | null) {
+    if (session || room.soloStarted)
+      throw new Error("게임 중에는 퇴장할 수 없어. 재접속할 수 있어.");
+    room.memberIds = room.memberIds.filter((id) => id !== me.id);
+    if (!room.memberIds.length) delete this.state.rooms[room.id];
+    else if (room.hostId === me.id) room.hostId = room.memberIds[0];
+  }
+  completeRating(userId: string, sessionId: string, rating: number | null) {
+    if (!this.analytics) throw new Error("플레이 기록을 사용할 수 없어.");
+    const room = this.roomFor(userId),
+      original = room ? structuredClone(room) : null;
+    try {
+      this.analytics.atomic(() => {
+        this.analytics!.rate(sessionId, userId, rating);
+        this.finishParticipant(userId, sessionId);
+      });
+    } catch (error) {
+      if (original) {
+        this.state.rooms[original.id] = original;
+      }
+      throw error;
+    }
+  }
+  finishParticipant(userId: string, sessionId: string) {
+    const room = this.roomFor(userId),
+      play = this.analytics?.play(sessionId);
+    if (
+      !room ||
+      !play ||
+      play.room_id !== room.id ||
+      (room.sessionId && room.sessionId !== sessionId)
+    )
+      return;
+    room.memberIds = room.memberIds.filter((id) => id !== userId);
+    if (!room.memberIds.length) delete this.state.rooms[room.id];
+    else if (room.hostId === userId) room.hostId = room.memberIds[0];
+    this.store.save();
+  }
+  abandonPlay(id: string) {
+    const play = this.analytics?.play(id);
+    if (!play?.room_id) return;
+    const room = this.state.rooms[play.room_id];
+    if (
+      room &&
+      (room.sessionId === id || (!room.sessionId && room.mode === "solo"))
+    ) {
+      delete this.state.rooms[room.id];
+      this.store.save();
+    }
+  }
+  cleanupFinishedRooms() {
+    if (!this.analytics) return;
+    let changed = false;
+    for (const room of Object.values(this.state.rooms)) {
+      const play = room.sessionId
+        ? this.analytics.play(room.sessionId)
+        : this.analytics.endedForRoom(room.id);
+      if (play?.ended && Date.now() - play.ended > 600000) {
+        delete this.state.rooms[room.id];
+        changed = true;
+      }
+    }
+    if (changed) this.store.save();
+  }
   endSolo(me: Guest, roomId: string, soloPlayId: string | null) {
-    const room = this.needRoom(me.id);
-    if (room.hostId !== me.id) throw Error("방장만 진행할 수 있어.");
-    if (room.id !== roomId) throw Error("현재 방을 확인해 줘.");
+    const room = this.roomFor(me.id);
+    if (!room) return;
+    if (room.hostId !== me.id) throw new Error("방장만 진행할 수 있어.");
+    if (room.id !== roomId) throw new Error("현재 방을 확인해 줘.");
     // Page exits can arrive after a return or a new start. Only end their own attempt.
     if (!room.soloStarted || (room.soloPlayId ?? null) !== soloPlayId) return;
     this.command(me, { type: "solo-return", requestId: crypto.randomUUID() });

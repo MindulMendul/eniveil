@@ -51,7 +51,8 @@
           "title": "1. 처리 항목과 목적",
           "paragraphs": [
             "게스트 로그인 시 입력한 닉네임, 생성된 게스트 ID 및 인증 토큰의 해시·만료 시각을 저장해 로그인과 접근 권한을 확인합니다. Google 로그인 시 Google에서 계정 고유 식별자(subject, sub)를 받아 서비스 계정 ID와 영속적으로 연결합니다. 이 연결로 다시 로그인할 때 같은 닉네임·작품·즐겨찾기에 접근합니다. Google에 요청하는 범위는 openid이며 실명·이메일·비밀번호를 수집하는 회원 가입 양식은 제공하지 않습니다.",
-            "방과 참가자, 역할·선택 등 게임 진행 상태, 솔로 플레이의 실행 ID·진행·결과·평점·이벤트 시각을 저장해 게임을 제공하고 작품 품질을 살펴봅니다. 창작마당에는 게스트 ID와 연결된 초안·공개 작품·메타데이터·즐겨찾기를 저장합니다. 닉네임과 공개 작품 정보는 해당 기능을 이용하는 다른 사람에게 표시될 수 있습니다."
+            "방과 참가자, 역할·선택 등 게임 진행 상태, 솔로 플레이의 실행 ID·진행·결과·평점·이벤트 시각을 저장해 게임을 제공하고 작품 품질을 살펴봅니다. 창작마당에는 게스트 ID와 연결된 초안·공개 작품·메타데이터·즐겨찾기를 저장합니다. 닉네임과 공개 작품 정보는 해당 기능을 이용하는 다른 사람에게 표시될 수 있습니다.",
+            "게임 난이도 분석을 위해 스토리·버전·단계별 소요 시간, 조사·선택·힌트·투표 등의 게임 내 조작, 게임 내 채팅 원문, 완료·이탈 결과, 평점과 참가자의 내부 식별자를 기록합니다. 실력 추정 지표는 내부 분석에만 사용하며 공개하지 않습니다. 이 기록은 선택형 외부 방문 분석과 구분됩니다."
           ]
         },
         {
@@ -64,7 +65,7 @@
         {
           "title": "3. 분석·오류 및 성능 측정",
           "paragraphs": [
-            "GTM 컨테이너가 설정된 배포에서는 분석 및 광고 태그 사용에 동의한 뒤에만 Google Tag Manager를 로드합니다. 운영자가 GTM에 설정한 Google Analytics 등 분석·광고 태그가 페이지 경로·언어·체류 시간·작품 이용 이벤트와 브라우저 정보를 처리하고 쿠키를 사용할 수 있습니다. 앱은 방 초대 코드가 포함된 쿼리와 해시를 페이지 조회 주소에서 제외합니다. 화면의 분석 및 광고 설정에서 허용 또는 거부를 변경할 수 있으며, 이 선택은 브라우저에 저장됩니다. 거부로 변경하면 페이지를 다시 열어 태그 실행을 중단합니다. Google의 개인정보처리방침과 Analytics 차단 도구를 아래에서 확인할 수 있습니다.",
+            "첫 방문 동의창에서 수집 범위를 선택합니다. 기본 수집은 GA 페이지 경로·언어·체류 시간·제한된 게임 이용 이벤트이며, 전체 수집은 여기에 계정과 연결된 작품·세션·행동 ID, 진행·결과·시간 및 품질 측정을 추가합니다. 로그인·게임 이용에는 전체 동의가 필요합니다. 데이터는 게임 품질 개선·난이도 분류·개인 실력 지표에만 사용하고 광고·마케팅에는 사용하지 않습니다. 채팅 원문·비공개 작품 본문·정답과 내부 계정 ID는 GA에 보내지 않습니다. 난이도·MMR 계산 및 표시는 아직 제공하지 않습니다.",
             "운영·QA 도메인에서는 Grafana Faro로 오류·세션·성능·추적 정보를 수집합니다. 전송 전 사용자 메타데이터와 페이지 경로·쿼리를 제거합니다. 서버에는 작품별 성능 측정값과 탐색 ID가 저장될 수 있습니다. 접속·보안 운영 과정에서 서버나 호스팅 로그에 IP 주소, 요청 정보, 브라우저 정보가 남을 수 있습니다."
           ]
         },
@@ -72,7 +73,8 @@
           "title": "4. 보관과 삭제",
           "paragraphs": [
             "로그인 인증의 유효기간은 30일입니다. 게스트가 앱에서 로그아웃하면 해당 닉네임·작품·즐겨찾기와 모든 인증 세션을 삭제합니다. Google 계정의 로그아웃은 모든 인증 세션을 삭제하지만 subject와 계정 ID의 연결, 닉네임·작품·즐겨찾기는 다음 로그인을 위해 보관합니다. 계정 설정에서 회원탈퇴를 확인하면 닉네임, Google 연결, 만든 작품, 즐겨찾기와 인증 세션을 삭제합니다. Google 계정 자체는 삭제되지 않으며 완료된 게임 기록과 익명 집계 통계는 남을 수 있습니다. 로그아웃이나 쿠키 만료만으로 Google 계정 및 계정·게임 기록 전체가 삭제되지는 않습니다. 운영자에게 열람·정정·삭제 또는 처리 정지를 요청할 수 있으며 본인 확인과 다른 이용자의 권리를 검토해 처리합니다.",
-            "처리 목적이 끝났거나 유효한 삭제 요청을 처리할 때에는 해당 정보를 삭제 또는 익명화합니다. 법령상 보존이 필요한 경우에는 그 사유와 범위를 안내합니다. 외부 분석·호스팅 시스템의 보관 기간은 각 서비스 설정과 정책에 따릅니다."
+            "처리 목적이 끝났거나 유효한 삭제 요청을 처리할 때에는 해당 정보를 삭제 또는 익명화합니다. 법령상 보존이 필요한 경우에는 그 사유와 범위를 안내합니다. 외부 분석·호스팅 시스템의 보관 기간은 각 서비스 설정과 정책에 따릅니다.",
+            "플레이 행동·채팅 원문은 최대 90일, 플레이 요약·평점·실력 분석 기록은 최대 365일 보관합니다. 방 종료·삭제와 기록 보관은 별개이며, 수집 데이터의 열람·삭제는 아래 문의처로 요청할 수 있습니다."
           ]
         },
         {
@@ -87,6 +89,13 @@
           "paragraphs": [
             "운영자는 MindulMendul이며 개인정보 문의는 아래 GitHub 문의 링크로 접수합니다. 공개 이슈에는 인증 쿠키, 초대 코드, 실명 등 개인정보를 적지 마세요. 민감한 내용이 필요한 요청은 먼저 비공개 전달 방법을 문의해 주세요.",
             "본인 또는 법정대리인은 개인정보 열람·정정·삭제·처리 정지를 요청할 수 있습니다. 아동의 정보가 부적절하게 제공된 것을 알게 되면 운영자에게 알려 주세요. 방침의 중요한 변경은 변경 내용과 적용일을 안내합니다."
+          ]
+        },
+        {
+          "title": "데이터 수집 범위 변경",
+          "paragraphs": [
+            "로그인 전 선택은 15분간 유효합니다. 전체 동의 후 5분 안에 로그인하면 해당 계정과 이 브라우저에 연결해 30일간 적용합니다. 이후 계정 변경·다른 기기에는 동의를 자동 이전하지 않습니다. 기존 분석 동의를 전체 동의로 간주하지 않습니다. 개인정보 안내와 데이터 수집 설정·로그아웃·탈퇴는 동의 전에도 이용할 수 있습니다.",
+            "전체 수집의 추가 분석 기록은 30일 보관 후 정기 삭제합니다. 기본 수집 전환·철회 시 해당 동의에 연결된 추가 기록을 즉시 삭제하고 이후 이용을 제한합니다. 게임 진행·작성한 평점 등 운영 데이터는 해당 서비스의 보관 정책을 따릅니다. GA·Faro로 이미 전송된 정보는 각 분석 시스템의 보관·삭제 설정에 따르며, 이 설정 변경이 과거 전송 데이터를 자동 삭제하지는 않습니다."
           ]
         }
       ]
@@ -144,7 +153,8 @@
           "title": "1. Information and purposes",
           "paragraphs": [
             "Guest sign-in stores your nickname, generated guest ID, and a hash and expiry time for the authentication token to provide access and check permissions. Google sign-in obtains the unique Google account identifier (subject, sub) and persistently links it to a service account ID, so subsequent sign-ins restore the same nickname, stories and favorites. The requested Google scope is openid; no registration form collects a real name, email address or password.",
-            "Rooms, participants, roles, choices and other game state, plus solo run IDs, progress, outcomes, ratings and event times, are stored to provide games and understand story quality. The workshop stores drafts, published stories, metadata and favorites linked to a guest ID. Your nickname and published story information may be visible to others using those features."
+            "Rooms, participants, roles, choices and other game state, plus solo run IDs, progress, outcomes, ratings and event times, are stored to provide games and understand story quality. The workshop stores drafts, published stories, metadata and favorites linked to a guest ID. Your nickname and published story information may be visible to others using those features.",
+            "To assess story difficulty, we record story/version/stage timings, in-game investigations, choices, hints and votes, in-game chat messages, completion and departure outcomes, ratings and internal participant identifiers. Skill estimates are for internal analysis only and are never published. These records are separate from optional external visit analytics."
           ]
         },
         {
@@ -157,7 +167,7 @@
         {
           "title": "3. Analytics, errors and performance",
           "paragraphs": [
-            "Deployments with a GTM container configured load Google Tag Manager only after you allow analytics and advertising tags. Operator-configured analytics and advertising tags, including Google Analytics, may process page paths, language, time spent, story interaction events and browser information and may use cookies. The app excludes queries and fragments containing room invitation codes from page-view URLs. Your choice is stored in this browser and can be changed through Analytics and advertising settings. Denying after allowing reloads the page to stop tags. Links to Google's privacy policy and Analytics opt-out tool appear below.",
+            "Choose a collection scope in the first-visit dialog. Basic includes GA page paths, language, duration and limited game usage events. Full also includes account-linked story, session and action IDs, progress, results, timing and quality measurements. Full consent is required to sign in and play. Data is used only to improve game quality, classify difficulty and support personal skill measures, never advertising or marketing. Chat text, private story content, answers and internal account IDs are not sent to GA. Difficulty and MMR calculation and display are not available yet.",
             "Production and QA domains use Grafana Faro for errors, sessions, performance and tracing. User metadata and page paths and queries are removed before sending. Story performance measurements and navigation IDs may also be stored on the server. Server or hosting logs may contain IP addresses, request information and browser details for access and security operations."
           ]
         },
@@ -165,7 +175,8 @@
           "title": "4. Retention and deletion",
           "paragraphs": [
             "Sign-in credentials are valid for 30 days. Signing out of a guest account in the app deletes its nickname, stories, favorites and all authentication sessions. Signing out of a Google account deletes all authentication sessions but retains the subject-to-account link, nickname, stories and favorites for the next sign-in. Confirming account deletion in account settings deletes the nickname, Google link, created stories, favorites and authentication sessions. It does not delete the Google account itself; completed game records and anonymous aggregate statistics may remain. Signing out or cookie expiry alone does not delete the Google account link or all account and game records. You can also request access, correction, deletion or restriction of processing; the operator will review identity verification and other users' rights when handling requests.",
-            "When the purpose ends or a valid deletion request is processed, the relevant information is deleted or anonymized. Where legal retention is required, its reason and scope will be explained. Retention in external analytics and hosting systems depends on their settings and policies."
+            "When the purpose ends or a valid deletion request is processed, the relevant information is deleted or anonymized. Where legal retention is required, its reason and scope will be explained. Retention in external analytics and hosting systems depends on their settings and policies.",
+            "Raw gameplay events and chat messages are retained for up to 90 days. Play summaries, ratings and skill analysis records are retained for up to 365 days. Closing a room does not erase these records. You can request access or deletion using the contact below."
           ]
         },
         {
@@ -180,6 +191,13 @@
           "paragraphs": [
             "The operator is MindulMendul. Use the GitHub contact link below for privacy inquiries. Never post authentication cookies, room invitation codes, real names or other personal data in a public issue. If a request needs sensitive details, first ask for a private way to provide them.",
             "You or your legal representative can request access, correction, deletion or restriction of personal data processing. Contact the operator if you discover that a child's information has been provided inappropriately. Significant policy changes will be announced with their effective date."
+          ]
+        },
+        {
+          "title": "Changing collection scope",
+          "paragraphs": [
+            "Before sign-in, the choice lasts 15 minutes. Signing in within 5 minutes of full consent links it to that account and browser for 30 days. It does not automatically transfer to later accounts or other devices. Legacy analytics consent does not become full consent. Privacy information, collection settings, sign-out and account deletion remain accessible without full consent.",
+            "Additional full-scope records are retained for 30 days and periodically removed. Switching to Basic or withdrawing immediately deletes additional records linked to that choice and restricts further service use. Operational game state and submitted ratings follow their service retention policies. Data previously sent to GA or Faro follows each system's retention and deletion settings; changing this preference does not automatically delete previously transmitted data."
           ]
         }
       ]

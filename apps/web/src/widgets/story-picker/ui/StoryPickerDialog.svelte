@@ -36,9 +36,11 @@
     t: (key: string) => string;
     onClose: () => void;
     onWorkshop: () => void;
-    onCreate: (scenarioId: string) => void;
+    onCreate: (scenarioId: string, access: "public" | "friends" | "secret", pin?: string) => void;
   } = $props();
 
+  let access = $state<"public" | "friends" | "secret">("public");
+  let pin = $state("");
   let stories = $state<CatalogStory[]>([]);
   let loading = $state(false);
   let error = $state("");
@@ -128,6 +130,8 @@
         <Button variant="tab" class="tab" onclick={onWorkshop}>{t("workshopNav")} ↗</Button>
       </div>
 
+      <label class="input-label">방 종류<Select bind:value={access}><option value="public">공개방</option><option value="friends">친구방 · 방장의 친구만</option><option value="secret">비밀방 · 4자리 PIN</option></Select></label>
+      {#if access === "secret"}<label class="input-label">4자리 PIN<TextInput type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength={4} bind:value={pin} /></label>{/if}
       <section class="story-picker-filters mb-4 mt-4">
         <Button
           variant="secondary"
@@ -225,7 +229,7 @@
                   <div><dt>{t("storyStartedPlays")}</dt><dd class="mt-1 text-sm">{story.startedPlays}</dd></div>
                   <div><dt>{t("storyCompletedPlays")}</dt><dd class="mt-1 text-sm">{story.completedPlays}</dd></div>
                 </dl>
-                <Button class="mt-4 w-full" disabled={!story.available || busy || !connected} onclick={() => onCreate(story.id)}>
+                <Button class="mt-4 w-full" disabled={!story.available || busy || !connected || (access === "secret" && !/^\d{4}$/.test(pin))} onclick={() => onCreate(story.id, access, access === "secret" ? pin : undefined)}>
                   {story.available ? t("createRoom") : t("storyComingSoon")}<span aria-hidden="true">{story.available ? "↗" : "…"}</span>
                 </Button>
               </div>
