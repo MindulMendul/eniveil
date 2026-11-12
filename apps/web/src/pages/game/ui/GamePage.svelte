@@ -75,6 +75,13 @@
             {/each}
           </div>
         {/if}
+        {#if session.collectableItems.length}
+          <div class="mt-4 flex flex-wrap gap-2">
+            {#each session.collectableItems as item (item.id)}
+              <Button variant="secondary" disabled={busy || !connected} onclick={() => onCommand("collect-item", item.id)}>{item.name} 수집 →</Button>
+            {/each}
+          </div>
+        {/if}
         {#each session.clues as clue, index (index)}
           <div class="clue">
             <span class="clue-label">단서 {index + 1}</span>

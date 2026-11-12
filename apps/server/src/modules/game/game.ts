@@ -115,7 +115,10 @@ export class Game {
                 },
                 items: (story?.content.items ?? [])
                   .filter((item) => session.itemOwners?.[item.id] === me.id || (!session.itemOwners && item.ownerRoleIndex === participant.roleIndex))
-                  .map(({ name, description }) => ({ name, description })),
+                  .map(({ id, name, description }) => ({ id, name, description })),
+                collectableItems: (story?.content.items ?? [])
+                  .filter((item) => session.itemOwners?.[item.id] === null)
+                  .map(({ id, name }) => ({ id, name })),
                 clues: this.visibleClues(session, story?.content),
                 availableClueCount: this.availableClues(session, story?.content).length,
                 collectedClueCount: session.collectedClueIds?.length ?? 0,
@@ -545,6 +548,8 @@ export class Game {
       case "move-room":
         this.moveRoom(me, session, command.roomId);
         break;
+      case "collect-item": this.collectItem(me, session, command.itemId); break;
+      case "transfer-item": this.transferItem(me, session, command.itemId, command.targetId); break;
       case "vote":
         this.vote(me, room, session, command.targetId);
         break;
@@ -720,6 +725,19 @@ export class Game {
     if (!target.requiredClueIds.every((id) => (session.collectedClueIds ?? []).includes(id)))
       throw new Error("아직 이 방을 열 조건을 충족하지 못했어.");
     (session.currentRoomIds ??= {})[me.id] = roomId;
+  }
+  private collectItem(me: Guest, session: Session | null, itemId: string) {
+    if (!session || (session.phase !== "first_investigation" && session.phase !== "second_investigation")) throw new Error("조사 단계에서만 아이템을 수집할 수 있어.");
+    const item = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.find((item) => item.id === itemId);
+    if (!item || session.itemOwners?.[itemId] !== null) throw new Error("수집할 수 없는 아이템이야.");
+    session.itemOwners[itemId] = me.id;
+  }
+  private transferItem(me: Guest, session: Session | null, itemId: string, targetId: string) {
+    if (!session || session.itemOwners?.[itemId] !== me.id) throw new Error("네가 가진 아이템만 전달할 수 있어.");
+    const item = this.storyCatalog.get(session.scenarioId, session.scenarioVersion)?.content.items?.find((item) => item.id === itemId);
+    const target = session.participants.find((participant) => participant.id === targetId);
+    if (!item || !target || item.transfer.mode === "never" || (item.transfer.mode === "owner_choice" && !item.transfer.targetRoleIndexes?.includes(target.roleIndex))) throw new Error("이 참가자에게 전달할 수 없어.");
+    session.itemOwners[itemId] = targetId;
   }
   private vote(
     me: Guest,
