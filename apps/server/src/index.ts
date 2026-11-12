@@ -4,9 +4,13 @@ import { serveStatic } from "hono/bun";
 import { bodyLimit } from "hono/body-limit";
 import { resolve } from "node:path";
 import { Store } from "./store";
+import { PlayAnalytics } from "./modules/game/play-analytics";
+import { sweepPlays } from "./modules/game/play-cleanup";
+import { createPlayRoutes, playOwner } from "./modules/game/play-routes";
 import { Game } from "./game";
 import { metrics, observeHTTP } from "./observability";
 import { storyCatalog } from "./modules/platform/stories/catalog";
+import { withRoleplayPackages } from "./modules/game/roleplay-content";
 import { fileStoryCatalog } from "./modules/platform/stories/file-catalog";
 import { SQLiteStoryRunStore } from "./infrastructure/sqlite/story-run-store";
 import { SQLiteWorkshopStore } from "./infrastructure/sqlite/workshop-store";
@@ -26,11 +30,16 @@ if (production && !process.env.APP_ORIGIN)
 export const store = new Store(
   process.env.DATABASE_PATH ?? "./data/festival.sqlite",
 );
-export const game = new Game(store, storyCatalog);
+const analytics = new PlayAnalytics(store.db);
+export const game = new Game(store, withRoleplayPackages(storyCatalog, fileStoryCatalog), analytics);
 const storyRunStore = new SQLiteStoryRunStore(store.db);
 const workshopStore = new SQLiteWorkshopStore(store.db);
 const playCatalog = new PlayStoryCatalog(fileStoryCatalog, workshopStore);
 const storySessions = new StorySessionService(playCatalog, storyRunStore);
+analytics.pruneRetention();
+analytics.cleanupLegacy();
+game.recoverLegacySessions();
+setInterval(() => sweepPlays({analytics,game,store,storySessions}),60000).unref();
 
 const notifyTemporal = (action: "start" | "event" | "end", payload: object) => {
   const baseUrl = process.env.TEMPORAL_GATEWAY_URL;
@@ -101,8 +110,13 @@ app.route("/api/game", createGameRoutes({
   stories: playCatalog,
   runs: storyRunStore,
   sessions: storySessions,
+  analytics,
+  owner: c => playOwner(c,store,production),
+  rate: (owner,id,rating)=>game.completeRating(owner,id,rating),
+  roomId: (owner,story) => game.soloRoomForStory(owner,story),
 }));
 app.route("/api/lobby", lobby.app);
+app.route("/api/play", createPlayRoutes({analytics,store,game,production,notify:lobby.broadcast,adminToken:process.env.STORY_ADMIN_TOKEN}));
 
 app.get("/metrics", (c) => {
   const token = process.env.METRICS_BEARER_TOKEN;

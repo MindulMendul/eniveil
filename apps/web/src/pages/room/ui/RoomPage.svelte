@@ -45,7 +45,7 @@
     <Button variant="text" disabled={busy || !connected} onclick={() => onCommand("leave")}>방 나가기 ↗</Button>
   </div>
 
-    {#if room.mode === "solo"}<p class="fine">{locale === "en" ? "Reloading or leaving this page ends the investigation and returns you to this room. Progress is not saved." : "새로고침하거나 페이지를 떠나면 수사를 종료하고 이 방으로 돌아와. 수사 진행은 저장되지 않아."}</p>{/if}
+
 
   <div class="lobby-grid">
     <Panel>

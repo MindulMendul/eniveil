@@ -97,6 +97,8 @@ test("personalized secrets, private ballots, complete game, return, replay", () 
   expect(() => game.command(b, cmd("leave"))).toThrow();
   game.command(a, cmd("advance"));
   game.command(a, cmd("advance"));
+  game.command(a, cmd("advance"));
+  game.command(a, cmd("advance"));
   expect(() =>
     game.command(a, { type: "vote", requestId: "1", targetId: "unknown" }),
   ).toThrow();
