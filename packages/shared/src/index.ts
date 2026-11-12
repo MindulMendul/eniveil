@@ -36,6 +36,8 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("mode"), mode: z.enum(["solo", "multiplayer"]), requestId: z.string().max(80) }),
   z.object({ type: z.literal("solo-return"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("start"), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("transfer-host"), targetId: z.string().max(80), requestId: z.string().max(80) }),
+  z.object({ type: z.literal("remove-member"), targetId: z.string().max(80), requestId: z.string().max(80) }),
   z.object({ type: z.literal("advance"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("collect-clue"), requestId: z.string().max(80) }),
   z.object({ type: z.literal("choose-final"), choiceId: z.string().max(80), requestId: z.string().max(80) }),

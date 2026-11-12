@@ -55,7 +55,11 @@
       </div>
       <ul class="members m-0 list-none p-0" role="list">
         {#each room.members as member (member.id)}
-          <li><RoomMemberRow member={member} currentMemberId={snapshot.me.id} hostId={room.hostId} /></li>
+          <li><RoomMemberRow member={member} currentMemberId={snapshot.me.id} hostId={room.hostId} />
+            {#if host && member.id !== snapshot.me.id}
+              <div class="flex gap-2"><Button variant="text" disabled={busy || !connected} onclick={() => onCommand("transfer-host", member.id)}>방장 위임</Button><Button variant="text" disabled={busy || !connected} onclick={() => onCommand("remove-member", member.id)}>내보내기</Button></div>
+            {/if}
+          </li>
         {/each}
         {#each Array(room.capacity - room.count) as _}
           <li class="member vacant">
