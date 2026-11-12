@@ -564,6 +564,12 @@ export class Game {
       case "start":
         this.startRoom(me, room, session);
         break;
+      case "transfer-host":
+        this.transferHost(me, room, session, command.targetId);
+        break;
+      case "remove-member":
+        this.removeMember(me, room, session, command.targetId);
+        break;
       case "advance":
         this.advanceRoom(me, room, session);
         break;
@@ -692,6 +698,21 @@ export class Game {
     );
     this.state.sessions[session.id] = session;
     room.sessionId = session.id;
+  }
+  private requireWaitingRoom(session: Session | null, room: Room) {
+    if (session || room.soloStarted) throw new Error("대기방에서만 할 수 있어.");
+  }
+  private transferHost(me: Guest, room: Room, session: Session | null, targetId: string) {
+    this.requireHost(me, room);
+    this.requireWaitingRoom(session, room);
+    if (targetId === me.id || !room.memberIds.includes(targetId)) throw new Error("방장으로 넘길 참가자를 확인해 줘.");
+    room.hostId = targetId;
+  }
+  private removeMember(me: Guest, room: Room, session: Session | null, targetId: string) {
+    this.requireHost(me, room);
+    this.requireWaitingRoom(session, room);
+    if (targetId === me.id || !room.memberIds.includes(targetId)) throw new Error("내보낼 참가자를 확인해 줘.");
+    room.memberIds = room.memberIds.filter((id) => id !== targetId);
   }
   private advanceRoom(me: Guest, room: Room, session: Session | null) {
     this.requireHost(me, room);
