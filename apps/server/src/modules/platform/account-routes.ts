@@ -4,11 +4,12 @@ import { createHash } from "node:crypto";
 import { getConnInfo } from "hono/bun";
 import { guestSchema, nicknameSchema, type Guest } from "@festival/shared";
 import type { Store } from "../../store";
+import type { PlayAnalytics } from "../game/play-analytics";
 
 export type GoogleConfig = { clientId: string; clientSecret: string; origin: string };
 export function createAccountRoutes(deps: {
   store: Store; production: boolean; google?: GoogleConfig; googleDemo?: boolean;
-  onLogout?: (id: string) => void;
+  onLogout?: (id: string) => void; analytics?: PlayAnalytics;
   fetch?: (url: string, options?: RequestInit) => Promise<Response>;
 }) {
   const app = new Hono();
@@ -25,6 +26,15 @@ export function createAccountRoutes(deps: {
   const nicknameAttempts = new Map<string, { count: number; until: number }>();
   app.use("*", async (c, next) => { c.header("Cache-Control", "no-store"); await next(); });
   app.get("/account", (c) => c.json(profile(session(c))));
+  app.get("/account/recent", (c) => {
+    const me = session(c);
+    if (!me) return c.json({ error: "로그인이 필요해." }, 401);
+    const recent = deps.analytics?.recent(me.id) ?? { stories: [], people: [] };
+    return c.json({ stories: recent.stories, people: recent.people.flatMap((person) => {
+      const guest = deps.store.state.guests[person.id];
+      return guest ? [{ nickname: guest.nickname, started: person.started }] : [];
+    }) });
+  });
   app.get("/auth/config", (c) => c.json({ google: !!deps.google, demo }));
   app.get("/nicknames/availability", (c) => {
     // Use authenticated identity or transport IP, never client-supplied forwarded headers.

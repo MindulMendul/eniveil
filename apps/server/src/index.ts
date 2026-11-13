@@ -95,7 +95,7 @@ const google = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET 
   : undefined;
 app.use("/api/*", collectionConsent.middleware);
 app.route("/api/platform", collectionConsent.routes());
-app.route("/api/platform", createAccountRoutes({ store, production, google, onLogout: lobby.disconnect, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
+app.route("/api/platform", createAccountRoutes({ store, production, google, analytics, onLogout: lobby.disconnect, googleDemo: process.env.GOOGLE_AUTH_DEMO === "true" }));
 app.route('/api/friends', createFriendRoutes(store, {
   isOnline: id => (game.online.get(id) ?? 0) > 0,
   presence: lobby.friendPresence,

@@ -720,6 +720,25 @@ export class PlayAnalytics {
     }
     return history;
   }
+  /** Own recent activity only; callers resolve current display names separately. */
+  recent(user: string) {
+    const rows = this.db.query("SELECT s.id,s.story_id,s.version,s.mode,s.started,s.ended,s.outcome,s.public_json FROM play_sessions s JOIN play_members m ON m.session_id=s.id WHERE m.user_id=? AND s.started>=? ORDER BY s.started DESC LIMIT 30").all(user, this.now() - 365 * 86400000) as { id:string; story_id:string; version:number; mode:string; started:number; ended:number|null; outcome:string|null; public_json:string }[];
+    const stories = new Map<string, { storyId:string; version:number; title:string; started:number; outcome:string|null; mode:string }>();
+    const people = new Map<string, number>();
+    for (const row of rows) {
+      const key = `${row.story_id}:${row.version}`;
+      if (!stories.has(key)) {
+        let title = row.story_id;
+        try { title = (JSON.parse(row.public_json) as { story?: { title?: string } }).story?.title ?? title; } catch { /* Retain safe identifier. */ }
+        stories.set(key, { storyId: row.story_id, version: row.version, title, started: row.started, outcome: row.outcome, mode: row.mode });
+      }
+      if (row.mode === "multiplayer") {
+        const peers = this.db.query("SELECT user_id FROM play_members WHERE session_id=? AND user_id<>?").all(row.id, user) as { user_id:string }[];
+        for (const peer of peers) people.set(peer.user_id, Math.max(people.get(peer.user_id) ?? 0, row.started));
+      }
+    }
+    return { stories: [...stories.values()].sort((a,b) => b.started-a.started).slice(0, 12), people: [...people].map(([id,started]) => ({ id, started })).sort((a,b) => b.started-a.started).slice(0, 12) };
+  }
   view(id: string, user: string) {
     const play = this.play(id),
       member = this.member(id, user);
