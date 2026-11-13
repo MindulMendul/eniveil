@@ -109,7 +109,7 @@ export function createLobbyRoutes(deps: {
       sort,
       limit: integer("limit", 12, 1, 100),
       offset: integer("offset", 0, 0, 1000000),
-    }));
+    }, c.get("guest").id));
   });
   app.get("/state", (c) => c.json(deps.game.snapshot(c.get("guest"))));
   app.post("/rooms", async (c) => {

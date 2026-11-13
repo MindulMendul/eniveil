@@ -224,7 +224,8 @@ export class Game {
     sort: "latest" | "rating" | "popular";
     limit: number;
     offset: number;
-  }) {
+  }, userId?: string) {
+    const history = userId ? this.analytics?.storyHistory(userId) : undefined;
     const playsByStoryVersion = new Map<
       string,
       { started: number; completed: number; players: Set<string> }
@@ -261,6 +262,7 @@ export class Game {
           startedPlays: plays?.started ?? 0,
           completedPlays: plays?.completed ?? 0,
           uniquePlayers: plays?.players.size ?? 0,
+          priorPlay: history?.get(JSON.stringify([story.id, story.version])) ?? null,
         };
       })
       .filter((story) => {

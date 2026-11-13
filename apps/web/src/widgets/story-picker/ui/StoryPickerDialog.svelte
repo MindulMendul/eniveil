@@ -19,6 +19,7 @@
     startedPlays: number;
     completedPlays: number;
     uniquePlayers: number;
+    priorPlay: "completed" | "unfinished" | null;
   };
 
   let {
@@ -53,6 +54,7 @@
   let pages = $state(0);
   let retry = $state(0);
   let filtersOpen = $state(false);
+  let replaying = $state<CatalogStory | null>(null);
   let activeFilterCount = $derived(
     [search.trim() !== "", origin !== "all", difficulty !== "all", players !== "all", sort !== "latest"]
       .filter(Boolean).length,
@@ -115,6 +117,10 @@
 
   function resetPage() {
     page = 1;
+  }
+  function createStory(story: CatalogStory) {
+    if (story.priorPlay) { replaying = story; return; }
+    onCreate(story.id, access, access === "secret" ? pin : undefined);
   }
 </script>
 
@@ -217,6 +223,7 @@
               </div>
               <div class="flex grow flex-col p-4">
                 <h3 class="mb-2 font-serif text-title-sm leading-title text-festival-text" id={`picker-story-${story.id}`}>{story.title}</h3>
+                {#if story.priorPlay}<p class="text-caption text-festival-gold">{t(story.priorPlay === 'completed' ? 'priorPlayCompleted' : 'priorPlayUnfinished')}</p>{/if}
                 <p class="muted grow">{story.subtitle}</p>
                 <dl class="mt-4 grid grid-cols-2 gap-3 border-y border-festival-line py-3">
                   <div><dt class="text-caption text-festival-muted">{t("workshopPlayers")}</dt><dd class="mt-1 text-sm text-festival-text">{story.available ? `${story.players}${t("playerUnit")}` : t("difficultyUndetermined")}</dd></div>
@@ -229,7 +236,7 @@
                   <div><dt>{t("storyStartedPlays")}</dt><dd class="mt-1 text-sm">{story.startedPlays}</dd></div>
                   <div><dt>{t("storyCompletedPlays")}</dt><dd class="mt-1 text-sm">{story.completedPlays}</dd></div>
                 </dl>
-                <Button class="mt-4 w-full" disabled={!story.available || busy || !connected || (access === "secret" && !/^\d{4}$/.test(pin))} onclick={() => onCreate(story.id, access, access === "secret" ? pin : undefined)}>
+                <Button class="mt-4 w-full" disabled={!story.available || busy || !connected || (access === "secret" && !/^\d{4}$/.test(pin))} onclick={() => createStory(story)}>
                   {story.available ? t("createRoom") : t("storyComingSoon")}<span aria-hidden="true">{story.available ? "↗" : "…"}</span>
                 </Button>
               </div>
@@ -243,6 +250,13 @@
         <span class="muted whitespace-nowrap text-sm">{page} / {Math.max(pages, 1)}</span>
         <Button variant="secondary" disabled={page >= pages || loading} onclick={() => (page += 1)}>{t("next")} →</Button>
       </footer>
+  </Modal>
+{/if}
+{#if replaying}
+  <Modal open labelledby="replay-warning-title" onClose={() => replaying = null}>
+    <h2 id="replay-warning-title">{t('priorPlayWarningTitle')}</h2>
+    <p>{t(replaying.priorPlay === 'completed' ? 'priorPlayCompletedWarning' : 'priorPlayUnfinishedWarning')}</p>
+    <div class="mt-4 flex gap-3"><Button onclick={() => { const story = replaying; replaying = null; if (story) onCreate(story.id, access, access === 'secret' ? pin : undefined); }}>{t('priorPlayContinue')}</Button><Button variant="secondary" onclick={() => replaying = null}>{t('cancel')}</Button></div>
   </Modal>
 {/if}
 
