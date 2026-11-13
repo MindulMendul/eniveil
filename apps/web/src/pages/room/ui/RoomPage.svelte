@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Command, RoomView, Snapshot } from "@festival/shared";
   import { RoomMemberRow } from "../../../entities/member";
+  import InviteQrCode from "../../../features/room-join/ui/InviteQrCode.svelte";
   import { Button, Panel } from "../../../shared/ui";
 
   let {
@@ -76,6 +77,7 @@
         <h2 class="heading-two sidebar-title">초대 코드</h2>
         <p class="invite-code">{room.code}</p>
         <Button variant="secondary" onclick={onCopy}>{copied ? "초대 링크 복사 완료" : "초대 링크 복사 ↗"}</Button>
+        <InviteQrCode code={room.code} {locale} />
       </Panel>
       {/if}
       <Panel>
