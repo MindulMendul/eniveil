@@ -10,6 +10,12 @@ export function socialRoutes(store: Store, game: Game, broadcast: () => void, in
   const invites = new Map<string, Invite>();
   const notices = new Map<string, { id: string; text: string; expires: number }[]>();
   const waiting = (id: string) => (game.online.get(id) ?? 0) > 0 && !game.roomFor(id) && inLobby(id);
+  const presence = (id: string) => {
+    if (!(game.online.get(id) ?? 0)) return 'offline' as const;
+    if (waiting(id)) return 'lobby' as const;
+    const room = game.roomFor(id);
+    return room?.sessionId || room?.soloStarted ? 'playing' as const : 'room_waiting' as const;
+  };
   function prune() {
     for (const [hostId, items] of notices) {
       const remaining = items.filter(item => item.expires > Date.now());
@@ -30,7 +36,7 @@ export function socialRoutes(store: Store, game: Game, broadcast: () => void, in
       for (const id of new Set(session.participants.map(p => p.id))) if (id !== me.id) counts.set(id, (counts.get(id) ?? 0) + 1);
     }
     const friends = store.friendIds(me.id).map(id => game.state.guests[id]).filter((other): other is NonNullable<typeof other> => !!other).map(other => ({
-      ...other, online: (game.online.get(other.id) ?? 0) > 0, available: waiting(other.id),
+      ...other, online: (game.online.get(other.id) ?? 0) > 0, available: waiting(other.id), presence: presence(other.id),
       gamesTogether: counts.get(other.id) ?? 0,
     }));
     return c.json({ friends, invitations: [...invites.values()].filter(i => i.targetId === me.id && i.status === 'pending').map(i => ({ id: i.id, host: game.state.guests[i.hostId]?.nickname, room: game.summary(game.state.rooms[i.roomId]), expires: i.expires })), notices: notices.get(me.id) ?? [] });
