@@ -52,6 +52,8 @@ export class PlayAnalytics {
       CREATE TABLE IF NOT EXISTS play_skill(user_id TEXT PRIMARY KEY,completed INTEGER NOT NULL,wins INTEGER NOT NULL,mmr REAL);
       CREATE TABLE IF NOT EXISTS play_reviews(session_id TEXT NOT NULL,user_id TEXT NOT NULL,story_id TEXT NOT NULL,text TEXT NOT NULL,spoiler INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(session_id,user_id));
       CREATE INDEX IF NOT EXISTS play_reviews_story ON play_reviews(story_id,created_at);
+      CREATE TABLE IF NOT EXISTS play_review_reports(review_id INTEGER NOT NULL,reporter_id TEXT NOT NULL,reason TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(review_id,reporter_id));
+      CREATE INDEX IF NOT EXISTS play_review_reports_created ON play_review_reports(created_at);
     `);
     if (
       !(
@@ -686,6 +688,25 @@ export class PlayAnalytics {
     const review = this.db.query("SELECT text,spoiler,created_at,updated_at FROM play_reviews WHERE story_id=? AND rowid=?").get(storyId, reviewId) as { text: string; spoiler: number; created_at: number; updated_at: number } | null;
     if (!review) throw new Error("후기를 찾을 수 없어.");
     return review;
+  }
+  ownReview(id: string, user: string) {
+    this.member(id, user);
+    return this.db.query("SELECT text,spoiler,created_at,updated_at FROM play_reviews WHERE session_id=? AND user_id=?").get(id, user) as { text: string; spoiler: number; created_at: number; updated_at: number } | null;
+  }
+  deleteReview(id: string, user: string) {
+    this.member(id, user);
+    this.db.query("DELETE FROM play_review_reports WHERE review_id IN (SELECT rowid FROM play_reviews WHERE session_id=? AND user_id=?)").run(id, user);
+    const result = this.db.query("DELETE FROM play_reviews WHERE session_id=? AND user_id=?").run(id, user);
+    if (!result.changes) throw new Error("삭제할 후기가 없어.");
+  }
+  reportReview(storyId: string, reviewId: number, reporter: string, reason: string) {
+    const review = this.db.query("SELECT rowid,user_id FROM play_reviews WHERE story_id=? AND rowid=?").get(storyId, reviewId) as { rowid: number; user_id: string } | null;
+    if (!review) throw new Error("후기를 찾을 수 없어.");
+    if (review.user_id === reporter) throw new Error("내 후기는 신고할 수 없어.");
+    this.db.query("INSERT OR IGNORE INTO play_review_reports(review_id,reporter_id,reason,created_at) VALUES(?,?,?,?)").run(reviewId, reporter, reason, this.now());
+  }
+  reviewReports() {
+    return this.db.query("SELECT r.review_id,r.reason,r.created_at,v.story_id,v.text,v.spoiler FROM play_review_reports r JOIN play_reviews v ON v.rowid=r.review_id ORDER BY r.created_at DESC LIMIT 200").all();
   }
   /** A viewer may only receive their own coarse history; no session results or other players are exposed. */
   storyHistory(user: string) {

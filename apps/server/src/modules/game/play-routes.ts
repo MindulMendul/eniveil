@@ -7,6 +7,7 @@ import {
   playRatingSchema,
   playChatSchema,
   playReviewSchema,
+  playReviewReportSchema,
 } from "@festival/shared";
 import type { Store } from "../../store";
 import type { PlayAnalytics } from "./play-analytics";
@@ -85,11 +86,27 @@ export function createPlayRoutes(deps: {
     deps.analytics.review(c.req.param("id"), c.get("owner"), text, spoiler);
     return c.json({ saved: true });
   });
+  app.get("/sessions/:id/review", (c) => c.json({ item: deps.analytics.ownReview(c.req.param("id"), c.get("owner")) }));
+  app.delete("/sessions/:id/review", (c) => {
+    deps.analytics.deleteReview(c.req.param("id"), c.get("owner"));
+    return c.json({ deleted: true });
+  });
   app.get("/stories/:id/reviews", (c) => c.json({ items: deps.analytics.reviews(c.req.param("id")) }));
   app.get("/stories/:id/reviews/:reviewId", (c) => {
     const raw = c.req.param("reviewId");
     if (!/^\d+$/.test(raw)) throw new Error("후기를 찾을 수 없어.");
     return c.json(deps.analytics.reviewText(c.req.param("id"), Number(raw)));
+  });
+  app.post("/stories/:id/reviews/:reviewId/report", async (c) => {
+    const raw = c.req.param("reviewId");
+    if (!/^\d+$/.test(raw)) throw new Error("후기를 찾을 수 없어.");
+    const { reason } = playReviewReportSchema.parse(await c.req.json());
+    deps.analytics.reportReview(c.req.param("id"), Number(raw), c.get("owner"), reason);
+    return c.json({ reported: true });
+  });
+  app.get("/admin/review-reports", (c) => {
+    if (!isAdmin(c)) return c.json({ error: "관리자 인증이 필요해." }, 401);
+    return c.json({ items: deps.analytics.reviewReports() });
   });
   app.get("/sessions/:id/chat", (c) =>
     c.json({

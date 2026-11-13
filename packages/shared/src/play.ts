@@ -52,6 +52,9 @@ export const playReviewSchema = z.object({
   text: z.string().trim().min(1).max(1000),
   spoiler: z.boolean().default(false),
 });
+export const playReviewReportSchema = z.object({
+  reason: z.enum(["spoiler", "abuse", "personal_info", "copyright", "other"]),
+});
 export const playChatSchema = z.object({
   id: z.uuid(),
   text: z.string().trim().min(1).max(1000),
