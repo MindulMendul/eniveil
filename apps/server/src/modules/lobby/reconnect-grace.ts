@@ -12,7 +12,7 @@ const schedule: Schedule = (expire, delay) => {
 export class ReconnectGrace {
   private pending = new Map<string, { cancel: () => void; expiresAt: number; roomId: string }>();
   constructor(
-    private game: Pick<Game, "online" | "roomFor" | "expireConnection">,
+    private game: Pick<Game, "online" | "roomFor" | "expireConnection" | "reconnectExpiresAt">,
     private changed: (transition: ReturnType<Game["expireConnection"]>) => void,
     private later: Schedule = schedule,
     private now: () => number = Date.now,
@@ -28,6 +28,7 @@ export class ReconnectGrace {
       }
     }
     this.pending.delete(guestId);
+    this.game.reconnectExpiresAt.delete(guestId);
     this.game.online.set(guestId, (this.game.online.get(guestId) ?? 0) + 1);
   }
 
@@ -40,10 +41,12 @@ export class ReconnectGrace {
     const roomId = room.id;
     const entry = { cancel: () => {}, expiresAt: this.now() + RECONNECT_GRACE_MS, roomId };
     this.pending.set(guestId, entry);
+    this.game.reconnectExpiresAt.set(guestId, entry.expiresAt);
     entry.cancel = this.later(() => {
       // A cancelled callback must never expire a later connection or grace period.
       if (this.pending.get(guestId) !== entry) return;
       this.pending.delete(guestId);
+      this.game.reconnectExpiresAt.delete(guestId);
       this.changed(this.game.expireConnection(guestId, roomId));
     }, RECONNECT_GRACE_MS);
   }

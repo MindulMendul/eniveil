@@ -77,7 +77,7 @@ export type RoomSummary = {
   capacity: number;
   status: "waiting" | "playing";
 };
-export type Member = Guest & { online: boolean };
+export type Member = Guest & { online: boolean; reconnectExpiresAt: number | null };
 export type SessionView = {
   id: string;
   scenarioVersion: number;
