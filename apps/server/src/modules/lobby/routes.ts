@@ -109,7 +109,7 @@ export function createLobbyRoutes(deps: {
       sort,
       limit: integer("limit", 12, 1, 100),
       offset: integer("offset", 0, 0, 1000000),
-    }));
+    }, c.get("guest").id));
   });
   app.get("/state", (c) => c.json(deps.game.snapshot(c.get("guest"))));
   app.post("/rooms", async (c) => {
@@ -238,5 +238,15 @@ export function createLobbyRoutes(deps: {
       if (entry.grant?.key === key) { entry.expires = 0; ws.close(1008,'Consent changed'); }
     }
   };
-  return { app, websocket, broadcast, disconnect, disconnectConsent, connectionCount: () => sockets.size };
+  // This is deliberately only a coarse activity state.  The friends API must
+  // never reveal a room code, story, role, or who else is playing.
+  const friendPresence = (id: string): 'offline' | 'lobby' | 'room_waiting' | 'playing' => {
+    if (!(deps.game.online.get(id) ?? 0)) return 'offline';
+    const room = deps.game.roomFor(id);
+    if (room) return room.sessionId || room.soloStarted ? 'playing' : 'room_waiting';
+    return [...sockets.values()].some(entry => entry.guest.id === id && entry.lobby && entry.expires > Date.now())
+      ? 'lobby'
+      : 'offline';
+  };
+  return { app, websocket, broadcast, disconnect, disconnectConsent, friendPresence, connectionCount: () => sockets.size };
 }

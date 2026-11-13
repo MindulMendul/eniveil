@@ -1,10 +1,20 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Button, TextInput } from '../../shared/ui';
-  type Person = { id: string; nickname: string; online?: boolean };
+  type Presence = 'offline' | 'lobby' | 'room_waiting' | 'playing';
+  type Person = { id: string; nickname: string; online?: boolean; presence?: Presence };
   let { locale, accountId, poll = false, onAuthLost = () => {} }: { locale: 'ko' | 'en'; accountId: string; poll?: boolean; onAuthLost?: () => void } = $props();
   const inputId = $props.id();
   const label = (ko: string, en: string) => locale === 'en' ? en : ko;
+  const presenceLabel = (presence?: Presence) => {
+    const labels = {
+      offline: label('오프라인', 'Offline'),
+      lobby: label('로비 대기 중', 'Waiting in lobby'),
+      room_waiting: label('방 대기 중', 'Waiting in room'),
+      playing: label('플레이 중', 'Playing'),
+    };
+    return presence ? labels[presence] : undefined;
+  };
   let nickname = $state(''), error = $state(''), message = $state('');
   let listError = $state('');
   let loading = $state(true), busy = $state(false), searched = $state(false);
@@ -109,12 +119,12 @@
     <ul>{#each outgoing as person (person.id)}<li><span>{person.nickname}</span><Button variant="secondary" disabled={busy} onclick={() => void cancel(person)}>{label('요청 취소', 'Cancel request')}</Button></li>{/each}</ul>
     {#if poll}
       <h3>{label('온라인', 'Online')} ({friends.filter(person => person.online).length})</h3>
-      <ul>{#each friends.filter(person => person.online) as person (person.id)}<li><span>{person.nickname}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
+      <ul>{#each friends.filter(person => person.online) as person (person.id)}<li><span>{person.nickname}{#if presenceLabel(person.presence)} · {presenceLabel(person.presence)}{/if}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
       <h3>{label('오프라인', 'Offline')} ({friends.filter(person => !person.online).length})</h3>
-      <ul>{#each friends.filter(person => !person.online) as person (person.id)}<li><span>{person.nickname}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
+      <ul>{#each friends.filter(person => !person.online) as person (person.id)}<li><span>{person.nickname}{#if presenceLabel(person.presence)} · {presenceLabel(person.presence)}{/if}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
     {:else}
       <h3>{label('친구', 'Friends')} ({friends.length})</h3>
-      <ul>{#each friends as person (person.id)}<li><span>{person.nickname}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
+      <ul>{#each friends as person (person.id)}<li><span>{person.nickname}{#if presenceLabel(person.presence)} · {presenceLabel(person.presence)}{/if}</span><Button variant="secondary" disabled={busy} onclick={() => void remove(person)}>{label('친구 삭제', 'Remove friend')}</Button></li>{/each}</ul>
     {/if}
     {#if !friends.length && !error && !listError}<p>{label('친구가 없어요.', 'No friends yet.')}</p>{/if}
     <Button variant="secondary" disabled={busy} onclick={() => void action(load)}>{label('새로고침', 'Refresh')}</Button>

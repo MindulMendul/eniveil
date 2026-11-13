@@ -40,6 +40,7 @@
   let authConfig = $state({ google: false, demo: false });
   let nickname = $state("");
   let code = $state("");
+  let inviteJoinAttempted = false;
   let pendingJoin = $state<string | null>(null);
   let joinPin = $state("");
   let error = $state("");
@@ -348,6 +349,12 @@
       accountLoaded = true;
       if (!socket || socket.readyState > 1) connect(generation);
       resumeGoogleAction();
+      const invite = new URLSearchParams(location.search).get("room")?.trim().toUpperCase();
+      if (!inviteJoinAttempted && !snapshot?.room && invite && /^[A-Z0-9]{6}$/.test(invite)) {
+        inviteJoinAttempted = true;
+        code = invite;
+        void join(invite);
+      }
     }
   }
   async function reconcileSolo() {
@@ -475,6 +482,9 @@
       if (!currentAuth(generation)) return;
       snapshot = next;
       code = "";
+      if (new URLSearchParams(location.search).get("room") === invite) {
+        history.replaceState({}, "", localePath(locale));
+      }
       pendingJoin = null;
       joinPin = "";
     });
@@ -522,6 +532,7 @@
       currentPath = pagePath(location.pathname);
       workshopPlayId = selectedWorkshopStory();
       code = new URLSearchParams(location.search).get("room") ?? "";
+      inviteJoinAttempted = false;
       editorId = new URLSearchParams(location.search).get("id") ?? undefined;
       document.documentElement.lang = locale;
     };
@@ -586,6 +597,9 @@
 
   {#if error}
     <ErrorNotice message={error} {locale} onDismiss={() => (error = "")} />
+  {/if}
+  {#if snapshot && room && !connected}
+    <p class="main" role="status">{locale === "en" ? "Reconnecting. Your room place is kept for up to 60 seconds." : "재연결 중이야. 방 자리는 최대 60초 동안 유지돼."}</p>
   {/if}
   {#if soloEndedNotice}
     <p class="main" role="status">{locale === "en" ? "Your previous solo investigation ended when you left the page. You are back in the room; start a new investigation when ready." : "페이지를 떠나 이전 1인 수사가 종료됐어. 같은 방으로 돌아왔으니 준비되면 새 수사를 시작해 줘."}</p>
@@ -741,9 +755,9 @@
 {#if pendingJoin && snapshot}
   <Modal open labelledby="room-pin-title" onClose={() => { pendingJoin = null; joinPin = ''; }}>
     <h2 id="room-pin-title">방 입장</h2>
-    <form onsubmit={event => { event.preventDefault(); if (pendingJoin) void enterRoom(pendingJoin, joinPin || undefined); }}>
-      <label>비밀방 PIN · 공개방은 비워 두세요<input type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" bind:value={joinPin} /></label>
-      <Button type="submit" disabled={busy}>입장</Button>
+    <form novalidate onsubmit={event => { event.preventDefault(); if (pendingJoin) void enterRoom(pendingJoin, joinPin || undefined); }}>
+      <label>비밀방 PIN · 공개방은 비워 두세요<input type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="4" value={joinPin} oninput={(event) => { joinPin = event.currentTarget.value.replace(/\D/g, "").slice(0, 4); }} /></label>
+      <Button type="submit" disabled={busy || (joinPin.length > 0 && !/^\d{4}$/.test(joinPin))}>입장</Button>
       <Button variant="secondary" onclick={() => pendingJoin = null}>취소</Button>
       {#if error}<p role="alert">{error}</p>{/if}
     </form>

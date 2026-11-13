@@ -31,7 +31,38 @@ test('only completed participants can save a story review',()=>{
  analytics.start('review','story',1,'solo',null,[{id:user,role:'detective'}],{});
  expect(()=>analytics.review('review',user,'좋았어요')).toThrow('결말');
  analytics.finish('review','completed',{});analytics.ending('review',user,'completed');analytics.review('review',user,'좋았어요');
- expect(analytics.reviews('story')).toEqual([{text:'좋았어요',created_at:100000}]);
+ expect(analytics.reviews('story')).toMatchObject([{text:'좋았어요',spoiler:0,created_at:100000,updated_at:100000}]);
+});
+
+test('spoiler reviews conceal their body until explicitly opened',()=>{
+ const{analytics,users}=setup(),user=users[0].id;
+ analytics.start('spoiler','story',1,'solo',null,[{id:user,role:'detective'}],{});
+ analytics.finish('spoiler','completed',{});analytics.ending('spoiler',user,'completed');analytics.review('spoiler',user,'범인은 탐정이야',true);
+ const review=analytics.reviews('story')[0]!;
+ expect(review.text).toBeNull();expect(review.spoiler).toBe(1);
+ expect(analytics.reviewText('story',review.id).text).toBe('범인은 탐정이야');
+});
+
+test('only the author can edit or delete a review, while reports are idempotent',()=>{
+ const{analytics,users}=setup(),[author,other]=users;
+ analytics.start('managed','story',1,'solo',null,[{id:author!.id,role:'detective'}],{});
+ analytics.finish('managed','completed',{});analytics.ending('managed',author!.id,'completed');analytics.review('managed',author!.id,'first');
+ expect(analytics.ownReview('managed',author!.id)?.text).toBe('first');
+ expect(()=>analytics.ownReview('managed',other!.id)).toThrow('본인');
+ const id=analytics.reviews('story')[0]!.id;
+ analytics.reportReview('story',id,other!.id,'abuse');analytics.reportReview('story',id,other!.id,'abuse');
+ expect(analytics.reviewReports()).toHaveLength(1);
+ analytics.deleteReview('managed',author!.id);expect(analytics.reviews('story')).toHaveLength(0);
+});
+
+test('story history is scoped to one player and distinguishes completed from unfinished versions',()=>{
+ const{analytics,users}=setup();const [owner,other]=users;
+ analytics.start('old','story',1,'solo',null,[{id:owner!.id,role:'detective'}],{});
+ analytics.finish('old','abandoned',{});
+ analytics.start('complete','story',2,'solo',null,[{id:owner!.id,role:'detective'}],{});
+ analytics.finish('complete','completed',{});
+ expect(analytics.storyHistory(owner!.id)).toEqual(new Map([[JSON.stringify(['story',1]),'unfinished'],[JSON.stringify(['story',2]),'completed']]));
+ expect(analytics.storyHistory(other!.id)).toEqual(new Map());
 });
 
 test('duplicate and late events preserve visits, separate active/unknown time and keep internal MMR private',()=>{

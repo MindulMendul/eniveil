@@ -13,6 +13,8 @@ import type { StoryCatalog, StoryContent } from "./story-catalog";
 import type { PlayAnalytics } from "./play-analytics";
 export class Game {
   online = new Map<string, number>();
+  /** Server-issued reconnect deadlines; only room members receive their timestamp. */
+  reconnectExpiresAt = new Map<string, number>();
   constructor(
     public store: GameStateStore,
     private readonly storyCatalog: StoryCatalog,
@@ -115,6 +117,7 @@ export class Game {
         members: r.memberIds.map((id) => ({
           ...this.state.guests[id],
           online: (this.online.get(id) ?? 0) > 0,
+          reconnectExpiresAt: this.reconnectExpiresAt.get(id) ?? null,
         })),
         session:
           session && participant
@@ -224,7 +227,8 @@ export class Game {
     sort: "latest" | "rating" | "popular";
     limit: number;
     offset: number;
-  }) {
+  }, userId?: string) {
+    const history = userId ? this.analytics?.storyHistory(userId) : undefined;
     const playsByStoryVersion = new Map<
       string,
       { started: number; completed: number; players: Set<string> }
@@ -261,6 +265,7 @@ export class Game {
           startedPlays: plays?.started ?? 0,
           completedPlays: plays?.completed ?? 0,
           uniquePlayers: plays?.players.size ?? 0,
+          priorPlay: history?.get(JSON.stringify([story.id, story.version])) ?? null,
         };
       })
       .filter((story) => {
