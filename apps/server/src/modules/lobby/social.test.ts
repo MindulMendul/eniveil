@@ -113,6 +113,24 @@ test('online users outside the common lobby cannot receive invitations', async (
   } finally { store.close(); }
 });
 
+test('friend presence distinguishes lobby, room waiting, playing, and offline without room details', async () => {
+  const {store,game,host,friend,other,req} = setup();
+  try {
+    const status = async (id: string) => {
+      const social = await (await req(host, '/social')).json() as { friends: { id: string; presence: string }[] };
+      return social.friends.find(item => item.id === id)?.presence;
+    };
+    expect(await status(friend.id)).toBe('lobby');
+    const room = game.create(friend, 'rehearsal');
+    expect(await status(friend.id)).toBe('room_waiting');
+    game.join(other, room.code);
+    game.command(friend, { type: 'start', requestId: 'start' });
+    expect(await status(friend.id)).toBe('playing');
+    game.online.set(friend.id, 0);
+    expect(await status(friend.id)).toBe('offline');
+  } finally { store.close(); }
+});
+
 test('shared game count includes completed games once and excludes unfinished ones', async () => {
   const {store,game,host,friend,req} = setup();
   try {

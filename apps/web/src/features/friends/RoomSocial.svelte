@@ -3,7 +3,7 @@
   import type { Snapshot, RoomSummary } from '@festival/shared';
   import { Modal, Button } from '../../shared/ui';
   let { snapshot, onEntered }: { snapshot: Snapshot; onEntered: () => Promise<void> } = $props();
-  type Friend = { id: string; nickname: string; online: boolean; available: boolean; gamesTogether: number };
+  type Friend = { id: string; nickname: string; online: boolean; available: boolean; presence: 'offline'|'lobby'|'room_waiting'|'playing'; gamesTogether: number };
   type Invitation = { id: string; host: string; room: RoomSummary };
   let friends = $state<Friend[]>([]), invitations = $state<Invitation[]>([]), notices = $state<{ id: string; text: string }[]>([]);
   let selected = $state<string | null>(null), pin = $state(''), error = $state(''), message = $state(''), busy = $state(false);
@@ -11,6 +11,7 @@
   let host = $derived(snapshot.room?.hostId === snapshot.me.id && !snapshot.room?.session && !snapshot.room?.soloStarted);
   let invite = $derived(!snapshot.room ? invitations[0] : undefined);
   let pinFor = $state<string | null>(null);
+  const presenceLabel = (value: Friend['presence']) => ({ lobby: '로비 대기 중', room_waiting: '방 대기 중', playing: '플레이 중', offline: '오프라인' }[value]);
   const controller = new AbortController();
   let refreshing = false;
   let dirty = false;
@@ -50,7 +51,7 @@
   <aside class="room-friends" aria-label="초대할 친구">
     <h2 class="heading-two">친구 초대</h2>
     {#each friends as item (item.id)}
-      <Button variant="secondary" onclick={() => { selected = item.id; message = ''; error = ''; }}>{item.nickname} · {item.available ? '로비 대기 중' : item.online ? '다른 방 참여 중' : '오프라인'}</Button>
+      <Button variant="secondary" onclick={() => { selected = item.id; message = ''; error = ''; }}>{item.nickname} · {presenceLabel(item.presence)}</Button>
     {:else}<p class="muted">친구 목록이 비어 있어. 로비의 친구 메뉴에서 친구를 추가해 줘.</p>{/each}
   </aside>
 {/if}
@@ -58,7 +59,7 @@
   <Modal open labelledby="friend-profile-title" onClose={() => selected = null}>
     <h2 id="friend-profile-title">{friend.nickname}</h2>
     <p>나와 함께한 게임 {friend.gamesTogether}판</p>
-    <p>{friend.available ? '로비 대기 중' : friend.online ? '다른 방 참여 중' : '오프라인'}</p>
+    <p>{presenceLabel(friend.presence)}</p>
     <Button disabled={busy || !friend.available || !!snapshot.room && snapshot.room.count >= snapshot.room.capacity} onclick={() => void act('/invitations', { targetId: friend?.id })}>초대</Button>
     <Button variant="secondary" onclick={() => selected = null}>닫기</Button>
     {#if message}<p role="status">{message}</p>{/if}
