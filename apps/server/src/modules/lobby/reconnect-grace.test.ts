@@ -38,8 +38,10 @@ for (const playing of [false, true]) {
     const s = setup(playing), sessionId = s.room.sessionId;
     s.presence.disconnect(s.b.id);
     expect(s.timers[0].at).toBe(RECONNECT_GRACE_MS);
+    expect(s.game.reconnectExpiresAt.get(s.b.id)).toBe(RECONNECT_GRACE_MS);
     s.tick(59_999); expect(s.game.roomFor(s.b.id)?.id).toBe(s.room.id);
     s.tick(1); expect(s.game.roomFor(s.b.id)).toBeUndefined();
+    expect(s.game.reconnectExpiresAt.has(s.b.id)).toBeFalse();
     expect(s.game.snapshot(s.b).room).toBeNull();
     s.presence.connect(s.b.id);
     expect(s.game.snapshot(s.b).room).toBeNull();
@@ -56,6 +58,7 @@ for (const playing of [false, true]) {
     const s = setup(playing);
     s.presence.disconnect(s.b.id); const stale = s.timers[0].fire;
     s.tick(59_999); s.presence.connect(s.b.id);
+    expect(s.game.reconnectExpiresAt.has(s.b.id)).toBeFalse();
     stale(); expect(s.game.roomFor(s.b.id)?.id).toBe(s.room.id);
     s.presence.disconnect(s.b.id); stale();
     s.tick(59_999); expect(s.game.roomFor(s.b.id)?.id).toBe(s.room.id);

@@ -13,6 +13,8 @@ import type { StoryCatalog, StoryContent } from "./story-catalog";
 import type { PlayAnalytics } from "./play-analytics";
 export class Game {
   online = new Map<string, number>();
+  /** Server-issued reconnect deadlines; only room members receive their timestamp. */
+  reconnectExpiresAt = new Map<string, number>();
   constructor(
     public store: GameStateStore,
     private readonly storyCatalog: StoryCatalog,
@@ -115,6 +117,7 @@ export class Game {
         members: r.memberIds.map((id) => ({
           ...this.state.guests[id],
           online: (this.online.get(id) ?? 0) > 0,
+          reconnectExpiresAt: this.reconnectExpiresAt.get(id) ?? null,
         })),
         session:
           session && participant

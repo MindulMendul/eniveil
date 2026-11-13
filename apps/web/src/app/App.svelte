@@ -587,6 +587,9 @@
   {#if error}
     <ErrorNotice message={error} {locale} onDismiss={() => (error = "")} />
   {/if}
+  {#if snapshot && room && !connected}
+    <p class="main" role="status">{locale === "en" ? "Reconnecting. Your room place is kept for up to 60 seconds." : "재연결 중이야. 방 자리는 최대 60초 동안 유지돼."}</p>
+  {/if}
   {#if soloEndedNotice}
     <p class="main" role="status">{locale === "en" ? "Your previous solo investigation ended when you left the page. You are back in the room; start a new investigation when ready." : "페이지를 떠나 이전 1인 수사가 종료됐어. 같은 방으로 돌아왔으니 준비되면 새 수사를 시작해 줘."}</p>
   {/if}
