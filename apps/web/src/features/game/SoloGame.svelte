@@ -9,6 +9,7 @@
   import PlayEnding from './PlayEnding.svelte';
   import { restoreSoloUi,soloUiKey } from '../../shared/lib/solo-progress';
   import { playTracker } from '../../shared/lib/play-tracker';
+  import { appendEvidenceResponse } from './response-dedupe';
 
   /** @type {{ locale?: 'ko' | 'en', storyId?: string, onExit?: () => void, exitLabel?: string, exitDisabled?: boolean, exitMessage?: string }} */
   let { locale = 'ko', storyId = supportedSoloStory.id, onExit = () => {}, exitLabel, exitDisabled = false, exitMessage = '' } = $props();
@@ -74,7 +75,7 @@
   let found = $state([]);
   let currentEvidence = $state('');
   let selectedSuspect = $state('');
-  /** @type {{ text: string, source: string }[]} */
+  /** @type {import('./response-dedupe').InterrogationResponse[]} */
   let responses = $state([]);
   /** @type {string[]} */
   let accusation = $state([]);
@@ -249,10 +250,12 @@
 
   /** @param {string} id */
   function presentEvidence(id) {
-    record('case_evidence_present', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', suspect_id: selectedSuspect, clue_id: id, language: locale });
     const response = reactions[selectedSuspect]?.[id];
     const text = response?.[0] ?? '…그 증거가 저와 무슨 상관이죠?';
-    responses = [...responses, { text, source: evidence[id].name }];
+    const next = appendEvidenceResponse(responses, id, evidence[id].name, text);
+    if (!next.added) return;
+    record('case_evidence_present', { story_id: storyPackage?.story.id ?? 'deokil-trading-murder', suspect_id: selectedSuspect, clue_id: id, language: locale });
+    responses = next.responses;
   }
 
   /** @param {string} id */
