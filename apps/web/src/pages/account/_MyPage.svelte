@@ -13,6 +13,7 @@
   let nickname = $state(untrack(() => me.nickname)), confirmLogout = $state(false), settings = $state(false), confirmDelete = $state(false);
   let items = $state<WorkshopStory[]>([]), total = $state(0), offset = $state(0), loading = $state(true), error = $state('');
   let deletion = $state<WorkshopStory | null>(null), deleting = $state(false), deleteError = $state('');
+  let recent = $state<{ stories: { storyId:string; title:string; started:number; outcome:string|null; mode:string }[]; people: { nickname:string; started:number }[] }>({ stories: [], people: [] });
   let settingsOpener = $state<HTMLButtonElement>();
   let disposed = false;
   onDestroy(() => { disposed = true; });
@@ -45,10 +46,17 @@
     finally { if (!disposed) deleting = false; }
   }
   onMount(() => { void load(); });
+  onMount(async () => { try { const response = await fetch('/api/platform/account/recent'); if (response.ok && !disposed) recent = await response.json(); } catch { /* Recent activity is optional. */ } });
 </script>
 <main id="main-content" tabindex="-1" class="main account-page">
   <div class="page-heading"><div><p class="eyebrow">MY ACCOUNT</p><h1 class="heading-one">{label('마이페이지', 'My page')}</h1><p class="muted">{me.nickname} · {accountType === 'google' ? 'GOOGLE' : 'GUEST'}</p></div><Button variant="secondary" onclick={onWorkshop}>{label('창작마당으로', 'Workshop')} ↗</Button></div>
   {#if accountType === 'google'}<section class="panel"><h2 class="heading-two">{label('친구', 'Friends')}</h2>{#key me.id}<FriendsPanel {locale} {onAuthLost} accountId={me.id} />{/key}</section>{/if}
+  <Panel><h2 class="heading-two">{label('최근 활동', 'Recent activity')}</h2>
+    <h3>{label('최근 본 작품', 'Recently played stories')}</h3>
+    {#if recent.stories.length}<ul>{#each recent.stories as story (story.storyId + story.started)}<li><div><strong>{story.title}</strong><p class="muted">{story.mode === 'multiplayer' ? label('함께 플레이', 'Multiplayer') : label('혼자 플레이', 'Solo')} · {story.outcome === 'completed' ? label('완료', 'Completed') : label('진행 기록', 'Play record')}</p></div></li>{/each}</ul>{:else}<p class="muted">{label('최근 플레이 기록이 없어요.', 'No recent play history yet.')}</p>{/if}
+    <h3 class="mt-5">{label('최근 함께한 사람', 'Recently played with')}</h3>
+    {#if recent.people.length}<ul>{#each recent.people as person (person.nickname + person.started)}<li><strong>{person.nickname}</strong></li>{/each}</ul>{:else}<p class="muted">{label('최근 함께한 사람이 없어요.', 'No recent co-players yet.')}</p>{/if}
+  </Panel>
   <Panel><h2 class="heading-two">{label('닉네임 변경', 'Change nickname')}</h2>
     <form onsubmit={event => { event.preventDefault(); void onRename(nickname); }}>
       <NicknameField bind:value={nickname} {locale} {busy} />
