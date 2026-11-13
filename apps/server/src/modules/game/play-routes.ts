@@ -81,11 +81,16 @@ export function createPlayRoutes(deps: {
     return c.json({ saved: true });
   });
   app.post("/sessions/:id/review", async (c) => {
-    const { text } = playReviewSchema.parse(await c.req.json());
-    deps.analytics.review(c.req.param("id"), c.get("owner"), text);
+    const { text, spoiler } = playReviewSchema.parse(await c.req.json());
+    deps.analytics.review(c.req.param("id"), c.get("owner"), text, spoiler);
     return c.json({ saved: true });
   });
   app.get("/stories/:id/reviews", (c) => c.json({ items: deps.analytics.reviews(c.req.param("id")) }));
+  app.get("/stories/:id/reviews/:reviewId", (c) => {
+    const raw = c.req.param("reviewId");
+    if (!/^\d+$/.test(raw)) throw new Error("후기를 찾을 수 없어.");
+    return c.json(deps.analytics.reviewText(c.req.param("id"), Number(raw)));
+  });
   app.get("/sessions/:id/chat", (c) =>
     c.json({
       messages: deps.analytics.chats(c.req.param("id"), c.get("owner")),

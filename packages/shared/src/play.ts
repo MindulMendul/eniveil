@@ -48,7 +48,10 @@ export const playEventBatchSchema = z.object({
 export const playRatingSchema = z.object({
   rating: z.number().int().min(1).max(5).nullable(),
 });
-export const playReviewSchema = z.object({ text: z.string().trim().min(1).max(1000) });
+export const playReviewSchema = z.object({
+  text: z.string().trim().min(1).max(1000),
+  spoiler: z.boolean().default(false),
+});
 export const playChatSchema = z.object({
   id: z.uuid(),
   text: z.string().trim().min(1).max(1000),
