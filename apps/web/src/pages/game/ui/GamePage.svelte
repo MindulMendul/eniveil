@@ -23,6 +23,14 @@
   } = $props();
   let tracker:ReturnType<typeof playTracker>|undefined;
   let now=$state(Date.now());
+  let clueQuery = $state("");
+  let clueSort = $state<"latest" | "oldest">("latest");
+  let clueLibrary = $derived(
+    session.clues
+      .map((text, index) => ({ id: index, name: `단서 ${index + 1}`, text, acquiredOrder: index + 1 }))
+      .filter((clue) => `${clue.name} ${clue.text}`.toLocaleLowerCase().includes(clueQuery.trim().toLocaleLowerCase()))
+      .sort((left, right) => clueSort === "latest" ? right.acquiredOrder - left.acquiredOrder : left.acquiredOrder - right.acquiredOrder),
+  );
   onMount(()=>{const timer=setInterval(()=>now=Date.now(),1000);return()=>clearInterval(timer);});
   onMount(()=>{tracker=playTracker(session.id);tracker.stage(session.phase);return()=>tracker?.stop();});
   $effect(()=>{tracker?.stage(session.phase);});
@@ -157,6 +165,30 @@
           <p class="muted detail-copy">{session.role.secret}</p>
         </details>
       </Panel>
+      {#if session.clues.length}
+        <Panel>
+          <div class="section-heading">
+            <div><p class="eyebrow">CLUE LIBRARY</p><h3 class="heading-three">획득 단서</h3></div>
+            <span class="count">{clueLibrary.length} / {session.clues.length}</span>
+          </div>
+          <label class="sr-only" for="clue-search">획득 단서 검색</label>
+          <input id="clue-search" class="input mt-3 w-full" type="search" bind:value={clueQuery} placeholder="단서 이름·내용 검색" autocomplete="off" />
+          <label class="sr-only" for="clue-sort">단서 정렬</label>
+          <select id="clue-sort" class="input mt-2 w-full" bind:value={clueSort}>
+            <option value="latest">최근 획득순</option>
+            <option value="oldest">처음 획득순</option>
+          </select>
+          {#if clueLibrary.length}
+            <ol class="m-0 mt-3 list-none space-y-2 p-0" aria-label="획득한 단서 목록">
+              {#each clueLibrary as clue (clue.id)}
+                <li class="clue"><span class="clue-label">{clue.name} · {clue.acquiredOrder}번째</span><p class="clue-text">{clue.text}</p></li>
+              {/each}
+            </ol>
+          {:else}
+            <p class="fine" role="status">검색 결과가 없어.</p>
+          {/if}
+        </Panel>
+      {/if}
       {#if session.resources.length}
         <Panel>
           <p class="eyebrow">RESOURCES</p>
