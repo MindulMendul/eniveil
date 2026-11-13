@@ -40,6 +40,7 @@
   let authConfig = $state({ google: false, demo: false });
   let nickname = $state("");
   let code = $state("");
+  let inviteJoinAttempted = false;
   let pendingJoin = $state<string | null>(null);
   let joinPin = $state("");
   let error = $state("");
@@ -348,6 +349,12 @@
       accountLoaded = true;
       if (!socket || socket.readyState > 1) connect(generation);
       resumeGoogleAction();
+      const invite = new URLSearchParams(location.search).get("room")?.trim().toUpperCase();
+      if (!inviteJoinAttempted && !snapshot?.room && invite && /^[A-Z0-9]{6}$/.test(invite)) {
+        inviteJoinAttempted = true;
+        code = invite;
+        void join(invite);
+      }
     }
   }
   async function reconcileSolo() {
@@ -475,6 +482,9 @@
       if (!currentAuth(generation)) return;
       snapshot = next;
       code = "";
+      if (new URLSearchParams(location.search).get("room") === invite) {
+        history.replaceState({}, "", localePath(locale));
+      }
       pendingJoin = null;
       joinPin = "";
     });
@@ -522,6 +532,7 @@
       currentPath = pagePath(location.pathname);
       workshopPlayId = selectedWorkshopStory();
       code = new URLSearchParams(location.search).get("room") ?? "";
+      inviteJoinAttempted = false;
       editorId = new URLSearchParams(location.search).get("id") ?? undefined;
       document.documentElement.lang = locale;
     };
