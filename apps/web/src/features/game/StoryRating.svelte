@@ -6,10 +6,15 @@
   let review=$state(''), spoiler=$state(false);
   type Review = {id:number;text:string|null;spoiler:number};
   let reviews=$state<Review[]>([]);
+  let reported=$state<number[]>([]);
   const copy=(ko:string,en:string)=>locale==='en'?en:ko;
   async function reveal(item:Review){
     try { const response=await fetch(`/api/play/stories/${storyId}/reviews/${item.id}`); const data=await response.json(); if(!response.ok)throw Error(data.error); reviews=reviews.map(review=>review.id===item.id?{...review,text:data.text}:review); }
     catch(cause){error=cause instanceof Error?cause.message:copy('후기를 불러오지 못했어.','Could not load the review.');}
+  }
+  async function report(item:Review){
+    try { const response=await fetch(`/api/play/stories/${storyId}/reviews/${item.id}/report`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:'other'})}); const data=await response.json(); if(!response.ok)throw Error(data.error); reported=[...reported,item.id]; }
+    catch(cause){error=cause instanceof Error?cause.message:copy('후기를 신고하지 못했어.','Could not report the review.');}
   }
   onMount(()=>{if(storyId)void fetch(`/api/play/stories/${storyId}/reviews`).then(response=>response.json()).then(data=>reviews=data.items??[]).catch(()=>{});});
   async function submit(rating:number|null){
@@ -26,5 +31,5 @@
   </div>
   <Button variant="secondary" disabled={busy} onclick={()=>submit(null)}>{locale==='en'?'Skip and return to lobby':'건너뛰고 로비로'}</Button>
   {#if error}<p role="alert">{error}</p>{/if}
-  {#if reviews.length}<section class="mt-6 text-left" aria-label={locale==='en'?'Recent reviews':'최근 후기'}><h2 class="heading-three">{locale==='en'?'Recent reviews':'최근 후기'}</h2>{#each reviews as item}<article class="muted">{#if item.spoiler && item.text === null}<p>{copy('스포일러가 포함된 후기입니다.','This review contains spoilers.')}</p><Button variant="secondary" onclick={()=>void reveal(item)}>{copy('스포일러 보기','Show spoiler')}</Button>{:else}<p>{item.text}</p>{/if}</article>{/each}</section>{/if}
+  {#if reviews.length}<section class="mt-6 text-left" aria-label={locale==='en'?'Recent reviews':'최근 후기'}><h2 class="heading-three">{locale==='en'?'Recent reviews':'최근 후기'}</h2>{#each reviews as item}<article class="muted">{#if item.spoiler && item.text === null}<p>{copy('스포일러가 포함된 후기입니다.','This review contains spoilers.')}</p><Button variant="secondary" onclick={()=>void reveal(item)}>{copy('스포일러 보기','Show spoiler')}</Button>{:else}<p>{item.text}</p>{/if}<Button variant="text" disabled={reported.includes(item.id)} onclick={()=>void report(item)}>{reported.includes(item.id)?copy('신고됨','Reported'):copy('후기 신고','Report review')}</Button></article>{/each}</section>{/if}
 </section>

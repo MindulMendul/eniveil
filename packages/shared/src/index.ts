@@ -143,6 +143,6 @@ export { WORKSHOP_AUTHORING_ENABLED } from './features';
 
 export const inviteFriendSchema = z.object({ targetId: z.uuid() });
 export const invitationResponseSchema = z.object({ accept: z.boolean(), pin: z.string().regex(/^\d{4}$/).optional() });
-export { playEventSchema, playEventBatchSchema, playRatingSchema, playReviewSchema, playChatSchema } from './play';
+export { playEventSchema, playEventBatchSchema, playRatingSchema, playReviewSchema, playReviewReportSchema, playChatSchema } from './play';
 export type { PlayEvent } from './play';
 export { playEndingSchema } from './play';

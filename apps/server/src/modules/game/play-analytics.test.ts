@@ -43,6 +43,18 @@ test('spoiler reviews conceal their body until explicitly opened',()=>{
  expect(analytics.reviewText('story',review.id).text).toBe('범인은 탐정이야');
 });
 
+test('only the author can edit or delete a review, while reports are idempotent',()=>{
+ const{analytics,users}=setup(),[author,other]=users;
+ analytics.start('managed','story',1,'solo',null,[{id:author!.id,role:'detective'}],{});
+ analytics.finish('managed','completed',{});analytics.ending('managed',author!.id,'completed');analytics.review('managed',author!.id,'first');
+ expect(analytics.ownReview('managed',author!.id)?.text).toBe('first');
+ expect(()=>analytics.ownReview('managed',other!.id)).toThrow('본인');
+ const id=analytics.reviews('story')[0]!.id;
+ analytics.reportReview('story',id,other!.id,'abuse');analytics.reportReview('story',id,other!.id,'abuse');
+ expect(analytics.reviewReports()).toHaveLength(1);
+ analytics.deleteReview('managed',author!.id);expect(analytics.reviews('story')).toHaveLength(0);
+});
+
 test('story history is scoped to one player and distinguishes completed from unfinished versions',()=>{
  const{analytics,users}=setup();const [owner,other]=users;
  analytics.start('old','story',1,'solo',null,[{id:owner!.id,role:'detective'}],{});
