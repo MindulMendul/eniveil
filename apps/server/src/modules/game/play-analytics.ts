@@ -687,6 +687,18 @@ export class PlayAnalytics {
     if (!review) throw new Error("후기를 찾을 수 없어.");
     return review;
   }
+  /** A viewer may only receive their own coarse history; no session results or other players are exposed. */
+  storyHistory(user: string) {
+    const rows = this.db.query("SELECT s.story_id,s.version,s.outcome,s.ended FROM play_sessions s JOIN play_members m ON m.session_id=s.id WHERE m.user_id=?").all(user) as { story_id: string; version: number; outcome: string | null; ended: number | null }[];
+    const history = new Map<string, 'completed' | 'unfinished'>();
+    for (const row of rows) {
+      const key = JSON.stringify([row.story_id, row.version]);
+      // A completed play takes precedence over an older abandoned attempt.
+      if (row.outcome === 'completed') history.set(key, 'completed');
+      else if (!history.has(key)) history.set(key, 'unfinished');
+    }
+    return history;
+  }
   view(id: string, user: string) {
     const play = this.play(id),
       member = this.member(id, user);

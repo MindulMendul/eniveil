@@ -43,6 +43,16 @@ test('spoiler reviews conceal their body until explicitly opened',()=>{
  expect(analytics.reviewText('story',review.id).text).toBe('범인은 탐정이야');
 });
 
+test('story history is scoped to one player and distinguishes completed from unfinished versions',()=>{
+ const{analytics,users}=setup();const [owner,other]=users;
+ analytics.start('old','story',1,'solo',null,[{id:owner!.id,role:'detective'}],{});
+ analytics.finish('old','abandoned',{});
+ analytics.start('complete','story',2,'solo',null,[{id:owner!.id,role:'detective'}],{});
+ analytics.finish('complete','completed',{});
+ expect(analytics.storyHistory(owner!.id)).toEqual(new Map([[JSON.stringify(['story',1]),'unfinished'],[JSON.stringify(['story',2]),'completed']]));
+ expect(analytics.storyHistory(other!.id)).toEqual(new Map());
+});
+
 test('duplicate and late events preserve visits, separate active/unknown time and keep internal MMR private',()=>{
  const{analytics,users,setTime}=setup();const user=users[0].id;
  analytics.start('p','story',1,'solo',null,[{id:user,role:'detective'}],{title:'Story'});
