@@ -1,0 +1,66 @@
+{
+  "format": "murder-parker-story",
+  "formatVersion": 1,
+  "story": {
+    "id": "last-train-alibi",
+    "version": 1,
+    "mode": "multiplayer",
+    "locale": "ko",
+    "title": "막차의 알리바이",
+    "subtitle": "폭우 속 종착역에서 사라진 편집자를 둘러싼 3인 미스터리 스릴러",
+    "playerCount": { "min": 3, "max": 3 },
+    "estimatedMinutes": 60,
+    "startSceneId": "platform-opening"
+  },
+  "content": {
+    "characters": [],
+    "assets": [],
+    "scenes": [{
+      "id": "platform-opening",
+      "cues": [
+        { "type": "dialogue.show", "speaker": "내레이션", "text": "폭우가 막차를 멈춰 세운 밤, 종착역 대합실에서 탐사보도 편집자 한서진이 사라졌다." },
+        { "type": "dialogue.show", "speaker": "내레이션", "text": "남은 세 사람은 모두 그가 남긴 원고와 관계가 있다. 각자의 비밀 목표를 지키며 진실을 찾아야 한다." }
+      ],
+      "choices": []
+    }],
+    "roles": [
+      { "id": "reporter", "name": "지역 기자", "description": "실종자의 마지막 기사를 함께 쓴 기자" },
+      { "id": "station-chief", "name": "역무 책임자", "description": "폐쇄된 역 구역의 열쇠를 관리하는 책임자" },
+      { "id": "whistleblower", "name": "제보자", "description": "기사의 핵심 자료를 건넨 익명의 제보자" }
+    ],
+    "information": [],
+    "items": [
+      { "id": "voice-recorder", "name": "음성 기록기", "description": "한서진이 남긴 23초짜리 녹음이 들어 있다.", "initialOwnerRoleId": "reporter", "visibleTo": { "type": "roles", "roleIds": ["reporter"] }, "transfer": { "mode": "owner_choice", "toRoleIds": ["station-chief", "whistleblower"] }, "use": { "label": "녹음 재생", "result": "빗소리 뒤로 '보관함 17번, 열차가 아니라 사람을 봐'라는 목소리가 들린다.", "consumes": false } },
+      { "id": "service-key", "name": "정비 통로 열쇠", "description": "승강장 아래 정비 통로를 열 수 있는 마스터 키다.", "initialOwnerRoleId": "station-chief", "visibleTo": { "type": "roles", "roleIds": ["station-chief"] }, "transfer": { "mode": "owner_choice", "toRoleIds": ["reporter", "whistleblower"] } },
+      { "id": "torn-photo", "name": "찢긴 사진", "description": "한서진과 낯선 남자가 보관함 앞에 서 있는 사진의 절반이다.", "initialOwnerRoleId": "whistleblower", "visibleTo": { "type": "roles", "roleIds": ["whistleblower"] }, "transfer": { "mode": "owner_choice", "toRoleIds": ["reporter", "station-chief"] } }
+    ],
+    "mechanics": {
+      "type": "roleplay",
+      "memories": [
+        { "roleId": "reporter", "text": "[개인 목표] 한서진이 기사에서 빼 달라고 한 네 이름을 끝까지 숨겨라. 단, 범인이 누구인지 맞히면 2점, 녹음을 자발적으로 공개하면 1점을 얻는다. 너는 그가 막차 직전 '역 안에 협력자가 있다'고 말하는 것을 들었다." },
+        { "roleId": "station-chief", "text": "[개인 목표] 무단 출입 기록을 감춘 사실을 들키지 마라. 단, 정비 통로 열쇠를 공유하면 1점, 진범을 맞히면 2점을 얻는다. 너는 22시 18분 보관함 구역의 전원이 꺼진 것을 알고 있다." },
+        { "roleId": "whistleblower", "text": "[개인 목표] 네가 제보자라는 정체를 끝까지 감춰라. 단, 사진을 공유하면 1점, 진범을 맞히면 2점을 얻는다. 너는 한서진이 자료를 넘기기 전 '가짜 시간표'를 언급한 것을 기억한다." }
+      ],
+      "firstClues": [
+        { "id": "locker-log", "text": "보관함 17번의 전자 기록에는 22시 19분, 역무 책임자 권한 카드로 문이 열렸다고 남아 있다." },
+        { "id": "wet-ticket", "text": "젖은 막차 승차권 뒷면에 '가짜 시간표는 22:20에 멈춘다'라고 적혀 있다." },
+        { "id": "camera-gap", "text": "대합실 카메라는 정확히 3분간 꺼졌고, 그 사이 플랫폼 시계만 4분 늦춰져 있었다." }
+      ],
+      "secondClues": [
+        { "id": "maintenance-mark", "text": "정비 통로 벽면의 진흙 자국은 승강장이 아니라 역 바깥 배수로에서 묻은 것이다." },
+        { "id": "draft-email", "text": "복구된 초안 메일에는 '편집장 박도현이 시간표를 조작해 화물 열차 사고를 덮었다'고 쓰여 있다." },
+        { "id": "platform-call", "text": "공중전화 녹음에는 한서진이 '박 편집장이 역으로 온다'고 말한 뒤 누군가와 몸싸움하는 소리가 남아 있다." }
+      ],
+      "stageDurations": { "firstInvestigationSeconds": 1200, "meetingSeconds": 1200, "secondInvestigationSeconds": 1200 },
+      "meetingPrompt": "각자가 가진 정보 중 무엇을 공개할지 선택하세요. 개인 목표 점수와 사건 해결은 별개지만, 숨긴 정보는 마지막 추리에 영향을 줄 수 있습니다.",
+      "finalChoices": [
+        { "id": "editor", "label": "편집장 박도현", "outcome": "정답. 박도현은 가짜 시간표 조작을 덮기 위해 한서진을 정비 통로로 유인했다. 세 사람은 각자의 비밀을 공개한 정도에 따라 개인 목표 점수를 정산한다." },
+        { "id": "station-chief-choice", "label": "역무 책임자", "outcome": "오답. 권한 카드와 전원 차단은 은폐를 위한 것이었지만, 실종을 실행한 사람은 아니다." },
+        { "id": "reporter-choice", "label": "지역 기자", "outcome": "오답. 기사는 지연됐지만 기자는 막차 안에 없었다." },
+        { "id": "whistleblower-choice", "label": "제보자", "outcome": "오답. 제보자는 사진을 숨겼지만 한서진을 해치지 않았다." }
+      ],
+      "answer": "진범은 편집장 박도현이다. 그는 화물 열차 사고를 덮으려고 시간표를 조작했고, 이를 폭로하려던 한서진을 정비 통로로 유인했다. 역무 책임자의 은폐와 제보자의 침묵은 의심을 키웠지만 살인의 실행과는 다르다.",
+      "answerRoleId": "station-chief"
+    }
+  }
+}

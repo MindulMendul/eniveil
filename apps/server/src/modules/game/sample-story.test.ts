@@ -32,3 +32,14 @@ test("the sample appears in the game catalog and can be created as a room", () =
     store.close();
   }
 });
+
+test("the three-player original is published with private goals and a one-hour structure", () => {
+  const source = new FileStoryCatalog().get("last-train-alibi");
+  expect(source?.story.playerCount).toEqual({ min: 3, max: 3 });
+  expect(source?.story.estimatedMinutes).toBe(60);
+  const version = source && roleplayStoryVersion(source);
+  expect(version?.scenario.available).toBeTrue();
+  expect(version?.content.roles).toHaveLength(3);
+  expect(version?.content.roles.every((role) => role.secret.includes("개인 목표"))).toBeTrue();
+  expect(version?.content.finalChoices).toHaveLength(4);
+});
