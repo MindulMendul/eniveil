@@ -30,7 +30,7 @@ export function createAccountRoutes(deps: {
     const me = session(c);
     if (!me) return c.json({ error: "로그인이 필요해." }, 401);
     const recent = deps.analytics?.recent(me.id) ?? { stories: [], people: [] };
-    return c.json({ stories: recent.stories, people: recent.people.flatMap((person) => {
+    return c.json({ stories: recent.stories, history: deps.analytics?.history(me.id) ?? [], people: recent.people.flatMap((person) => {
       const guest = deps.store.state.guests[person.id];
       return guest ? [{ nickname: guest.nickname, started: person.started }] : [];
     }) });

@@ -739,6 +739,14 @@ export class PlayAnalytics {
     }
     return { stories: [...stories.values()].sort((a,b) => b.started-a.started).slice(0, 12), people: [...people].map(([id,started]) => ({ id, started })).sort((a,b) => b.started-a.started).slice(0, 12) };
   }
+  history(user: string) {
+    const rows = this.db.query("SELECT s.id,s.story_id,s.version,s.mode,s.started,s.ended,s.outcome,s.public_json,m.finished_at FROM play_sessions s JOIN play_members m ON m.session_id=s.id WHERE m.user_id=? ORDER BY s.started DESC LIMIT 50").all(user) as { id:string; story_id:string; version:number; mode:string; started:number; ended:number|null; outcome:string|null; public_json:string; finished_at:number|null }[];
+    return rows.map((row) => {
+      let title = row.story_id; try { title = (JSON.parse(row.public_json) as { story?: { title?:string } }).story?.title ?? title; } catch { /* retain identifier */ }
+      const status = !row.ended ? "in_progress" : row.outcome === "abandoned" ? "abandoned" : !row.finished_at ? "ending" : row.outcome === "completed" ? "completed" : "failed";
+      return { id: row.id, storyId: row.story_id, version: row.version, title, mode: row.mode, started: row.started, ended: row.ended, status };
+    });
+  }
   view(id: string, user: string) {
     const play = this.play(id),
       member = this.member(id, user);
