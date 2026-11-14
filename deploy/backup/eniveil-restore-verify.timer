@@ -1,0 +1,9 @@
+[Unit]
+Description=Verify the latest Eniveil backup monthly
+
+[Timer]
+OnCalendar=*-*-01 03:17:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

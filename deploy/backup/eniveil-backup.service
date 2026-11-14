@@ -1,0 +1,7 @@
+[Unit]
+Description=Eniveil encrypted remote SQLite backup
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/eniveil/backup.env
+ExecStart=/usr/local/lib/eniveil/eniveil-backup.py
