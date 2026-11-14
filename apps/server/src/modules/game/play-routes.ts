@@ -58,6 +58,7 @@ export function createPlayRoutes(deps: {
   app.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     c.set("owner", playOwner(c, deps.store, deps.production));
+    if (!c.req.path.startsWith("/admin/") && deps.analytics.restricted(c.get("owner"))) return c.json({ error: "운영자 검토에 따라 일시적으로 이용이 제한됐어." }, 403);
     await next();
   });
   app.get("/sessions/:id", (c) =>
@@ -107,6 +108,22 @@ export function createPlayRoutes(deps: {
   app.get("/admin/review-reports", (c) => {
     if (!isAdmin(c)) return c.json({ error: "관리자 인증이 필요해." }, 401);
     return c.json({ items: deps.analytics.reviewReports() });
+  });
+  app.post("/admin/review-reports/:reviewId/action", async (c) => {
+    if (!isAdmin(c)) return c.json({ error: "관리자 인증이 필요해." }, 401);
+    const id = c.req.param("reviewId"); if (!/^\d+$/.test(id)) throw new Error("후기를 찾을 수 없어.");
+    const body = await c.req.json() as { action?: string; reason?: string };
+    if ((body.action !== "hide" && body.action !== "delete") || typeof body.reason !== "string" || !body.reason.trim()) throw new Error("조치 내용을 확인해 줘.");
+    deps.analytics.moderateReview(Number(id), body.action, body.reason.trim());
+    return c.json({ saved: true });
+  });
+  app.post("/admin/accounts/:id/restriction", async (c) => {
+    if (!isAdmin(c)) return c.json({ error: "관리자 인증이 필요해." }, 401);
+    const body = await c.req.json() as { until?: number; reason?: string };
+    const until = body.until;
+    if (typeof until !== "number" || !Number.isInteger(until) || typeof body.reason !== "string" || !body.reason.trim()) throw new Error("제한 내용을 확인해 줘.");
+    deps.analytics.restrictAccount(c.req.param("id"), until, body.reason.trim());
+    return c.json({ saved: true });
   });
   app.get("/sessions/:id/chat", (c) =>
     c.json({
