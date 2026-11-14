@@ -54,6 +54,8 @@ export class PlayAnalytics {
       CREATE INDEX IF NOT EXISTS play_reviews_story ON play_reviews(story_id,created_at);
       CREATE TABLE IF NOT EXISTS play_review_reports(review_id INTEGER NOT NULL,reporter_id TEXT NOT NULL,reason TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(review_id,reporter_id));
       CREATE INDEX IF NOT EXISTS play_review_reports_created ON play_review_reports(created_at);
+      CREATE TABLE IF NOT EXISTS moderation_actions(id INTEGER PRIMARY KEY AUTOINCREMENT,target_type TEXT NOT NULL,target_id TEXT NOT NULL,action TEXT NOT NULL,reason TEXT NOT NULL,created_at INTEGER NOT NULL,expires_at INTEGER);
+      CREATE TABLE IF NOT EXISTS account_restrictions(user_id TEXT PRIMARY KEY,expires_at INTEGER NOT NULL,reason TEXT NOT NULL,created_at INTEGER NOT NULL);
     `);
     if (
       !(
@@ -87,6 +89,8 @@ export class PlayAnalytics {
       db.exec("ALTER TABLE play_reviews ADD COLUMN spoiler INTEGER NOT NULL DEFAULT 0");
     if (!reviews.some((column) => column.name === "updated_at"))
       db.exec("ALTER TABLE play_reviews ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0");
+    if (!reviews.some((column) => column.name === "hidden"))
+      db.exec("ALTER TABLE play_reviews ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0");
     if (
       !(
         db.query("PRAGMA table_info(play_sessions)").all() as { name: string }[]
@@ -682,7 +686,7 @@ export class PlayAnalytics {
     this.db.query("INSERT INTO play_reviews(session_id,user_id,story_id,text,spoiler,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(session_id,user_id) DO UPDATE SET text=excluded.text,spoiler=excluded.spoiler,updated_at=excluded.updated_at").run(id, user, play.story_id, text, spoiler ? 1 : 0, now, now);
   }
   reviews(storyId: string) {
-    return this.db.query("SELECT rowid AS id,CASE WHEN spoiler THEN NULL ELSE text END AS text,spoiler,created_at,updated_at FROM play_reviews WHERE story_id=? ORDER BY updated_at DESC,created_at DESC LIMIT 20").all(storyId) as { id: number; text: string | null; spoiler: number; created_at: number; updated_at: number }[];
+    return this.db.query("SELECT rowid AS id,CASE WHEN spoiler THEN NULL ELSE text END AS text,spoiler,created_at,updated_at FROM play_reviews WHERE story_id=? AND hidden=0 ORDER BY updated_at DESC,created_at DESC LIMIT 20").all(storyId) as { id: number; text: string | null; spoiler: number; created_at: number; updated_at: number }[];
   }
   reviewText(storyId: string, reviewId: number) {
     const review = this.db.query("SELECT text,spoiler,created_at,updated_at FROM play_reviews WHERE story_id=? AND rowid=?").get(storyId, reviewId) as { text: string; spoiler: number; created_at: number; updated_at: number } | null;
@@ -707,6 +711,29 @@ export class PlayAnalytics {
   }
   reviewReports() {
     return this.db.query("SELECT r.review_id,r.reason,r.created_at,v.story_id,v.text,v.spoiler FROM play_review_reports r JOIN play_reviews v ON v.rowid=r.review_id ORDER BY r.created_at DESC LIMIT 200").all();
+  }
+  moderateReview(reviewId: number, action: "hide" | "delete", reason: string) {
+    const review = this.db.query("SELECT rowid FROM play_reviews WHERE rowid=?").get(reviewId) as { rowid:number } | null;
+    if (!review) throw new Error("후기를 찾을 수 없어.");
+    this.atomic(() => {
+      if (action === "hide") this.db.query("UPDATE play_reviews SET hidden=1 WHERE rowid=?").run(reviewId);
+      else this.db.query("DELETE FROM play_reviews WHERE rowid=?").run(reviewId);
+      this.db.query("INSERT INTO moderation_actions(target_type,target_id,action,reason,created_at) VALUES('review',?,?,?,?)").run(String(reviewId), action, reason, this.now());
+    });
+  }
+  restrictAccount(user: string, until: number, reason: string) {
+    const maximum = this.now() + 30 * 86400000;
+    if (!Number.isFinite(until) || until <= this.now() || until > maximum) throw new Error("계정 제한은 현재부터 최대 30일까지만 가능해.");
+    this.atomic(() => {
+      this.db.query("INSERT INTO account_restrictions(user_id,expires_at,reason,created_at) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET expires_at=excluded.expires_at,reason=excluded.reason,created_at=excluded.created_at").run(user, until, reason, this.now());
+      this.db.query("INSERT INTO moderation_actions(target_type,target_id,action,reason,created_at,expires_at) VALUES('account',?,'temporary_restriction',?,?,?)").run(user, reason, this.now(), until);
+    });
+  }
+  restricted(user: string) {
+    const row = this.db.query("SELECT expires_at FROM account_restrictions WHERE user_id=?").get(user) as { expires_at:number } | null;
+    if (!row) return false;
+    if (row.expires_at <= this.now()) { this.db.query("DELETE FROM account_restrictions WHERE user_id=?").run(user); return false; }
+    return true;
   }
   /** A viewer may only receive their own coarse history; no session results or other players are exposed. */
   storyHistory(user: string) {
