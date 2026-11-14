@@ -13,7 +13,7 @@
   let nickname = $state(untrack(() => me.nickname)), confirmLogout = $state(false), settings = $state(false), confirmDelete = $state(false);
   let items = $state<WorkshopStory[]>([]), total = $state(0), offset = $state(0), loading = $state(true), error = $state('');
   let deletion = $state<WorkshopStory | null>(null), deleting = $state(false), deleteError = $state('');
-  let recent = $state<{ stories: { storyId:string; title:string; started:number; outcome:string|null; mode:string }[]; people: { nickname:string; started:number }[] }>({ stories: [], people: [] });
+  let recent = $state<{ stories: { storyId:string; title:string; started:number; outcome:string|null; mode:string }[]; history: { id:string; title:string; version:number; mode:string; started:number; status:string }[]; people: { nickname:string; started:number }[] }>({ stories: [], history: [], people: [] });
   let settingsOpener = $state<HTMLButtonElement>();
   let disposed = false;
   onDestroy(() => { disposed = true; });
@@ -52,6 +52,8 @@
   <div class="page-heading"><div><p class="eyebrow">MY ACCOUNT</p><h1 class="heading-one">{label('마이페이지', 'My page')}</h1><p class="muted">{me.nickname} · {accountType === 'google' ? 'GOOGLE' : 'GUEST'}</p></div><Button variant="secondary" onclick={onWorkshop}>{label('창작마당으로', 'Workshop')} ↗</Button></div>
   {#if accountType === 'google'}<section class="panel"><h2 class="heading-two">{label('친구', 'Friends')}</h2>{#key me.id}<FriendsPanel {locale} {onAuthLost} accountId={me.id} />{/key}</section>{/if}
   <Panel><h2 class="heading-two">{label('최근 활동', 'Recent activity')}</h2>
+    <h3>{label('내 플레이 기록', 'My play history')}</h3>
+    {#if recent.history.length}<ul>{#each recent.history as play (play.id)}<li><div><strong>{play.title} <span class="muted">v{play.version}</span></strong><p class="muted">{play.mode === 'multiplayer' ? label('함께 플레이', 'Multiplayer') : label('혼자 플레이', 'Solo')} · {play.status === 'in_progress' ? label('이어하기 가능', 'Ready to resume') : play.status === 'ending' ? label('결말 확인 대기', 'Ending pending') : play.status === 'completed' ? label('완료', 'Completed') : play.status === 'failed' ? label('실패', 'Failed') : label('중단', 'Abandoned')}</p></div></li>{/each}</ul>{:else}<p class="muted">{label('플레이 기록이 없어요.', 'No play history yet.')}</p>{/if}
     <h3>{label('최근 본 작품', 'Recently played stories')}</h3>
     {#if recent.stories.length}<ul>{#each recent.stories as story (story.storyId + story.started)}<li><div><strong>{story.title}</strong><p class="muted">{story.mode === 'multiplayer' ? label('함께 플레이', 'Multiplayer') : label('혼자 플레이', 'Solo')} · {story.outcome === 'completed' ? label('완료', 'Completed') : label('진행 기록', 'Play record')}</p></div></li>{/each}</ul>{:else}<p class="muted">{label('최근 플레이 기록이 없어요.', 'No recent play history yet.')}</p>{/if}
     <h3 class="mt-5">{label('최근 함께한 사람', 'Recently played with')}</h3>
