@@ -25,6 +25,9 @@
   let now=$state(Date.now());
   let clueQuery = $state("");
   let clueSort = $state<"latest" | "oldest">("latest");
+  let notes = $state("");
+  let noteStorageAvailable = $state(true);
+  const noteKey = $derived(`eniveil:private-note:${session.id}`);
   let clueLibrary = $derived(
     session.clues
       .map((text, index) => ({ id: index, name: `단서 ${index + 1}`, text, acquiredOrder: index + 1 }))
@@ -33,6 +36,13 @@
   );
   onMount(()=>{const timer=setInterval(()=>now=Date.now(),1000);return()=>clearInterval(timer);});
   onMount(()=>{tracker=playTracker(session.id);tracker.stage(session.phase);return()=>tracker?.stop();});
+  onMount(() => { try { notes = localStorage.getItem(noteKey) ?? ""; } catch { noteStorageAvailable = false; } });
+  $effect(() => {
+    const key = noteKey, value = notes;
+    if (!noteStorageAvailable) return;
+    try { if (value) localStorage.setItem(key, value); else localStorage.removeItem(key); }
+    catch { noteStorageAvailable = false; }
+  });
   $effect(()=>{tracker?.stage(session.phase);});
 </script>
 
@@ -197,6 +207,15 @@
           {/each}
         </Panel>
       {/if}
+      <Panel>
+        <p class="eyebrow">PRIVATE NOTES</p>
+        <h3 class="heading-three">개인 추리 메모</h3>
+        <p class="fine">이 메모는 이 기기의 브라우저에만 저장되며 다른 참가자나 서버에 전송되지 않아.</p>
+        <label class="sr-only" for="private-notes">개인 추리 메모</label>
+        <textarea id="private-notes" class="input mt-3 w-full" bind:value={notes} maxlength="3000" rows="8" placeholder="의심 인물, 알리바이, 확인할 단서를 적어 보세요." />
+        <div class="mt-2 flex items-center justify-between gap-2"><span class="fine">{notes.length} / 3000</span>{#if noteStorageAvailable}<span class="fine" role="status">자동 저장됨</span>{:else}<span class="fine" role="alert">브라우저 저장소를 사용할 수 없어.</span>{/if}</div>
+        <Button class="mt-3" variant="text" disabled={!notes} onclick={() => { notes = ""; }}>메모 지우기</Button>
+      </Panel>
       <Panel>
         <h3 class="heading-three">다음 진행</h3>
         {#if host}
